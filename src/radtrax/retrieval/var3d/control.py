@@ -27,14 +27,15 @@ We rely on :func:`gaussx.cholesky` to produce ``U`` as a structured operator,
 so the whitening cost stays ``O(B-solve)`` rather than ``O(N²)`` for any of
 the structured ``B`` flavours in :mod:`.background`.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/control.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/control.py``); its frozen
+dataclasses became Equinox modules in radtrax#58.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import equinox as eqx
 import gaussx as gx
 import jax
 import jax.numpy as jnp
@@ -50,8 +51,7 @@ else:
 # ── identity ────────────────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class IdentityTransform:
+class IdentityTransform(eqx.Module):
     """Pass-through transform. Use when the prior is already well-conditioned
     *or* when you want the textbook ``½ δxᵀ B⁻¹ δx`` form for didactic clarity.
     """
@@ -69,8 +69,7 @@ class IdentityTransform:
 # ── whitening (Cholesky CVT) ────────────────────────────────────────────────
 
 
-@dataclass(frozen=True)
-class WhiteningTransform:
+class WhiteningTransform(eqx.Module):
     """``δx = U ξ`` where ``B = U Uᵀ``.
 
     Constructed once via :meth:`from_background`; afterwards each call is a

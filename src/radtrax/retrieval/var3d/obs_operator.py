@@ -30,15 +30,16 @@ The factory :meth:`RadianceObservationModel.from_lut` precomputes ``a(ν)`` once
 from the HAPI cross-section LUT so the per-iteration cost in 3D-Var is dominated
 by the cube-shaped operations (PSF, GSD, SRF).
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/obs_operator.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/obs_operator.py``); its frozen
+dataclasses became Equinox modules in radtrax#58.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -56,8 +57,7 @@ if TYPE_CHECKING:
     from radtrax.instrument.srf import SpectralResponseFunction
 
 
-@dataclass(frozen=True)
-class RadianceObservationModel:
+class RadianceObservationModel(eqx.Module):
     """Bundle of precomputed pieces that defines the forward operator H.
 
     Attributes
@@ -68,8 +68,9 @@ class RadianceObservationModel:
         forward map is just ``L_hr(i,j,ν) = exp(-a(ν) · ΔVMR(i,j))``.
     srf_matrix : jnp.ndarray
         L1-normalised SRF matrix, shape ``(n_bands, n_lambda)``.
-    vmr_reference : float
-        Background VMR ``x_ref`` around which radiances are normalised. Setting
+    vmr_reference : Array
+        Scalar background VMR, stored as an array so it is traced, not static,
+        under ``eqx.filter_jit`` and differentiable with ``eqx.filter_grad``. Background VMR ``x_ref`` around which radiances are normalised. Setting
         ``vmr_reference = 0`` recovers absolute Beer-Lambert; setting it to the
         scene's true background produces the differential signal that matched
         filter retrievals consume.
@@ -81,15 +82,20 @@ class RadianceObservationModel:
 
     absorption_coeff_hr: jax.Array
     srf_matrix: jax.Array
-    vmr_reference: float = 0.0
+    vmr_reference: jax.Array
     psf: PointSpreadFunction | None = None
     gsd: GroundSamplingDistance | None = None
-    n_lambda: int = field(init=False)
-    n_bands: int = field(init=False)
 
-    def __post_init__(self) -> None:
-        a = jnp.asarray(self.absorption_coeff_hr)
-        s = jnp.asarray(self.srf_matrix)
+    def __init__(
+        self,
+        absorption_coeff_hr: jax.Array,
+        srf_matrix: jax.Array,
+        vmr_reference: float | jax.Array = 0.0,
+        psf: PointSpreadFunction | None = None,
+        gsd: GroundSamplingDistance | None = None,
+    ) -> None:
+        a = jnp.asarray(absorption_coeff_hr)
+        s = jnp.asarray(srf_matrix)
         if a.ndim != 1:
             raise ValueError(
                 f"RadianceObservationModel: absorption_coeff_hr must be 1-D, "
@@ -100,11 +106,23 @@ class RadianceObservationModel:
                 f"RadianceObservationModel: srf_matrix shape {s.shape} does not "
                 f"align with absorption_coeff_hr (n_lambda={a.size})."
             )
-        # Frozen dataclass: bypass __setattr__ for derived fields.
-        object.__setattr__(self, "absorption_coeff_hr", a)
-        object.__setattr__(self, "srf_matrix", s)
-        object.__setattr__(self, "n_lambda", int(a.size))
-        object.__setattr__(self, "n_bands", int(s.shape[0]))
+        self.absorption_coeff_hr = a
+        self.srf_matrix = s
+        # An array, not a Python float: a float field is static under
+        # eqx.filter_jit, so a new value would recompile and get no gradient.
+        self.vmr_reference = jnp.asarray(vmr_reference, dtype=a.dtype)
+        self.psf = psf
+        self.gsd = gsd
+
+    @property
+    def n_lambda(self) -> int:
+        """Number of high-resolution spectral samples."""
+        return int(self.absorption_coeff_hr.shape[-1])
+
+    @property
+    def n_bands(self) -> int:
+        """Number of sensor bands."""
+        return int(self.srf_matrix.shape[-2])
 
     # ── factory ──────────────────────────────────────────────────────────────
 
@@ -161,7 +179,7 @@ class RadianceObservationModel:
         return cls(
             absorption_coeff_hr=jnp.asarray(a),
             srf_matrix=jnp.asarray(srf.matrix),
-            vmr_reference=float(vmr_reference),
+            vmr_reference=vmr_reference,
             psf=psf,
             gsd=gsd,
         )
@@ -206,13 +224,17 @@ class RadianceObservationModel:
         return jnp.einsum("bl, ijl -> ijb", self.srf_matrix, L_hr)
 
     def make_forward(self, *, linear: bool = False) -> Callable[[jax.Array], jax.Array]:
-        """Return a closure that captures the model so it can be ``jit``-compiled.
+        """Return a closure ``vmr_field → obs`` with the model captured.
 
-        ``jax.jit(model.forward)`` works in JAX ≥ 0.4 because frozen dataclasses
-        without ``register_pytree_node_class`` are hashable and become static
-        arguments — but explicit closures are easier to compose with
-        ``jax.value_and_grad`` and friends, and they work uniformly across
-        JAX versions.
+        The closure composes directly with ``jax.value_and_grad`` and the
+        optimisers, which differentiate with respect to the state only. To
+        differentiate with respect to the model itself (its SRF, its PSF
+        kernel), pass the model as an argument instead:
+        ``eqx.filter_grad(lambda m, x: loss(m.forward(x)))``.
+
+        ``jax.jit(model.forward)`` no longer works: the model holds arrays, so
+        it is not hashable (it was a hashable frozen dataclass in plumax). Use
+        ``eqx.filter_jit(model.forward)`` or ``jax.jit(model.make_forward())``.
         """
         linear_flag = bool(linear)
 
