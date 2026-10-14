@@ -123,8 +123,9 @@ Everything composes because it keeps these contracts.
 - **`vmap` outside `jacrev`.** A swath is a `filter_vmap` over pixels of a
   per-pixel Jacobian, never a Jacobian of a batch.
 - **Gradients are tested.** Every public differentiable function has a test
-  comparing `jax.jacrev` against central finite differences (the
-  gradient-check harness, issue #19).
+  comparing `jax.jacrev` against central finite differences:
+  `from _gradcheck import assert_gradients_match` in a test module
+  (`tests/_gradcheck.py`; rtol 1e-6 on a float64 reduced state by default).
 
 ### 2. Numerics
 
@@ -168,6 +169,7 @@ docstring before changing what it checks.
 | `tests/conftest.py` | Float64 is on for the whole suite |
 | `--doctest-modules` on `src/radtrax` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
 | `tests/test_exceptions.py` | The hierarchy: every error is a `RadtraxError` |
+| `tests/test_gradcheck.py` | The gradient-check harness rejects a 1 % wrong derivative, including on an entry 1e-4 of the Jacobian's scale, and accepts correct ones |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
 | `[tool.coverage.report] fail_under = 90` | Coverage of `src/radtrax` in every coverage-enabled run (CI, `make test-cov`) |
 | `strict_markers = true` | Only the registered tier markers (`slow`, `integration`) exist |
