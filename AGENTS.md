@@ -29,7 +29,7 @@ the layout drifts:
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
 | `atmosphere/` | `AtmosphericState`, AFGL profiles, hydrostatics | Wave 3 |
-| `spectroscopy/` | cross-section tables; `hitran/` builds them (`[hitran]`) | Wave 1 |
+| `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
 | `instrument/` | SRF band integration, PSF and ground sampling | Wave 1 |

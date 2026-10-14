@@ -46,7 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 # HITRAN cross-section tables through HAPI (offline table building).
-hitran = []
+hitran = ["hitran-api"]
 # GeoTensor operators (radtrax.geo): geotoolz, georeader.
 geo = []
 # scikit-learn background estimators for the matched filter.
@@ -145,6 +145,14 @@ docstring-code-line-length = 72
 
 [tool.ty.environment]
 python-version = "3.12"
+
+# ty does not see optional extras (`hapi` behind `[hitran]`) and narrows
+# xarray/numpy unions too aggressively; plumax downgrades the same rules for
+# the code ported from it. Add a rule here only with the reason it is a false
+# positive; the test suite is the correctness gate.
+[tool.ty.rules]
+unresolved-import = "ignore"
+unresolved-attribute = "ignore"
 
 [tool.pytest.ini_options]
 # `src/radtrax` is a testpath so that --doctest-modules collects the
