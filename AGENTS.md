@@ -4,57 +4,55 @@ Standing instructions for **every** coding agent working in this repository
 (Claude Code, Copilot, Codex, Gemini, …). This is the single source of truth:
 `CLAUDE.md` and `.github/copilot-instructions.md` point here.
 
-> **This repository is a template.** Passages that describe the bundled
-> example package, `radtrax`, start with a `<!-- template-example: … -->`
-> comment (`# template-example: …` in code and config). Each marker covers
-> the section it opens, down to the next heading of the same level, unless
-> it names a smaller scope. Marked passages are true of the example and must
-> be rewritten from your own code when you adopt the template (the
-> `adopt-template` skill walks through it; `grep -rn "template-example" .`
-> lists them). Everything unmarked is a permanent rule.
-
 ## What this repo is
 
-<!-- template-example: describe your package and its module map. -->
+`radtrax` (formerly rtmx) is the GeoStack's differentiable radiative transfer
+package for methane and multi-gas remote sensing: a forward model
+$y = F(x)$ from an atmospheric state to what a sensor measures, written in
+JAX and Equinox so that every Jacobian a retrieval needs,
+$K = \partial F / \partial x$, comes from automatic differentiation. The
+design is *radtrax · 3* in the GeoStack docs
+(`docs/geomodels/radtrax/03_design.md` in jejjohnson/geostack); the moves
+into it are *package boundaries* (`docs/geomodels/package_boundaries.md`).
 
-An opinionated Python package template (Python 3.12+, uv, ruff, ty, pytest,
-mystmd and MkDocs, release-please) that ships a real worked example,
-`radtrax`: a **dependency-free** library of descriptive statistics,
-smoothing filters and composable transforms over one-dimensional numeric
-series, with an `argparse` console script. It exists so every tool here has
-real code to operate on: mkdocstrings renders its docstrings, ty checks its
-annotations, the coverage gate measures its branches, and every docstring
-example runs as a doctest.
+Other packages build on it (plumax first), so **the package is a library of
+primitives**: new code composes what is here, and anything new lands where
+the next person will find and reuse it.
 
-People build on a package like this, so **the package is a library of
-primitives**: new code composes what is here, and anything genuinely new
-lands where the next person will find and reuse it.
+It is one package, `src/radtrax/`. The public API is `radtrax.__all__`,
+re-exported from `src/radtrax/__init__.py`. Today it holds only the
+exception base; the subpackages arrive in the order of the backlog
+(issues #1–#4 are the wave epics):
 
-It is one package, `src/radtrax/`. The public API is
-`radtrax.__all__`, re-exported from `src/radtrax/__init__.py`, plus the
-`radtrax.cli` module (`main`, `build_parser`). Imports only point down
-this table:
-
-| Module | Owns |
-|---|---|
-| `_typing.py` | PEP 695 `type Series = Sequence[float]`; the runtime-checkable `Transform` and `Fittable` protocols |
-| `exceptions.py` | `RadtraxError` and its subclasses `ValidationError` (also a `ValueError`), `EmptySeriesError`, `NotFittedError` (also a `RuntimeError`) |
-| `utils.py` | The boundary validators `as_floats`, `require_non_empty`, `require_positive`; the generic `Window[T]` ring buffer; `timer` / `Elapsed` |
-| `stats.py` | `summarize` → frozen `Summary`, `quantile`, `zscores`, streaming `RunningStats` (Welford) |
-| `smoothing.py` | `moving_average`, `exponential_moving_average`, `median_filter`, the `Padding` boundary strategies |
-| `transforms.py` | `Standardize`, `MinMaxScale` (fitted), `Clip`, `MovingAverage` (stateless), `Pipeline`, `chain` |
-| `cli.py` | The `radtrax` console script (`summarize`, `smooth` subcommands), wired through `[project.scripts]` |
+| Module | Owns | Lands in |
+|---|---|---|
+| `exceptions.py` | `RadtraxError`, the base of every error | now |
+| `atmosphere/` | `AtmosphericState`, AFGL profiles, hydrostatics | Wave 3 |
+| `spectroscopy/` | cross-section tables; `hitran/` builds them (`[hitran]`) | Wave 1 |
+| `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
+| `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
+| `instrument/` | SRF band integration, PSF and ground sampling | Wave 1 |
+| `slab/` | plumax's single-slab models, kept as v0's regression oracle | Wave 1 |
+| `retrieval/` | `matched_filter/` (the one core), `var3d/` (3D-Var) | Wave 1 |
+| `geo/` | GeoTensor operators and SBMP (`[geo]`) | Wave 2 |
 
 ### Boundaries
 
-<!-- template-example: this list only; replace it with your runtime dependencies, who builds on the package, and what it must never import. -->
+These are the package-boundaries rules that apply here; break one and the
+GeoStack package graph gets a cycle.
 
-- **No runtime dependencies** (`dependencies = []` in `pyproject.toml`):
-  everything is the standard library. A new runtime dependency needs
-  discussion; an optional one goes behind an extra and an in-function import
-  that names the extra when it is missing.
-- **The CLI is a thin shell.** `cli.py` parses arguments and formats output;
-  the computation lives in the library modules, which never import `cli`.
+- **radtrax never imports plumax**, not even lazily. Radiative transfer does
+  not know about plumes; plumax's plume-to-radiance coupling imports radtrax.
+- **No GeoModels or GeoML package below it.** radtrax builds on Numerics
+  (gaussx, lineax, optimistix) and, through extras, GeoStack (geotoolz,
+  georeader). finitevolx, spectraldiffx and somax are not dependencies: a
+  layer grid is three arrays and a band integration is a matrix product.
+- **Geo carriers arrive through extras.** `radtrax[geo]` adds geotoolz and
+  georeader; the base install stays JAX-only. Code in `geo/` imports only
+  public geotoolz names, never `geotoolz._src`.
+- **Optional dependencies are lazy.** Anything behind an extra (`hitran`,
+  `geo`, `cluster`, `bayes`) is imported inside the function that needs it,
+  and a missing extra raises an `ImportError` that names the extra.
 
 Whatever the package, dependencies point one way. When other projects build
 on it, list them here and keep their imports working: a rename or removal of
@@ -63,155 +61,113 @@ a public name goes through a deprecation (the old name keeps working with a
 
 ## What it is built on
 
-<!-- template-example: one row per library your package uses, with the rule it brings. -->
-
-Each foundation brings a rule. Breaking one runs fine on your example and
-fails in someone else's pipeline or in CI.
+Each foundation brings a rule. Breaking one runs fine on one pixel and fails
+on a swath, under `jit` or in CI.
 
 | Foundation | The package uses it for | The rule it brings |
 |---|---|---|
-| **Python ≥ 3.12 standard library** | PEP 695 `type` aliases and generics (`class Window[T]`), `typing.Self`, `enum.StrEnum`, `math.fsum`, `statistics.median` | No runtime dependency for what the standard library already does. |
-| **`dataclasses`** | `Summary`, every transform, `RunningStats`, `Elapsed` | `slots=True` always; `frozen=True` for values and stateless objects; a fitted transform keeps what it learned in `init=False` fields with a trailing underscore (`mean_`) defaulting to `None`; validation in `__post_init__`. |
-| **`typing.Protocol`** (`runtime_checkable`) | `Transform`, `Fittable` | Structural, not nominal: no base class, no registry. `isinstance` only checks that the attribute exists, so code that relies on a protocol also checks the attribute is callable (as `Pipeline.__post_init__` does). |
-| **`argparse`** | `radtrax.cli` | Output goes to the injected streams, `main` returns an exit status instead of calling `sys.exit`. |
-| **pytest + `--doctest-modules`** | The suite and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
+| **JAX** | every forward model and its derivatives | Pure functions of arrays; no Python side effects or data-dependent Python control flow inside traced code. Float64 for spectroscopy (`jax_enable_x64`; `tests/conftest.py` sets it). |
+| **Equinox** | modules for state (tables, SRFs, profiles, noise models) | Arrays are leaves, never `eqx.field(static=True)` (Equinox warns and hashing breaks under `filter_jit`); choose what is not differentiated with `eqx.partition` or `jax.lax.stop_gradient`. |
+| **jaxtyping** | shape annotations on every public array argument | Name dimensions once and reuse them: `L` layers, `G` wavenumbers, `B` bands, `N` pixels. |
+| **lineax**, **optimistix** | linear solves, fixed points, Gauss–Newton and Levenberg–Marquardt with `ImplicitAdjoint` | Use them rather than hand-written iterations; JAXopt is unmaintained. |
+| **gaussx** | structured covariances (`LowRankUpdate`, Woodbury), block-tridiagonal solves | A structured operator, never a dense inverse; `gx.solve` dispatches on structure. |
+| **NumPy**, **xarray** | offline table building and I/O | Off the gradient path only; nothing differentiable is NumPy. |
 
 ## Reuse before you write
 
-Before writing a helper, a validator, a statistic, a filter or a transform,
-find out whether it exists:
+Before writing a helper, a solver or a covariance, find out whether it
+exists:
 
 1. **Search the capability index.**
    [`docs/api/capabilities.md`](docs/api/capabilities.md) lists every
-   public name once, at its public home, grouped by the module that defines
-   it, with a one-line summary. It is generated (`make capabilities`) and
-   checked by `tests/test_capabilities.py`, so it is current.
-2. **Search the private helpers** in the table below: several invariants
-   live in exactly one place each.
+   public name once, at its public home, with a one-line summary. It is
+   generated (`make capabilities`) and checked by
+   `tests/test_capabilities.py`, so it is current.
+2. **Search the stack.** Much of radtrax is ported, not written: plumax's
+   `radtran`, `hapi_lut`, `assimilation` and `matched_filter`, and geotoolz's
+   `matched_filter` and `plume.SBMP`. Port with tests, do not rewrite.
 3. **If it is missing, add it to the module that owns the concept**, at the
    lowest layer every caller can reach, not inline in the one caller you
-   have today; a helper two modules need goes into `utils.py`.
+   have today.
 4. **One object, one name.** A name means one thing across the package and
    its submodules (`tests/test_capabilities.py`); a deliberate exception is
    listed with its reason in `ALLOWED_SHARED_NAMES` in
    `scripts/capabilities.py`.
 
-<!-- template-example: this table maps hand-rolled code to the example's names; rebuild it for your package. -->
-
 | You are about to write… | Use instead |
 |---|---|
-| `[float(v) for v in series]`, an emptiness check, an `if window <= 0` guard | `as_floats`, `require_non_empty`, `require_positive` (`radtrax.utils`); they raise `ValidationError` / `EmptySeriesError` with the uniform `'name' must …` message |
-| A mean, variance, min / max or median loop | `summarize` (→ `Summary`, with `std`, `spread`, `to_dict()`); `quantile`; `zscores`; one value at a time, `RunningStats` |
-| `math.fsum(values) / len(values)` that must survive overflow | `stats._mean` (rescales by a power of two when the sum overflows) |
-| A rolling mean, rolling median or exponential smoother | `moving_average`, `median_filter`, `exponential_moving_average` |
-| Padding a series at its ends | the `Padding` strategies (`edge`, `zero`, `reflect`, `none`) through `smoothing._pad`, `_reflect_index`; `_validate_window`, `_as_padding` for the arguments |
-| A `collections.deque(maxlen=…)` buffer | `Window[T]` |
-| `(x - mean) / std`, min–max scaling, clamping | `Standardize` (with `inverse`), `MinMaxScale`, `Clip` |
-| A list of steps applied in order, a base class for "things with `apply`" | `Pipeline`, `chain`, a pipeline composed with the `or` operator (`Pipeline.__or__`); satisfy the `Transform` protocol structurally |
-| A new exception for bad input or a missing `fit` | `ValidationError`, `EmptySeriesError`, `NotFittedError` |
-| `time.perf_counter()` bookkeeping | `timer()` → `Elapsed` |
-| Reading numbers from a file or stdin for the CLI, a non-negative-int option | `cli._read_values` (finite values only), `cli._non_negative_int` |
+| `jnp.linalg.inv(S) @ v`, a Woodbury identity by hand | `gaussx` operators and `gx.solve` |
+| A Gauss–Newton or Levenberg–Marquardt loop | `optimistix.GaussNewton` / `LevenbergMarquardt` (`ImplicitAdjoint`) |
+| A fixed-point iteration | `optimistix.FixedPointIteration` |
+| L-BFGS for a MAP retrieval | `optax.lbfgs` (`[bayes]`) |
+| A tridiagonal or block-tridiagonal solve | `lineax` (scalar bands) or `gaussx.BlockTriDiag` (blocks) |
+| A Jacobian written by hand | `jax.jacrev` / `jax.jacfwd`; keep a hand Jacobian only as a test oracle |
+| A loop over pixels | `eqx.filter_vmap` outside `jax.jacrev` |
 
 ## The contracts
 
-<!-- template-example: the contracts below are the example's extension points; replace them with your package's. -->
+Everything composes because it keeps these contracts.
 
-Everything composes because it keeps these contracts; the tests in "What
-enforces them" check most of them.
+### 1. Forward-model components
 
-### 1. Public functions
+- **Modules carry state; functions carry transforms.** A table, a line
+  list, an SRF or a noise covariance is an `eqx.Module`; a Voigt profile, a
+  Chapman factor or a delta-M scaling is a function.
+- **Protocols at the seams.** `OpacityProvider`, `RTSolver`, `Surface`,
+  `Instrument` and `NoiseModel` are abstract Equinox modules
+  (`eqx.AbstractVar` and `eqx.abstractmethod` on the base, concrete fields
+  on the subclass), so `filter_jit` compiles each combination.
+- **`vmap` outside `jacrev`.** A swath is a `filter_vmap` over pixels of a
+  per-pixel Jacobian, never a Jacobian of a batch.
+- **Gradients are tested.** Every public differentiable function has a test
+  comparing `jax.jacrev` against central finite differences (the
+  gradient-check harness, issue #19).
 
-- **Validate once, at the boundary.** A public function coerces and checks
-  its inputs through the `utils` validators (`require_non_empty(series)`,
-  `require_positive(window, name="window")`) and raises `ValidationError`
-  (or `EmptySeriesError`) whose message names the argument:
-  `'window' must be a positive integer, got 0`. Internal helpers assume
-  well-formed data.
-- **Pure.** Return a **new** `list[float]` and never mutate the input (the
-  `SMOOTHERS` tests in `tests/test_smoothing.py`, `test_does_not_mutate_input`
-  in the stats and transforms tests). Any `collections.abc.Sequence` of
-  numbers is accepted (`Series`).
-- **Honest numerics.** `math.fsum` for sums; an overflow becomes `inf`, not an
-  exception, when the true result is not representable (see `summarize`);
-  degenerate input (a constant series to standardise, `ddof` ≥ the count)
-  raises `ValidationError` rather than returning `nan`.
-- **Documented.** Google-style docstring with the formula (`$…$` / `$$…$$`,
-  rendered by MathJax in the API reference), `Args:`, `Returns:`, `Raises:`
-  and an executable `Examples:` block.
+### 2. Numerics
 
-### 2. Transforms
+- **Float64** for line-by-line and table opacity; float32 moves line
+  centres by a visible fraction of a Doppler width.
+- **No NaN gradients from safe values.** A branch that is 0/0 at a point
+  (e.g. $\mu = \mu_0$) uses the double-where pattern: a safe denominator in
+  the branch not taken, or `jnp.where` still propagates the NaN.
+- **Units in names or docstrings**: wavenumbers in cm⁻¹, columns in
+  molecules/cm² or kg/m², pressures in Pa unless the name says otherwise.
 
-- A transform satisfies `Transform`: `apply(series) -> list[float]`,
-  returning a new list. No base class.
-- **Stateless** (`Clip`, `MovingAverage`): `@dataclass(frozen=True,
-  slots=True)`; `fit` returns `self` unchanged; `fit_apply` is `apply`.
-- **Fitted** (`Standardize`, `MinMaxScale`): `@dataclass(slots=True)`;
-  learned state in `init=False` trailing-underscore fields defaulting to
-  `None`; `fit(series)` validates, sets them and returns `self` (so it
-  chains); `apply` before `fit` raises `NotFittedError("<Name> is not
-  fitted; call .fit(series) first")`, never a silent identity; `fit_apply`
-  is `fit(series).apply(series)`.
-- Constructor arguments that can be checked without data are validated in
-  `__post_init__` (`ValidationError`), as `MinMaxScale`, `Clip` and
-  `MovingAverage` do; the rest are checked by `fit`.
-- `Pipeline` fits each step on the previous step's output, calls `fit` only
-  when the step has a callable one, and rejects a step without a callable
-  `apply`; `|` returns a new pipeline.
-
-### 3. The CLI
-
-- A subcommand is a subparser in `build_parser()` plus a
-  `_run_<name>(args, out, stdin) -> int` handler registered in the
-  `handlers` dict in `main`.
-- Write only to the injected `out` stream; read numbers through
-  `_read_values`; validate options with an `argparse` `type=` (as
-  `_non_negative_int` does), so a bad option is a usage error (exit 2).
-- Library errors propagate as `RadtraxError`, which `main` reports as
-  `error: …` on `err` with exit status 1 (`EXIT_ERROR`); `OSError` likewise.
-  Never call `sys.exit` or `print` in a handler.
-
-### 4. Exceptions
+### 3. Exceptions
 
 - Every error derives from `RadtraxError` **and** the closest
   standard-library exception, so `except ValueError` keeps working. A new
-  error goes into `exceptions.py`, is exported, and joins the parametrised
-  lists in `tests/test_exceptions.py`.
+  error goes into `exceptions.py`, is exported, and is tested in
+  `tests/test_exceptions.py`.
 
 ### The public API
 
 - Export a public name from its module's `__all__` and from
   `src/radtrax/__init__.py` (import and `__all__`); both stay sorted (ruff's
   `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
-- A new module declares a sorted `__all__`, joins `SUBMODULES` in
+- A new top-level module declares a sorted `__all__`, joins `SUBMODULES` in
   `tests/test_public_api.py`, and gets its own page in `docs/api/` (a
   `::: radtrax.<module>` block), a `nav` entry in `mkdocs.yml` and a row in
-  `docs/api/index.md`; a name on an existing module's page is picked up by
-  its `:::` block.
+  `docs/api/index.md`.
 - Run `make capabilities` after any public API change.
-- Link prose to the API by the **top-level** name
-  (``[`summarize`](xref:api#radtrax.summarize)``), see "Documentation".
+- Link prose to the API by the **top-level** name, see "Documentation".
 
 ## What enforces them
 
 Most rules here are tests, so CI tells you when one breaks. Read a test's
 docstring before changing what it checks.
 
-<!-- template-example: the test files and registries are the example's; list your own. -->
-
 | Test | Enforces |
 |---|---|
 | `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
+| `tests/conftest.py` | Float64 is on for the whole suite |
 | `--doctest-modules` on `src/radtrax` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
-| `tests/test_smoothing.py` (`SMOOTHERS`) | Smoothers never mutate their input, return a new list, leave constants unchanged |
-| `tests/test_transforms.py` (`TestProtocols`, `TestPipeline`) | Every transform satisfies `Transform` (fitted ones `Fittable`); `NotFittedError` before `fit`; sequential fitting; no mutation |
-| `tests/test_exceptions.py` | The hierarchy: every error is a `RadtraxError` and its stdlib base |
-| `tests/test_cli.py` | Injected streams, exit codes 0 / 1 / 2, finite-only input, the `[project.scripts]` entry point |
+| `tests/test_exceptions.py` | The hierarchy: every error is a `RadtraxError` |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
-| `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its quoted numbers hold; every name the plugin skill and reviewer mention exists |
 | `[tool.coverage.report] fail_under = 90` | Coverage of `src/radtrax` in every coverage-enabled run (CI, `make test-cov`) |
 | `strict_markers = true` | Only the registered tier markers (`slow`, `integration`) exist |
-| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `src/radtrax` and `scripts` |
+| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo), format, types on `src/radtrax` and `scripts` |
 
 ## Recipes
 
@@ -220,32 +176,22 @@ Step-by-step recipes for the common jobs live as plain Markdown in
 agent can read and follow them), and two read-only review checklists in
 `.claude/agents/`:
 
-<!-- template-example: this table only; `add-function`, `add-transform`, `add-cli-command` and `radtrax-review` are the example package's, replace them with your extension points. -->
-
 | Job | Recipe |
 |---|---|
-| Turn a fresh copy of the template into your project | `adopt-template` |
-| Add a public function, class or module | `add-function` |
-| Add a transform (the `Transform` protocol) | `add-transform` |
-| Add a CLI subcommand or option | `add-cli-command` |
 | Add or update a guide page (MyST prose) | `add-guide-page` |
 | Add or update an example notebook | `add-notebook` |
 | Verify before a PR | `pre-pr-check` |
-| Review a change | `radtrax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
+| Review a change | `radtrax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `numerics-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
-<!-- template-example: this paragraph only; the plugin describes the example package. -->
+Recipes for radtrax's extension points (a new opacity provider, solver,
+surface or instrument) arrive with their protocols in Wave 3.
 
-Downstream users get the package's guidance through the Claude Code plugin
-in `plugins/radtrax/` (published by `.claude-plugin/marketplace.json`) and
-`docs/llms.txt` (copied to the site root by `ROOT_FILES` in
-`scripts/build_docs.py`); see `docs/agents.md`. When the public API or the
-headline usage changes, update
-`plugins/radtrax/skills/series-analysis-with-radtrax/` too:
-`tests/test_plugin_skill.py` runs its worked example, checks the numbers its
-prose quotes, and checks that every `mp.X` / `radtrax.X` it and the plugin
-reviewer name still exists.
+Downstream users get the package's guidance through `docs/llms.txt`
+(copied to the site root by `ROOT_FILES` in `scripts/build_docs.py`); update
+it when the public API or the headline usage changes. A Claude Code plugin
+for downstream packages follows once the public API exists.
 
 ## Working in the repo
 
@@ -272,7 +218,7 @@ make build                # wheel + sdist into dist/
 so pass `--no-cov` when running part of the suite:
 
 ```bash
-uv run pytest --no-cov tests/test_stats.py::TestSummarize::test_known_values -v
+uv run pytest --no-cov tests/test_exceptions.py -v
 ```
 
 ### Test tiers
@@ -293,13 +239,11 @@ give them a CI job of their own rather than dropping them.
 
 ### Tests that assert on random draws
 
-<!-- template-example: this paragraph only. The example draws no random numbers; its tests use fixed fixtures in tests/conftest.py. -->
-
-`radtrax` draws no random numbers; its tests use the fixed series in
-`tests/conftest.py`.
+radtrax draws no random numbers yet. When it does, randomness comes from a
+`jax.random` key the caller passes; nothing seeds a global state.
 
 - **Incidental randomness** (any draw would do): seed it
-  (`random.Random(0)`, `numpy.random.default_rng(0)`, a fixed key) so a
+  (`jax.random.key(0)`, `numpy.random.default_rng(0)`) so a
   failure reproduces.
 - **Sampling behaviour under test** (a Monte Carlo estimate, a statistical
   property): bound the statistic by its own sampling distribution (a number
@@ -354,7 +298,7 @@ the code; when you fix a bug or add a feature, add the test that checks it.
   affects a shared branch.
 - Commit messages and PR titles follow
   [Conventional Commits](https://www.conventionalcommits.org/) with a
-  lowercase subject (`feat(stats): add …`); CI validates PR titles
+  lowercase subject (`feat(spectroscopy): add …`); CI validates PR titles
   (`conventional-commits.yml`). Types: `feat`, `fix`, `docs`, `style`,
   `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. Breaking
   changes use `!` and a `BREAKING CHANGE:` footer.
@@ -421,8 +365,8 @@ clone of the theme.
 - **Prose is MyST Markdown**, not MkDocs-Material syntax: `:::{note}`,
   `:::{tab-set}`, `:::{dropdown}` directives, not `!!!` / `===` / `???`.
 - **Link to the API** with the `xref:` protocol and the **top-level**
-  exported name: ``[`summarize`](xref:api#radtrax.summarize)``, not
-  `radtrax.stats.summarize` (mystmd lowercases `$`-abbreviated anchors;
+  exported name: ``[`RadtraxError`](xref:api#radtrax.RadtraxError)``, not
+  `radtrax.exceptions.RadtraxError` (mystmd lowercases `$`-abbreviated anchors;
   see `docs/README.md`). A missing target fails `myst build --strict`.
 - **URLs are flat**: a page's URL is its basename, with `_` turned into `-`
   (`guide/quickstart.md` → `/quickstart/`,

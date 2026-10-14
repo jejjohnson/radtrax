@@ -1,26 +1,24 @@
 ---
 name: radtrax-review
-description: Review a change or pull request in this repository against its own rules — CODE_REVIEW.md, the contracts in AGENTS.md, reuse of what the package already provides, and correctness at the boundaries (validation, mutation, the fit / apply lifecycle, numeric edge cases, doctest accuracy). Use when asked to review a diff, branch or PR in this repo.
+description: Review a change or pull request in radtrax against its own rules — CODE_REVIEW.md, the contracts in AGENTS.md, reuse of what the stack already provides, and numerical correctness (pytrees, gradients, precision, batching, units, package boundaries). Use when asked to review a diff, branch or PR in this repo.
 ---
-
-<!-- template-example: the skill's name and step 4 are the example package's; rename the skill to <yourpackage>-review and rewrite step 4 from your contracts. -->
 
 # Review a change
 
 1. **Get the diff** as `CODE_REVIEW.md` describes, or from the PR. Note
    which modules, tests and docs it touches.
 2. **Reuse** — run the `reuse-reviewer` subagent on the diff: a re-written
-   validator, statistic, filter, padding rule or transform is the main way a
-   package drifts from itself.
-3. **Correctness** — run the `correctness-reviewer` subagent in parallel
-   with step 2: validation at the boundary, mutation of inputs, the
-   fit / apply lifecycle, numeric edge cases, error types and messages,
-   doctest accuracy, test tolerances.
+   solver, covariance, matched filter or SRF integration is the main way the
+   stack drifts from itself.
+3. **Numerics** — run the `numerics-reviewer` subagent in parallel with
+   step 2: static arrays, NaN gradients, precision, batching, units,
+   tolerances, package boundaries.
 4. **Contracts** — for each module touched, the rules under "The contracts"
-   in `AGENTS.md`: the `utils` validators and `'name' must …` messages, new
-   lists out, `NotFittedError` before `fit`, `fit` returning `self`,
-   frozen stateless transforms, CLI handlers writing only to the injected
-   streams, exceptions deriving from `RadtraxError` and their stdlib base.
+   in `AGENTS.md`: Equinox modules with arrays as leaves, protocols as
+   abstract modules, derivatives from autodiff with a gradient test,
+   `filter_vmap` outside `jacrev`, float64 for spectroscopy, no `plumax`
+   import, geo code only in `radtrax.geo`, exceptions deriving from
+   `RadtraxError` and their stdlib base.
 5. **Checklist** — the rest of `CODE_REVIEW.md` (public API, API page and
    `docs/api/index.md` row, capability index, MyST prose, tests and tiers),
    skipping what ruff, ty or the tests already enforce.

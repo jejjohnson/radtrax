@@ -4,12 +4,10 @@ Standing instructions for **all** agents performing code reviews on this
 repository. Read "Reuse before you write", "The contracts" and "What enforces
 them" in [`AGENTS.md`](AGENTS.md) first; this file is the checklist and the
 report format. Most defects worth finding are a contract broken in a way the
-tests cannot see (an input mutated on one path, a validator skipped, an
-unfitted transform that quietly does nothing, a docstring that promises what
-the code does not do) or a re-implementation of something the package
-already has, not style.
-
-<!-- template-example: this file's sections 2 and "Package-Specific Checks" describe the example package. -->
+tests cannot see (a JAX array in a static field, a NaN gradient at a valid
+input, a Jacobian of a batch, a hand-written derivative with no autodiff
+check, an import that points up the package graph) or a re-implementation
+of something the stack already has, not style.
 
 ---
 
@@ -62,24 +60,20 @@ they cannot see.
 
 ### 2. The contracts
 
-<!-- template-example: the example package's contracts; replace with your package's. -->
-
-- **Public functions** validate once, at the boundary, with
-  `as_floats` / `require_non_empty` / `require_positive`; raise
-  `ValidationError` / `EmptySeriesError` whose message names the argument;
-  return a **new** list and never mutate the input; use `math.fsum` for
-  sums; turn degenerate input into an error, not a `nan`.
-- **Transforms** satisfy `Transform` structurally (no base class); stateless
-  ones are frozen dataclasses whose `fit` returns `self`; fitted ones keep
-  learned state in `init=False` trailing-underscore fields, return `self`
-  from `fit`, and raise `NotFittedError` from `apply` before `fit`; every
-  transform has `fit_apply`; constructor arguments are validated in
-  `__post_init__`; the transform joins `TestProtocols` in
-  `tests/test_transforms.py`.
-- **CLI** subcommands are a subparser plus a `_run_<name>` handler in
-  `main`'s `handlers`; they write only to the injected `out`, read through
-  `_read_values`, validate options with an `argparse` `type=`, and never
-  `print` or `sys.exit`.
+- **Boundaries**: no import of `plumax`, lazily or not; nothing from
+  geotoolz or georeader outside `radtrax.geo` and the `[geo]` extra; no
+  `geotoolz._src` import anywhere; an optional dependency is imported inside
+  the function and a missing extra names itself in the `ImportError`.
+- **Forward-model components** are `eqx.Module`s; arrays are leaves, never
+  `eqx.field(static=True)`; abstract bases use `eqx.AbstractVar` and
+  `eqx.abstractmethod`, concrete classes plain fields.
+- **Derivatives** come from `jax.jacrev` / `jax.jacfwd`; a hand Jacobian is
+  only a test oracle; every public differentiable function has a
+  finite-difference gradient test.
+- **Batches**: `eqx.filter_vmap` outside `jax.jacrev`, never a Jacobian of a
+  batch; no Python loop over pixels.
+- **Numerics**: float64 for spectroscopy; a branch that is 0/0 somewhere
+  uses the double-where pattern; units stated (cm⁻¹, molecules/cm², Pa).
 - **Exceptions** derive from `RadtraxError` and the closest stdlib
   exception; errors are chained (`raise … from err`).
 
@@ -101,9 +95,10 @@ they cannot see.
 
 ### 4. Tests
 
-- Each behaviour is checked against a closed form, a hand computation or a
-  published value; edge cases (empty input, a single value, a constant
-  series, invalid arguments, overflow) have their own tests.
+- Each behaviour is checked against a closed form, a hand computation, a
+  reference code (HAPI, the ported slab) or a published value, with the
+  tolerance and its reason in the test; edge cases (zero column, μ = μ₀,
+  grid edges of a table, invalid arguments) have their own tests.
 - New code is covered (the 90 % gate is global, so a well-covered package
   can hide an untested module: look at the diff, not the total).
 - Randomness, if any, is seeded; a statistical assertion is bounded by the
@@ -134,125 +129,72 @@ they cannot see.
 
 ## Package-Specific Checks
 
-<!-- template-example: these patterns are the example package's; replace them with the defects your package is prone to. Every example here runs. -->
+Every example here runs (float64 on).
 
-### Validate once, at the boundary
-
-```python
-# ❌ No validation: window=0 or an empty series fails deep inside max() with
-#    "max() iterable argument is empty", and a string slips through as text
-def rolling_max(series, window):
-    return [max(series[i : i + window]) for i in range(len(series) - window + 1)]
-
-
-# ✅ The package's validators, and the package's error messages
-from radtrax import Series, require_non_empty, require_positive
-
-
-def rolling_max(series: Series, window: int) -> list[float]:
-    values = require_non_empty(series)
-    window = require_positive(window, name="window")
-    return [max(values[i : i + window]) for i in range(len(values) - window + 1)]
-```
-
-### Never mutate the input
+### Arrays are leaves, not static fields
 
 ```python
-# ❌ Sorts the caller's list in place
-def upper_quartile(series: list[float]) -> float:
-    series.sort()
-    return series[(3 * len(series)) // 4]
+import equinox as eqx
+import jax
+import jax.numpy as jnp
 
 
-# ✅ Work on a fresh, validated copy, or reuse the existing statistic
-from radtrax import Series, quantile
+# ❌ Equinox warns "A JAX array is being set as static!", and the module
+#    stops hashing under filter_jit
+class BadSRF(eqx.Module):
+    weights: jax.Array = eqx.field(static=True)
 
 
-def upper_quartile(series: Series) -> float:
-    return quantile(series, 0.75)
+# ✅ A leaf; choose what is not differentiated with eqx.partition
+class SRF(eqx.Module):
+    weights: jax.Array  # (B, G)
+
+    def __call__(self, radiance):  # (G,) → (B,)
+        return self.weights @ radiance
 ```
 
-### A fitted transform fails loudly before `fit`
+### No NaN gradient at a valid input
 
 ```python
-from dataclasses import dataclass, field
-from typing import Self
-
-from radtrax import NotFittedError, Series, as_floats, require_non_empty
+# M(μ) = (e^{−τ/μ₀} − e^{−τ/μ}) / (1/μ − 1/μ₀), with limit τ e^{−τ/μ₀} at μ = μ₀
 
 
-# ❌ Unfitted, `apply` silently behaves as the identity
-@dataclass(slots=True)
-class CenterSilently:
-    mean_: float | None = field(default=None, init=False)
-
-    def apply(self, series: Series) -> list[float]:
-        return [value - (self.mean_ or 0.0) for value in as_floats(series)]
+# ❌ jnp.where picks the right value, but the branch not taken is still
+#    differentiated: jax.grad(multiplier_naive)(0.5, 0.5) is nan
+def multiplier_naive(mu, mu0, tau=1.0):
+    general = (jnp.exp(-tau / mu0) - jnp.exp(-tau / mu)) / (1 / mu - 1 / mu0)
+    return jnp.where(jnp.isclose(mu, mu0), tau * jnp.exp(-tau / mu0), general)
 
 
-# ✅ The package's fit / apply lifecycle
-@dataclass(slots=True)
-class Center:
-    mean_: float | None = field(default=None, init=False)
-
-    def fit(self, series: Series) -> Self:
-        values = require_non_empty(series)
-        self.mean_ = sum(values) / len(values)
-        return self
-
-    def apply(self, series: Series) -> list[float]:
-        if self.mean_ is None:
-            msg = "Center is not fitted; call .fit(series) first"
-            raise NotFittedError(msg)
-        return [value - self.mean_ for value in as_floats(series)]
-
-    def fit_apply(self, series: Series) -> list[float]:
-        return self.fit(series).apply(series)
+# ✅ Double where: a safe input in the branch not taken
+def multiplier_safe(mu, mu0, tau=1.0):
+    close = jnp.isclose(mu, mu0)
+    mu_s = jnp.where(close, mu0 + 1.0, mu)
+    general = (jnp.exp(-tau / mu0) - jnp.exp(-tau / mu_s)) / (1 / mu_s - 1 / mu0)
+    return jnp.where(close, tau * jnp.exp(-tau / mu0), general)
 ```
 
-### Typed, chained errors that name the argument
+### `vmap` outside `jacrev`
 
 ```python
-from radtrax import ValidationError
+def y_of(theta):  # (3,) → (7,)
+    return jnp.exp(-theta[0] * jnp.linspace(0, 1, 7)) * theta[1] + theta[2]
 
 
-# ❌ A bare except catches everything (KeyboardInterrupt included), and the
-#    error is a RuntimeError naming neither the argument nor the bad value
-def parse_alpha(text: str) -> float:
-    try:
-        return float(text)
-    except:  # noqa: E722
-        raise RuntimeError("bad input")
+thetas = jnp.ones((256, 3))
 
+# ❌ The Jacobian of a batch is (256, 7, 256, 3), almost all zeros
+# K = jax.jacrev(jax.vmap(y_of))(thetas)
 
-# ✅ The package's error (also a ValueError), the argument's name, the cause
-def parse_alpha(text: str) -> float:
-    try:
-        alpha = float(text)
-    except ValueError as err:
-        msg = f"'alpha' must be a number, got {text!r}"
-        raise ValidationError(msg) from err
-    if not 0.0 < alpha <= 1.0:
-        msg = f"'alpha' must lie in (0, 1], got {alpha!r}"
-        raise ValidationError(msg)
-    return alpha
+# ✅ A per-pixel Jacobian, mapped over pixels: (256, 3) → (256, 7, 3)
+K = eqx.filter_vmap(jax.jacrev(y_of))(thetas)
 ```
 
-### Doctest output the code really prints
+### A hand Jacobian is an oracle, not the implementation
 
-```python
-# ❌ Expected output copied from a calculator: the doctest fails on the
-#    17th digit, or passes only on one platform
-#     >>> zscores([1.0, 2.0, 4.0])
-#     [-0.87, -0.22, 1.09]
-
-# ✅ Round in the example, and paste what it prints
-#     >>> [round(z, 4) for z in zscores([1.0, 2.0, 4.0])]
-#     [-0.8729, -0.2182, 1.0911]
-from radtrax import zscores
-
-assert [round(z, 4) for z in zscores([1.0, 2.0, 4.0])] == [-0.8729, -0.2182, 1.0911]
-```
+Ported code (plumax's slab forward model) returns derivatives written by
+hand. Keep them, but test them against `jax.jacrev`, and write new code so
+that autodiff is the only derivative.
 
 ---
 

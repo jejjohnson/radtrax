@@ -15,7 +15,7 @@ two-tool build.
 - A project-level page (contributing, changelog, agents): `docs/<name>.md`,
   in the matching toc section.
 - An executable walkthrough is a notebook instead (`add-notebook`); an API
-  page under `docs/api/` is MkDocs, not MyST (`add-function`).
+  page under `docs/api/` is MkDocs, not MyST (see "The public API" in `AGENTS.md`).
 - The basename must be unique across `docs/`, `docs/guide/` and
   `docs/notebooks/`: the page is served at `/<basename>/` (`_` → `-`), and
   frontmatter `slug:` is ignored.
@@ -27,7 +27,7 @@ two-tool build.
   `:::{grid-item-card}` (see `docs/index.md` and `docs/guide/*.md`).
 - Maths with `$…$` and `$$…$$`.
 - Link the API with the `xref:` protocol and the **top-level** name:
-  ``[`summarize`](xref:api#radtrax.summarize)``. Links to other prose pages
+  ``[`RadtraxError`](xref:api#radtrax.RadtraxError)``. Links to other prose pages
   are relative paths to their source files (`[CLI](guide/cli.md)`).
 - Code blocks are illustrative (nothing executes them): run every snippet
   yourself and paste real output.

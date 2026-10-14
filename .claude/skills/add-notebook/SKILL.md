@@ -43,7 +43,7 @@ read it first. This is the checklist.
 - Figures inline with `plt.show()`: no `savefig`, no committed PNGs; keep
   the notebook under the pre-commit `check-added-large-files` limit (500 kB
   by default) with few, small figures.
-- Link API names with ``[`summarize`](xref:api#radtrax.summarize)`` — the
+- Link API names with ``[`RadtraxError`](xref:api#radtrax.RadtraxError)`` — the
   **top-level** name; a missing target fails the strict build.
 - Every number quoted in a markdown cell matches what the cells print.
 - Random draws, if any, are seeded so a re-run reproduces the outputs.

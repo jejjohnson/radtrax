@@ -30,9 +30,8 @@ Co-authored-by: <preserve all unique Co-authored-by lines from the individual co
   `perf`, `test`, `build`, `ci`, `chore`, `revert`; a lowercase subject
   (`conventional-commits.yml` enforces it on PR titles). The scope is
   optional and names the area.
-  <!-- template-example: the scopes are the example package's modules; list yours. -->
-  Scopes used here: `stats`, `smoothing`, `transforms`, `utils`, `cli`,
-  `docs`, `agents`, `ci`, `deps`.
+  Scopes used here: `atmosphere`, `spectroscopy`, `solvers`, `surface`,
+  `instrument`, `slab`, `retrieval`, `geo`, `docs`, `agents`, `ci`, `deps`.
 - release-please (`release-please-config.json`) builds the changelog from
   `feat`, `fix`, `perf` and `revert` commits and hides the other types, so
   the type decides whether a change is listed. Before 1.0
