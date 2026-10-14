@@ -17,13 +17,7 @@ import radtrax
 
 
 SUBMODULES = [
-    "_typing",
-    "cli",
     "exceptions",
-    "smoothing",
-    "stats",
-    "transforms",
-    "utils",
 ]
 
 

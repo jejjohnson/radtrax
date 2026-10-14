@@ -70,13 +70,7 @@ plugins:
 nav:
   - Overview: index.md
   - Capability index: capabilities.md
-  - Statistics: stats.md
-  - Smoothing: smoothing.md
-  - Transforms: transforms.md
-  - Utilities: utils.md
-  - Protocols: typing.md
   - Exceptions: exceptions.md
-  - CLI: cli.md
 
 markdown_extensions:
   - admonition

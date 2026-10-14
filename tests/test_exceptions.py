@@ -1,62 +1,18 @@
-"""Tests for the exception hierarchy.
-
-The hierarchy is part of the public contract: downstream code catches these,
-so a change in the inheritance graph is a breaking change.
-"""
+"""The exception hierarchy."""
 
 from __future__ import annotations
 
 import pytest
 
-from radtrax import (
-    EmptySeriesError,
-    NotFittedError,
-    RadtraxError,
-    Standardize,
-    ValidationError,
-    summarize,
-)
+from radtrax import RadtraxError
 
 
-@pytest.mark.parametrize(
-    "error",
-    [ValidationError, EmptySeriesError, NotFittedError],
-)
-def test_every_error_derives_from_the_base(error: type[Exception]) -> None:
-    assert issubclass(error, RadtraxError)
+def test_radtrax_error_is_an_exception() -> None:
+    with pytest.raises(RadtraxError, match="boom"):
+        raise RadtraxError("boom")
 
 
-@pytest.mark.parametrize(
-    ("error", "stdlib_base"),
-    [
-        (ValidationError, ValueError),
-        (EmptySeriesError, ValueError),
-        (NotFittedError, RuntimeError),
-    ],
-)
-def test_errors_alias_the_closest_stdlib_exception(
-    error: type[Exception], stdlib_base: type[Exception]
-) -> None:
-    assert issubclass(error, stdlib_base)
+def test_float64_is_enabled_in_tests() -> None:
+    import jax.numpy as jnp
 
-
-def test_empty_series_error_specialises_validation_error() -> None:
-    assert issubclass(EmptySeriesError, ValidationError)
-
-
-def test_a_single_except_clause_catches_the_package() -> None:
-    caught: list[RadtraxError] = []
-    for call in (lambda: summarize([]), lambda: Standardize().apply([1.0])):
-        try:
-            call()
-        except RadtraxError as err:
-            caught.append(err)
-    assert len(caught) == 2
-    assert isinstance(caught[0], EmptySeriesError)
-    assert isinstance(caught[1], NotFittedError)
-
-
-def test_messages_name_the_offending_argument() -> None:
-    with pytest.raises(EmptySeriesError) as excinfo:
-        summarize([])
-    assert "'series'" in str(excinfo.value)
+    assert jnp.zeros(1).dtype == jnp.float64
