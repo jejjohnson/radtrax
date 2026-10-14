@@ -20,6 +20,22 @@ SUBMODULES = [
     "exceptions",
 ]
 
+# The layout of radtrax · 3. Each subpackage owns one stage of the forward
+# model; adding or removing one is a design change, so it fails here first.
+SUBPACKAGES = [
+    "atmosphere",
+    "geo",
+    "instrument",
+    "retrieval",
+    "retrieval.matched_filter",
+    "retrieval.var3d",
+    "slab",
+    "solvers",
+    "spectroscopy",
+    "spectroscopy.hitran",
+    "surface",
+]
+
 
 def test_version_is_a_dotted_string() -> None:
     assert isinstance(radtrax.__version__, str)
@@ -61,3 +77,19 @@ def test_package_is_typed() -> None:
     """PEP 561 marker must ship so downstream type checkers see annotations."""
     marker = Path(radtrax.__path__[0]) / "py.typed"
     assert marker.is_file(), f"missing PEP 561 marker at {marker}"
+
+
+def test_subpackages_match_the_layout() -> None:
+    found = {
+        info.name.removeprefix("radtrax.")
+        for info in pkgutil.walk_packages(radtrax.__path__, prefix="radtrax.")
+        if info.ispkg
+    }
+    assert found == set(SUBPACKAGES)
+
+
+@pytest.mark.parametrize("package", SUBPACKAGES)
+def test_subpackages_import_and_declare_all(package: str) -> None:
+    imported = importlib.import_module(f"radtrax.{package}")
+    assert imported.__doc__, f"radtrax.{package} needs a docstring saying what it owns"
+    assert imported.__all__ == sorted(imported.__all__)

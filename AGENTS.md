@@ -20,9 +20,10 @@ primitives**: new code composes what is here, and anything new lands where
 the next person will find and reuse it.
 
 It is one package, `src/radtrax/`. The public API is `radtrax.__all__`,
-re-exported from `src/radtrax/__init__.py`. Today it holds only the
-exception base; the subpackages arrive in the order of the backlog
-(issues #1–#4 are the wave epics):
+re-exported from `src/radtrax/__init__.py`. Today it holds the exception
+base and the layout below; each subpackage is empty until its issue lands
+(issues #1–#4 are the wave epics), and `tests/test_public_api.py` fails if
+the layout drifts:
 
 | Module | Owns | Lands in |
 |---|---|---|
@@ -43,6 +44,8 @@ GeoStack package graph gets a cycle.
 
 - **radtrax never imports plumax**, not even lazily. Radiative transfer does
   not know about plumes; plumax's plume-to-radiance coupling imports radtrax.
+  An import-linter contract (`[tool.importlinter]` in `pyproject.toml`)
+  checks it.
 - **No GeoModels or GeoML package below it.** radtrax builds on Numerics
   (gaussx, lineax, optimistix) and, through extras, GeoStack (geotoolz,
   georeader). finitevolx, spectraldiffx and somax are not dependencies: a
@@ -159,7 +162,8 @@ docstring before changing what it checks.
 
 | Test | Enforces |
 |---|---|
-| `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
+| `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules and `SUBPACKAGES` the set of subpackages; each declares a docstring and a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
+| `lint-imports` (`make lint`, `lint.yml`) | radtrax never imports plumax |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
 | `tests/conftest.py` | Float64 is on for the whole suite |
 | `--doctest-modules` on `src/radtrax` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |

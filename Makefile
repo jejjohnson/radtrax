@@ -113,6 +113,7 @@ init: ## 🔧 Bootstrap .env from .env.example (skip if .env already exists)
 lint: ## 🧹 Lint code with ruff (no auto-fix) — entire repo
 	@printf "$(YELLOW)>>> Running ruff check...$(RESET)\n"
 	uv run --group lint ruff check .
+	uv run --group lint lint-imports
 	@printf "$(GREEN)>>> ✅ Lint passed!$(RESET)\n"
 
 format: ## 🖊️  Format code with ruff (format + auto-fix) — entire repo

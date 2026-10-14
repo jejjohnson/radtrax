@@ -69,6 +69,7 @@ dev = [
     "pre-commit>=4.6.0",
 ]
 lint = [
+    "import-linter>=2.1",
     "ruff>=0.15.22",
 ]
 typecheck = [
@@ -175,3 +176,17 @@ exclude_also = [
     "raise NotImplementedError",
     "\\.\\.\\.",
 ]
+
+# Package-boundaries rule 2: radtrax never imports plumax, not even lazily.
+# Plume physics imports radiative transfer, never the reverse; an import back
+# would put a cycle in the GeoStack package graph. `lint-imports` checks it
+# (`make lint`, lint.yml).
+[tool.importlinter]
+root_package = "radtrax"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "radtrax never imports plumax"
+type = "forbidden"
+source_modules = ["radtrax"]
+forbidden_modules = ["plumax"]
