@@ -186,8 +186,7 @@ class InstrumentSpec:
             band_centers_nm=np.asarray(self.band_centers_nm, dtype=float),
             band_widths_nm=np.asarray(self.band_widths_nm, dtype=float),
             band_names=tuple(self.band_names),
-            # __post_init__ checks srf_type against the Literal's values.
-            srf_type=self.srf_type,  # ty: ignore[invalid-argument-type]
+            srf_type=self.srf_type,
         )
 
 
