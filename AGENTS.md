@@ -32,8 +32,8 @@ the layout drifts:
 | `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
-| `instrument/` | SRF band integration, PSF and ground sampling | Wave 1 |
-| `slab/` | plumax's single-slab models, kept as v0's regression oracle | Wave 1 |
+| `instrument/` | `srf`: SRF band integration; `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
+| `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
 | `retrieval/` | `matched_filter/` (the one core), `var3d/` (3D-Var) | Wave 1 |
 | `geo/` | GeoTensor operators and SBMP (`[geo]`) | Wave 2 |
 
