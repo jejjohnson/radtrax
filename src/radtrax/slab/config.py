@@ -15,9 +15,9 @@ This module factors the latter two into frozen dataclasses:
   measured SRFs; ``InstrumentSpec`` is a convenient constructor for the
   tutorial notebooks.
 
-``BOLTZMANN_J_PER_K`` and ``ATM_TO_PA`` mirror the constants in
-:mod:`radtrax.spectroscopy.tables` so the two forward-model stacks agree
-on the ideal-gas number density computation.
+The constants, the number density and the air-mass factor have one home,
+:mod:`radtrax.atmosphere` (radtrax#27); this module re-exports the
+constants and wraps the number density with scalar validation.
 
 Ported from plumax 0.1.2 at 28f257e (``src/plumax/radtran/config.py``); only import paths changed.
 """
@@ -34,10 +34,14 @@ if TYPE_CHECKING:  # avoid circular import at module load
     from radtrax.instrument.srf import SpectralResponseFunction
 
 
-# cgs-consistent constants, mirroring hapi_lut.beers for cross-module agreement.
-BOLTZMANN_J_PER_K: float = 1.380649e-23  # [J/K]
-ATM_TO_PA: float = 101325.0  # [Pa/atm]
-CM3_PER_M3: float = 1e6
+# Re-exported (the ``X as X`` form) from their one home, radtrax.atmosphere.
+from radtrax.atmosphere.gas import (
+    ATM_TO_PA as ATM_TO_PA,
+    BOLTZMANN_J_PER_K as BOLTZMANN_J_PER_K,
+    CM3_PER_M3 as CM3_PER_M3,
+    number_density,
+)
+from radtrax.atmosphere.geometry import air_mass_factor
 
 
 @dataclass(frozen=True)
@@ -98,9 +102,7 @@ class ObservationGeometry:
         """Plane-parallel two-way AMF, or the explicit override if provided."""
         if self.amf is not None:
             return float(self.amf)
-        sza = np.deg2rad(self.sza_deg)
-        vza = np.deg2rad(self.vza_deg)
-        return float(1.0 / np.cos(sza) + 1.0 / np.cos(vza))
+        return float(air_mass_factor(self.sza_deg, self.vza_deg))
 
 
 @dataclass(frozen=True)
@@ -197,6 +199,4 @@ def number_density_cm3(p_atm: float, T_K: float) -> float:
             "number_density_cm3: `T_K` and `p_atm` must be > 0 "
             f"(got T_K={T_K!r}, p_atm={p_atm!r})"
         )
-    p_pa = p_atm * ATM_TO_PA
-    n_per_m3 = p_pa / (BOLTZMANN_J_PER_K * T_K)
-    return float(n_per_m3 / CM3_PER_M3)
+    return float(number_density(p_atm, T_K))

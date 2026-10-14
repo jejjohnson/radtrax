@@ -30,11 +30,29 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 
+# The one home of the constants, number density and air-mass factor
+# (radtrax#27); re-exported here, where plumax defined them.
+from radtrax.atmosphere.gas import (
+    ATM_TO_PA,
+    BOLTZMANN_J_PER_K,
+    CM3_PER_M3,
+    number_density,
+)
+from radtrax.atmosphere.geometry import air_mass_factor
 
-# Physical constants — cgs-compatible forms.
-BOLTZMANN_J_PER_K: float = 1.380649e-23  # [J/K]
-ATM_TO_PA: float = 101325.0  # [Pa/atm]
-CM3_PER_M3: float = 1e6
+
+__all__ = [
+    "ATM_TO_PA",
+    "BOLTZMANN_J_PER_K",
+    "CM3_PER_M3",
+    "absorption_coefficient",
+    "air_mass_factor",
+    "beers_law_from_lut",
+    "interpolate_cross_section",
+    "number_density",
+    "plume_ratio_spectrum",
+    "transmittance",
+]
 
 
 def interpolate_cross_section(
@@ -53,23 +71,6 @@ def interpolate_cross_section(
     if var not in ds:
         raise KeyError(f"variable {var!r} not in dataset (have {list(ds.data_vars)})")
     return ds[var].interp(temperature=T_K, pressure=p_atm)
-
-
-def number_density(p_atm: float, T_K: float) -> float:
-    """Return total number density [molecules / cm³] from the ideal-gas law."""
-    p_pa = p_atm * ATM_TO_PA
-    n_per_m3 = p_pa / (BOLTZMANN_J_PER_K * T_K)
-    return n_per_m3 / CM3_PER_M3
-
-
-def air_mass_factor(sza_deg: float, vza_deg: float) -> float:
-    """Plane-parallel two-way AMF for sun → surface → sensor.
-
-    Breaks down past ~75° zenith; fine for the tutorial regime.
-    """
-    sza = np.deg2rad(sza_deg)
-    vza = np.deg2rad(vza_deg)
-    return 1.0 / np.cos(sza) + 1.0 / np.cos(vza)
 
 
 def absorption_coefficient(
