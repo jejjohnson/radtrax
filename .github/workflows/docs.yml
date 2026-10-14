@@ -33,7 +33,15 @@ jobs:
       # cross-generator references, and fails if any internal link — in either
       # half, or crossing between them — does not resolve.
       - name: Build and verify the documentation site
-        run: uv run python scripts/build_docs.py
+        # On failure, re-emit the broken links and errors as annotations so they
+        # are readable on the PR and through the API without the job log.
+        run: |
+          set -o pipefail
+          uv run python scripts/build_docs.py 2>&1 | tee build.log || {
+            grep -E '^  - |[Ee]rror|[Ww]arning|missing|broken|Traceback' build.log \
+              | head -50 | sed 's/^/::error title=docs build::/'
+            exit 1
+          }
 
       - name: Upload site
         uses: actions/upload-artifact@v7
