@@ -137,6 +137,9 @@ lines-after-imports = 2
 [tool.ruff.lint.per-file-ignores]
 # Tests deliberately construct invalid inputs and assert on the failure.
 "tests/**" = ["B011"]
+# A lazy (PEP 562) package: its exports are imported under TYPE_CHECKING only,
+# for type checkers, and resolved at runtime by __getattr__.
+"src/radtrax/retrieval/var3d/__init__.py" = ["F401"]
 
 [tool.ruff.format]
 # Format the code inside ``Examples:`` doctest blocks like real source.
