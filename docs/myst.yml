@@ -25,6 +25,16 @@ project:
     api: http://127.0.0.1:8910/
   toc:
     - file: index.md
+    - title: Theory
+      children:
+        - file: theory/hitran_tables.md
+        - file: theory/matched_filter.md
+        - file: theory/var3d.md
+    - title: Examples
+      children:
+        - file: notebooks/hitran_ch4_table.ipynb
+        - file: notebooks/hitran_multigas_tables.ipynb
+        - file: notebooks/mf_covariance_flavours.ipynb
     - title: Project
       children:
         - file: contributing.md
