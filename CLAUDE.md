@@ -20,10 +20,10 @@ specific to Claude Code.
   - building: `add-function`, `add-transform`, `add-cli-command`,
     `add-guide-page`, `add-notebook` (the first three are the example
     package's extension points: rewrite them on adoption);
-  - shipping: `pre-pr-check`, `mypackage-review`, `squash-commit`;
+  - shipping: `pre-pr-check`, `radtrax-review`, `squash-commit`;
   - GitHub housekeeping: `create-gh-issue`, `link-gh-issues`.
 - **Subagents** (`.claude/agents/`), both read-only, both used by
-  `mypackage-review`; run them on any diff that adds code, before
+  `radtrax-review`; run them on any diff that adds code, before
   committing:
   - `reuse-reviewer`: does the diff re-implement something in
     `docs/api/capabilities.md` or a shared private helper?

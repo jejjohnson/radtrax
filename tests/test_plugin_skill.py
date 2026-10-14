@@ -1,10 +1,10 @@
 """Keep the Claude Code plugin's guidance runnable and current.
 
-``plugins/mypackage/skills/series-analysis-with-mypackage/SKILL.md`` is what
+``plugins/radtrax/skills/series-analysis-with-radtrax/SKILL.md`` is what
 agents in downstream projects read before writing code on the package, so a
 stale name or a broken example there teaches them the wrong API. These tests
 run its worked example, check the numbers its prose quotes, and check that
-every ``mp.X`` / ``mypackage.X`` / ``mypackage.cli.X`` it and the plugin's
+every ``mp.X`` / ``radtrax.X`` / ``radtrax.cli.X`` it and the plugin's
 reviewer name is a current public name.
 
 On adoption, point ``SKILL`` / ``AGENT`` at your plugin, ``_ALIASES`` /
@@ -21,16 +21,16 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN = ROOT / "plugins" / "mypackage"
-SKILL = PLUGIN / "skills" / "series-analysis-with-mypackage" / "SKILL.md"
-AGENT = PLUGIN / "agents" / "mypackage-reuse-reviewer.md"
+PLUGIN = ROOT / "plugins" / "radtrax"
+SKILL = PLUGIN / "skills" / "series-analysis-with-radtrax" / "SKILL.md"
+AGENT = PLUGIN / "agents" / "radtrax-reuse-reviewer.md"
 if not SKILL.is_file():
     # A built distribution ships tests/ without the repository root.
     pytest.skip("the plugin is not present", allow_module_level=True)
 
-_ALIASES = {"mp": "mypackage"}
+_ALIASES = {"mp": "radtrax"}
 # Not preceded by a word character, dot or slash, so URLs do not match.
-_NAME = re.compile(r"(?<![\w./])(mp|mypackage\.cli|mypackage)\.([A-Za-z_]\w*)")
+_NAME = re.compile(r"(?<![\w./])(mp|radtrax\.cli|radtrax)\.([A-Za-z_]\w*)")
 _BLOCKS = re.compile(r"```python\n(.*?)```", re.S)
 
 
@@ -79,7 +79,7 @@ def test_named_api_is_current(path: Path) -> None:
         module = importlib.import_module(module_name)
         if attr in getattr(module, "__all__", dir(module)):
             continue
-        try:  # a submodule path such as ``mypackage.cli``
+        try:  # a submodule path such as ``radtrax.cli``
             importlib.import_module(f"{module_name}.{attr}")
         except ImportError:
             stale.append(f"{module_name}.{attr}")

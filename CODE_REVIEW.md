@@ -80,7 +80,7 @@ they cannot see.
   `main`'s `handlers`; they write only to the injected `out`, read through
   `_read_values`, validate options with an `argparse` `type=`, and never
   `print` or `sys.exit`.
-- **Exceptions** derive from `MypackageError` and the closest stdlib
+- **Exceptions** derive from `RadtraxError` and the closest stdlib
   exception; errors are chained (`raise … from err`).
 
 ### 3. Public API and documentation
@@ -94,7 +94,7 @@ they cannot see.
   `Raises:` matching the code; an executable `Examples:` block whose output
   is what the code prints (print rounded values, not 17-digit floats).
 - Prose pages: MyST directives, not MkDocs-Material syntax; API links by the
-  top-level name (`xref:api#mypackage.<Name>`); a new page or notebook in
+  top-level name (`xref:api#radtrax.<Name>`); a new page or notebook in
   the `docs/myst.yml` toc with a basename unique across `docs/`.
 - Notebooks committed executed, with no error outputs, and every number
   quoted in the prose matching the printed output.
@@ -146,7 +146,7 @@ def rolling_max(series, window):
 
 
 # ✅ The package's validators, and the package's error messages
-from mypackage import Series, require_non_empty, require_positive
+from radtrax import Series, require_non_empty, require_positive
 
 
 def rolling_max(series: Series, window: int) -> list[float]:
@@ -165,7 +165,7 @@ def upper_quartile(series: list[float]) -> float:
 
 
 # ✅ Work on a fresh, validated copy, or reuse the existing statistic
-from mypackage import Series, quantile
+from radtrax import Series, quantile
 
 
 def upper_quartile(series: Series) -> float:
@@ -178,7 +178,7 @@ def upper_quartile(series: Series) -> float:
 from dataclasses import dataclass, field
 from typing import Self
 
-from mypackage import NotFittedError, Series, as_floats, require_non_empty
+from radtrax import NotFittedError, Series, as_floats, require_non_empty
 
 
 # ❌ Unfitted, `apply` silently behaves as the identity
@@ -213,7 +213,7 @@ class Center:
 ### Typed, chained errors that name the argument
 
 ```python
-from mypackage import ValidationError
+from radtrax import ValidationError
 
 
 # ❌ A bare except catches everything (KeyboardInterrupt included), and the
@@ -249,7 +249,7 @@ def parse_alpha(text: str) -> float:
 # ✅ Round in the example, and paste what it prints
 #     >>> [round(z, 4) for z in zscores([1.0, 2.0, 4.0])]
 #     [-0.8729, -0.2182, 1.0911]
-from mypackage import zscores
+from radtrax import zscores
 
 assert [round(z, 4) for z in zscores([1.0, 2.0, 4.0])] == [-0.8729, -0.2182, 1.0911]
 ```

@@ -1,8 +1,8 @@
 # CLI
 
-The `mypackage` console script. See the [CLI guide](../../cli/) for
+The `radtrax` console script. See the [CLI guide](../../cli/) for
 usage, flags, and exit codes.
 
-::: mypackage.cli
+::: radtrax.cli
     options:
       members: ["main", "build_parser"]

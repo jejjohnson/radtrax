@@ -1,32 +1,32 @@
-# pypackage_template
+# radtrax
 
-[![Tests](https://github.com/jejjohnson/pypackage_template/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/pypackage_template/actions/workflows/ci.yml)
-[![Lint](https://github.com/jejjohnson/pypackage_template/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/pypackage_template/actions/workflows/lint.yml)
-[![Type Check](https://github.com/jejjohnson/pypackage_template/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/pypackage_template/actions/workflows/typecheck.yml)
-[![Deploy Docs](https://github.com/jejjohnson/pypackage_template/actions/workflows/pages.yml/badge.svg)](https://github.com/jejjohnson/pypackage_template/actions/workflows/pages.yml)
-[![codecov](https://codecov.io/gh/jejjohnson/pypackage_template/branch/main/graph/badge.svg)](https://codecov.io/gh/jejjohnson/pypackage_template)
-[![PyPI version](https://img.shields.io/pypi/v/mypackage.svg)](https://pypi.org/project/mypackage/)
-[![Python versions](https://img.shields.io/pypi/pyversions/mypackage.svg)](https://pypi.org/project/mypackage/)
+[![Tests](https://github.com/jejjohnson/radtrax/actions/workflows/ci.yml/badge.svg)](https://github.com/jejjohnson/radtrax/actions/workflows/ci.yml)
+[![Lint](https://github.com/jejjohnson/radtrax/actions/workflows/lint.yml/badge.svg)](https://github.com/jejjohnson/radtrax/actions/workflows/lint.yml)
+[![Type Check](https://github.com/jejjohnson/radtrax/actions/workflows/typecheck.yml/badge.svg)](https://github.com/jejjohnson/radtrax/actions/workflows/typecheck.yml)
+[![Deploy Docs](https://github.com/jejjohnson/radtrax/actions/workflows/pages.yml/badge.svg)](https://github.com/jejjohnson/radtrax/actions/workflows/pages.yml)
+[![codecov](https://codecov.io/gh/jejjohnson/radtrax/branch/main/graph/badge.svg)](https://codecov.io/gh/jejjohnson/radtrax)
+[![PyPI version](https://img.shields.io/pypi/v/radtrax.svg)](https://pypi.org/project/radtrax/)
+[![Python versions](https://img.shields.io/pypi/pyversions/radtrax.svg)](https://pypi.org/project/radtrax/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://pre-commit.com/)
 
 Author: J. Emmanuel Johnson
-Repo: [https://github.com/jejjohnson/pypackage_template](https://github.com/jejjohnson/pypackage_template)
+Repo: [https://github.com/jejjohnson/radtrax](https://github.com/jejjohnson/radtrax)
 Website: [jejjohnson.netlify.com](https://jejjohnson.netlify.com)
 
 An opinionated, modern Python package template with best-practice tooling already wired up. When you use this template, you get linting, formatting, type checking, testing with coverage gates, auto-generated documentation, automated releases, security scanning, and AI agent instructions — all configured and integrated from day one.
 
-It also ships a **real worked example** rather than an empty `src/` directory. `mypackage` is a dependency-free library for descriptive statistics, smoothing filters, and composable transforms over numeric series — around 500 statements, 100% covered, with a console script, executable doctests, guide pages, and two executed example notebooks. Every piece of tooling in this repository is therefore *demonstrably working* on day one: the API reference renders real docstrings, the coverage gate measures real branches, and the notebooks import the real package. Delete it and drop in your own code when you adopt the template.
+It also ships a **real worked example** rather than an empty `src/` directory. `radtrax` is a dependency-free library for descriptive statistics, smoothing filters, and composable transforms over numeric series — around 500 statements, 100% covered, with a console script, executable doctests, guide pages, and two executed example notebooks. Every piece of tooling in this repository is therefore *demonstrably working* on day one: the API reference renders real docstrings, the coverage gate measures real branches, and the notebooks import the real package. Delete it and drop in your own code when you adopt the template.
 
 ---
 
 ## 📂 Repository Layout
 
 ```
-pypackage_template/
-├── src/mypackage/                    # Main package code (src layout)
+radtrax/
+├── src/radtrax/                    # Main package code (src layout)
 │   ├── _typing.py                    # Type aliases + structural protocols
 │   ├── exceptions.py                 # Typed exception hierarchy
 │   ├── utils.py                      # Validators, generic Window[T], timer()
@@ -71,8 +71,8 @@ pypackage_template/
 
 ```bash
 # Prerequisites: uv (https://github.com/astral-sh/uv)
-git clone https://github.com/jejjohnson/pypackage_template.git
-cd pypackage_template
+git clone https://github.com/jejjohnson/radtrax.git
+cd radtrax
 make install      # install all dependency groups
 make test         # run tests + doctests
 make docs-serve   # preview docs locally
@@ -81,8 +81,8 @@ make docs-serve   # preview docs locally
 Then try the bundled example:
 
 ```bash
-echo "1 2 3 4 5" | uv run mypackage summarize
-echo "1 1 99 1 1" | uv run mypackage smooth --method median --window 3
+echo "1 2 3 4 5" | uv run radtrax summarize
+echo "1 1 99 1 1" | uv run radtrax smooth --method median --window 3
 ```
 
 ---
@@ -123,14 +123,14 @@ echo "1 1 99 1 1" | uv run mypackage smooth --method median --window 3
 
 ### 📁 `src/` Layout
 
-**Directory:** `src/mypackage/`
+**Directory:** `src/radtrax/`
 
-Source code lives under `src/mypackage/` rather than at the repo root. This forces the package to be properly installed before it can be imported, which means:
+Source code lives under `src/radtrax/` rather than at the repo root. This forces the package to be properly installed before it can be imported, which means:
 
 - Packaging bugs (missing files, incorrect paths) are caught early rather than hidden by the flat-layout import shortcut.
 - Tests always exercise the installed package, not an accidentally-importable source directory.
 
-> **What:** All source code lives under `src/mypackage/` instead of at the repo root, so the package must be installed before it can be imported.
+> **What:** All source code lives under `src/radtrax/` instead of at the repo root, so the package must be installed before it can be imported.
 
 > **Why `src/` layout?** Industry best practice. See writings by Brett Cannon and Hynek Schlawack on why flat layouts silently mask packaging errors.
 
@@ -146,7 +146,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypackage"]
+packages = ["src/radtrax"]
 ```
 
 Zero-config, PEP 517 compliant. No `MANIFEST.in`, no surprises. Integrates cleanly with uv.
@@ -155,9 +155,9 @@ The demo package also exercises two packaging features you will want in a real
 project:
 
 - **`[project.scripts]`** installs a console script:
-  `mypackage = "mypackage.cli:main"`. `make build` produces a wheel whose
-  `mypackage` command works on any machine that installs it.
-- **`src/mypackage/py.typed`** is the [PEP 561](https://peps.python.org/pep-0561/) marker that tells downstream
+  `radtrax = "radtrax.cli:main"`. `make build` produces a wheel whose
+  `radtrax` command works on any machine that installs it.
+- **`src/radtrax/py.typed`** is the [PEP 561](https://peps.python.org/pep-0561/) marker that tells downstream
   type checkers your annotations are real and should be honoured. Without it,
   every annotation you write is invisible to your users.
 
@@ -215,15 +215,15 @@ python-version = "3.12"
 
 ```toml
 [tool.pytest.ini_options]
-testpaths = ["tests", "src/mypackage"]
-addopts = "--doctest-modules --cov=src/mypackage --cov-report=term-missing ..."
+testpaths = ["tests", "src/radtrax"]
+addopts = "--doctest-modules --cov=src/radtrax --cov-report=term-missing ..."
 
 [tool.coverage.report]
 fail_under = 90
 ```
 
 - Tests live in `tests/`.
-- **Doctests are part of the suite.** `src/mypackage` is a testpath and
+- **Doctests are part of the suite.** `src/radtrax` is a testpath and
   `--doctest-modules` is in `addopts`, so every `Examples:` block in a
   Google-style docstring is executed. Documentation that drifts from the code
   fails the build. `ruff format` is configured with `docstring-code-format`
@@ -293,7 +293,7 @@ make docs-serve    # build, then serve the assembled site at :8000
 Prose links into the API with the `xref:` protocol:
 
 ```markdown
-[`summarize`](xref:api#mypackage.summarize)
+[`summarize`](xref:api#radtrax.summarize)
 ```
 
 A target that is not in the inventory fails `myst build --strict`.
@@ -527,7 +527,7 @@ Documented variables:
 
 | Variable | Purpose |
 |----------|---------|
-| `PKGROOT` | Path to package source (default: `src/mypackage`) |
+| `PKGROOT` | Path to package source (default: `src/radtrax`) |
 | `PYPI_TOKEN` | PyPI token for publishing |
 | `GITHUB_TOKEN` | GitHub personal access token |
 
@@ -604,16 +604,16 @@ With Claude Code, the `adopt-template` skill
 (`.claude/skills/adopt-template/SKILL.md`) walks through the same steps,
 including the rename commands and rewriting the agent files from your code.
 
-1. **Decide what to do with the demo package.** `src/mypackage/` is a worked
+1. **Decide what to do with the demo package.** `src/radtrax/` is a worked
    example, not scaffolding you must keep. Either delete its modules and start
    fresh (also clearing `tests/`, `docs/guide/`, `docs/api/`, and
    `docs/notebooks/`), or keep one module as a reference while you build. The
    coverage gate is set to 90%, so an empty package with no tests will fail CI
    until you either add tests or lower `fail_under`.
-2. **Search-and-replace** `mypackage` with your package name everywhere (source, config, docs)
+2. **Search-and-replace** `radtrax` with your package name everywhere (source, config, docs)
 3. **Update `[project]` in `pyproject.toml`**: name, description, authors, keywords, classifiers, `requires-python`
 4. **Update `mkdocs.yml`**: `site_name`, `site_description`, `repo_url`, `repo_name`
-5. **Rename `src/mypackage/`** to `src/<yourpackage>/`
+5. **Rename `src/radtrax/`** to `src/<yourpackage>/`
 6. **Copy `.env.example` to `.env`** (`make init`) and fill in values
 7. **Run `make install`** then **`make test`** to verify the baseline works
 8. **Set up Codecov** and add `CODECOV_TOKEN` to GitHub Secrets if you want coverage tracking

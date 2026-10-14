@@ -5,7 +5,7 @@ Standing instructions for **every** coding agent working in this repository
 `CLAUDE.md` and `.github/copilot-instructions.md` point here.
 
 > **This repository is a template.** Passages that describe the bundled
-> example package, `mypackage`, start with a `<!-- template-example: … -->`
+> example package, `radtrax`, start with a `<!-- template-example: … -->`
 > comment (`# template-example: …` in code and config). Each marker covers
 > the section it opens, down to the next heading of the same level, unless
 > it names a smaller scope. Marked passages are true of the example and must
@@ -19,7 +19,7 @@ Standing instructions for **every** coding agent working in this repository
 
 An opinionated Python package template (Python 3.12+, uv, ruff, ty, pytest,
 mystmd and MkDocs, release-please) that ships a real worked example,
-`mypackage`: a **dependency-free** library of descriptive statistics,
+`radtrax`: a **dependency-free** library of descriptive statistics,
 smoothing filters and composable transforms over one-dimensional numeric
 series, with an `argparse` console script. It exists so every tool here has
 real code to operate on: mkdocstrings renders its docstrings, ty checks its
@@ -30,20 +30,20 @@ People build on a package like this, so **the package is a library of
 primitives**: new code composes what is here, and anything genuinely new
 lands where the next person will find and reuse it.
 
-It is one package, `src/mypackage/`. The public API is
-`mypackage.__all__`, re-exported from `src/mypackage/__init__.py`, plus the
-`mypackage.cli` module (`main`, `build_parser`). Imports only point down
+It is one package, `src/radtrax/`. The public API is
+`radtrax.__all__`, re-exported from `src/radtrax/__init__.py`, plus the
+`radtrax.cli` module (`main`, `build_parser`). Imports only point down
 this table:
 
 | Module | Owns |
 |---|---|
 | `_typing.py` | PEP 695 `type Series = Sequence[float]`; the runtime-checkable `Transform` and `Fittable` protocols |
-| `exceptions.py` | `MypackageError` and its subclasses `ValidationError` (also a `ValueError`), `EmptySeriesError`, `NotFittedError` (also a `RuntimeError`) |
+| `exceptions.py` | `RadtraxError` and its subclasses `ValidationError` (also a `ValueError`), `EmptySeriesError`, `NotFittedError` (also a `RuntimeError`) |
 | `utils.py` | The boundary validators `as_floats`, `require_non_empty`, `require_positive`; the generic `Window[T]` ring buffer; `timer` / `Elapsed` |
 | `stats.py` | `summarize` → frozen `Summary`, `quantile`, `zscores`, streaming `RunningStats` (Welford) |
 | `smoothing.py` | `moving_average`, `exponential_moving_average`, `median_filter`, the `Padding` boundary strategies |
 | `transforms.py` | `Standardize`, `MinMaxScale` (fitted), `Clip`, `MovingAverage` (stateless), `Pipeline`, `chain` |
-| `cli.py` | The `mypackage` console script (`summarize`, `smooth` subcommands), wired through `[project.scripts]` |
+| `cli.py` | The `radtrax` console script (`summarize`, `smooth` subcommands), wired through `[project.scripts]` |
 
 ### Boundaries
 
@@ -73,7 +73,7 @@ fails in someone else's pipeline or in CI.
 | **Python ≥ 3.12 standard library** | PEP 695 `type` aliases and generics (`class Window[T]`), `typing.Self`, `enum.StrEnum`, `math.fsum`, `statistics.median` | No runtime dependency for what the standard library already does. |
 | **`dataclasses`** | `Summary`, every transform, `RunningStats`, `Elapsed` | `slots=True` always; `frozen=True` for values and stateless objects; a fitted transform keeps what it learned in `init=False` fields with a trailing underscore (`mean_`) defaulting to `None`; validation in `__post_init__`. |
 | **`typing.Protocol`** (`runtime_checkable`) | `Transform`, `Fittable` | Structural, not nominal: no base class, no registry. `isinstance` only checks that the attribute exists, so code that relies on a protocol also checks the attribute is callable (as `Pipeline.__post_init__` does). |
-| **`argparse`** | `mypackage.cli` | Output goes to the injected streams, `main` returns an exit status instead of calling `sys.exit`. |
+| **`argparse`** | `radtrax.cli` | Output goes to the injected streams, `main` returns an exit status instead of calling `sys.exit`. |
 | **pytest + `--doctest-modules`** | The suite and every docstring `Examples:` block | An example's expected output is what the code prints; a stale example is a failing test. |
 
 ## Reuse before you write
@@ -100,7 +100,7 @@ find out whether it exists:
 
 | You are about to write… | Use instead |
 |---|---|
-| `[float(v) for v in series]`, an emptiness check, an `if window <= 0` guard | `as_floats`, `require_non_empty`, `require_positive` (`mypackage.utils`); they raise `ValidationError` / `EmptySeriesError` with the uniform `'name' must …` message |
+| `[float(v) for v in series]`, an emptiness check, an `if window <= 0` guard | `as_floats`, `require_non_empty`, `require_positive` (`radtrax.utils`); they raise `ValidationError` / `EmptySeriesError` with the uniform `'name' must …` message |
 | A mean, variance, min / max or median loop | `summarize` (→ `Summary`, with `std`, `spread`, `to_dict()`); `quantile`; `zscores`; one value at a time, `RunningStats` |
 | `math.fsum(values) / len(values)` that must survive overflow | `stats._mean` (rescales by a power of two when the sum overflows) |
 | A rolling mean, rolling median or exponential smoother | `moving_average`, `median_filter`, `exponential_moving_average` |
@@ -166,13 +166,13 @@ enforces them" check most of them.
 - Write only to the injected `out` stream; read numbers through
   `_read_values`; validate options with an `argparse` `type=` (as
   `_non_negative_int` does), so a bad option is a usage error (exit 2).
-- Library errors propagate as `MypackageError`, which `main` reports as
+- Library errors propagate as `RadtraxError`, which `main` reports as
   `error: …` on `err` with exit status 1 (`EXIT_ERROR`); `OSError` likewise.
   Never call `sys.exit` or `print` in a handler.
 
 ### 4. Exceptions
 
-- Every error derives from `MypackageError` **and** the closest
+- Every error derives from `RadtraxError` **and** the closest
   standard-library exception, so `except ValueError` keeps working. A new
   error goes into `exceptions.py`, is exported, and joins the parametrised
   lists in `tests/test_exceptions.py`.
@@ -180,16 +180,16 @@ enforces them" check most of them.
 ### The public API
 
 - Export a public name from its module's `__all__` and from
-  `src/mypackage/__init__.py` (import and `__all__`); both stay sorted (ruff's
+  `src/radtrax/__init__.py` (import and `__all__`); both stay sorted (ruff's
   `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
 - A new module declares a sorted `__all__`, joins `SUBMODULES` in
   `tests/test_public_api.py`, and gets its own page in `docs/api/` (a
-  `::: mypackage.<module>` block), a `nav` entry in `mkdocs.yml` and a row in
+  `::: radtrax.<module>` block), a `nav` entry in `mkdocs.yml` and a row in
   `docs/api/index.md`; a name on an existing module's page is picked up by
   its `:::` block.
 - Run `make capabilities` after any public API change.
 - Link prose to the API by the **top-level** name
-  (``[`summarize`](xref:api#mypackage.summarize)``), see "Documentation".
+  (``[`summarize`](xref:api#radtrax.summarize)``), see "Documentation".
 
 ## What enforces them
 
@@ -202,16 +202,16 @@ docstring before changing what it checks.
 |---|---|
 | `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules; every submodule declares a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
-| `--doctest-modules` on `src/mypackage` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
+| `--doctest-modules` on `src/radtrax` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
 | `tests/test_smoothing.py` (`SMOOTHERS`) | Smoothers never mutate their input, return a new list, leave constants unchanged |
 | `tests/test_transforms.py` (`TestProtocols`, `TestPipeline`) | Every transform satisfies `Transform` (fitted ones `Fittable`); `NotFittedError` before `fit`; sequential fitting; no mutation |
-| `tests/test_exceptions.py` | The hierarchy: every error is a `MypackageError` and its stdlib base |
+| `tests/test_exceptions.py` | The hierarchy: every error is a `RadtraxError` and its stdlib base |
 | `tests/test_cli.py` | Injected streams, exit codes 0 / 1 / 2, finite-only input, the `[project.scripts]` entry point |
 | `tests/test_build_docs.py` | The two-tool docs pipeline: inventory parsing, anchor repair, link checking, the inventory port and the absolute nav URL in `docs/myst.yml`, the files copied to the site root (`ROOT_FILES`) |
 | `tests/test_plugin_skill.py` | The downstream plugin's worked example runs and its quoted numbers hold; every name the plugin skill and reviewer mention exists |
-| `[tool.coverage.report] fail_under = 90` | Coverage of `src/mypackage` in every coverage-enabled run (CI, `make test-cov`) |
+| `[tool.coverage.report] fail_under = 90` | Coverage of `src/radtrax` in every coverage-enabled run (CI, `make test-cov`) |
 | `strict_markers = true` | Only the registered tier markers (`slow`, `integration`) exist |
-| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `src/mypackage` and `scripts` |
+| ruff (`select = E, F, I, UP, B, SIM, RUF`), ty | Lint (the whole repo, notebook code cells included), format, types on `src/radtrax` and `scripts` |
 
 ## Recipes
 
@@ -220,7 +220,7 @@ Step-by-step recipes for the common jobs live as plain Markdown in
 agent can read and follow them), and two read-only review checklists in
 `.claude/agents/`:
 
-<!-- template-example: this table only; `add-function`, `add-transform`, `add-cli-command` and `mypackage-review` are the example package's, replace them with your extension points. -->
+<!-- template-example: this table only; `add-function`, `add-transform`, `add-cli-command` and `radtrax-review` are the example package's, replace them with your extension points. -->
 
 | Job | Recipe |
 |---|---|
@@ -231,20 +231,20 @@ agent can read and follow them), and two read-only review checklists in
 | Add or update a guide page (MyST prose) | `add-guide-page` |
 | Add or update an example notebook | `add-notebook` |
 | Verify before a PR | `pre-pr-check` |
-| Review a change | `mypackage-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
+| Review a change | `radtrax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `correctness-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
 <!-- template-example: this paragraph only; the plugin describes the example package. -->
 
 Downstream users get the package's guidance through the Claude Code plugin
-in `plugins/mypackage/` (published by `.claude-plugin/marketplace.json`) and
+in `plugins/radtrax/` (published by `.claude-plugin/marketplace.json`) and
 `docs/llms.txt` (copied to the site root by `ROOT_FILES` in
 `scripts/build_docs.py`); see `docs/agents.md`. When the public API or the
 headline usage changes, update
-`plugins/mypackage/skills/series-analysis-with-mypackage/` too:
+`plugins/radtrax/skills/series-analysis-with-radtrax/` too:
 `tests/test_plugin_skill.py` runs its worked example, checks the numbers its
-prose quotes, and checks that every `mp.X` / `mypackage.X` it and the plugin
+prose quotes, and checks that every `mp.X` / `radtrax.X` it and the plugin
 reviewer name still exists.
 
 ## Working in the repo
@@ -258,7 +258,7 @@ make test                 # every test + doctests, no coverage (fast)
 make test-cov             # the same with coverage and the 90 % gate (what CI runs)
 make lint                 # ruff check .   (entire repo)
 make format               # ruff format . && ruff check --fix .
-make typecheck            # ty check src/mypackage scripts (what CI runs)
+make typecheck            # ty check src/radtrax scripts (what CI runs)
 make capabilities         # regenerate docs/api/capabilities.md
 make docs                 # build both docs halves into public/ and check every link
 make docs-check           # strict validation of both halves, no themed render
@@ -295,7 +295,7 @@ give them a CI job of their own rather than dropping them.
 
 <!-- template-example: this paragraph only. The example draws no random numbers; its tests use fixed fixtures in tests/conftest.py. -->
 
-`mypackage` draws no random numbers; its tests use the fixed series in
+`radtrax` draws no random numbers; its tests use the fixed series in
 `tests/conftest.py`.
 
 - **Incidental randomness** (any draw would do): seed it
@@ -313,10 +313,10 @@ All of these must pass, from the repo root:
 1. `make test`: zero failures (doctests included).
 2. `uv run --group lint ruff check .`: the **entire** repo, which includes
    `tests/`, `scripts/` and the code cells of `docs/notebooks/*.ipynb`.
-   Never lint a subdirectory: `ruff check src/mypackage/` misses errors CI
+   Never lint a subdirectory: `ruff check src/radtrax/` misses errors CI
    catches.
 3. `uv run --group lint ruff format --check .`
-4. `make typecheck` (`ty check src/mypackage scripts`, as CI runs it).
+4. `make typecheck` (`ty check src/radtrax scripts`, as CI runs it).
 5. After changing a public API: `make capabilities`, and the `docs/api`
    page.
 6. After changing docs, docstrings, `mkdocs.yml` or `docs/myst.yml`:
@@ -421,8 +421,8 @@ clone of the theme.
 - **Prose is MyST Markdown**, not MkDocs-Material syntax: `:::{note}`,
   `:::{tab-set}`, `:::{dropdown}` directives, not `!!!` / `===` / `???`.
 - **Link to the API** with the `xref:` protocol and the **top-level**
-  exported name: ``[`summarize`](xref:api#mypackage.summarize)``, not
-  `mypackage.stats.summarize` (mystmd lowercases `$`-abbreviated anchors;
+  exported name: ``[`summarize`](xref:api#radtrax.summarize)``, not
+  `radtrax.stats.summarize` (mystmd lowercases `$`-abbreviated anchors;
   see `docs/README.md`). A missing target fails `myst build --strict`.
 - **URLs are flat**: a page's URL is its basename, with `_` turned into `-`
   (`guide/quickstart.md` → `/quickstart/`,

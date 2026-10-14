@@ -13,7 +13,7 @@ honestly: what ran, what passed, what was skipped and why.
 ```bash
 uv run --group lint ruff check .          # entire repo: tests/, scripts/, notebook cells
 uv run --group lint ruff format --check .
-make typecheck                            # ty on src/mypackage and scripts (what CI runs)
+make typecheck                            # ty on src/radtrax and scripts (what CI runs)
 make test-cov                             # every test + doctests, with the 90 % coverage gate (what CI runs)
 ```
 

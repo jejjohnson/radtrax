@@ -16,7 +16,7 @@ read it first. This is the checklist.
   `docs/notebooks/`: mystmd builds flat URLs from basenames, underscores
   becoming hyphens (`smoothing_deep_dive.ipynb` → `/smoothing-deep-dive/`),
   and a clash gets an unstable `-1` suffix.
-- Use the public API the way a user would (`import mypackage as mp`); no
+- Use the public API the way a user would (`import radtrax as mp`); no
   private names.
 
 ## 2. Draft in `.py`, commit the `.ipynb`
@@ -43,7 +43,7 @@ read it first. This is the checklist.
 - Figures inline with `plt.show()`: no `savefig`, no committed PNGs; keep
   the notebook under the pre-commit `check-added-large-files` limit (500 kB
   by default) with few, small figures.
-- Link API names with ``[`summarize`](xref:api#mypackage.summarize)`` — the
+- Link API names with ``[`summarize`](xref:api#radtrax.summarize)`` — the
   **top-level** name; a missing target fails the strict build.
 - Every number quoted in a markdown cell matches what the cells print.
 - Random draws, if any, are seeded so a re-run reproduces the outputs.

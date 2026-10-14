@@ -95,7 +95,7 @@ Fill in sections according to the template's intent. **Minimum required sections
   ````
 
 - **Code-first, prose-last** — Design Snapshot and Proposed API should LEAD with the exact snippet the implementer will reproduce; prose goes after.
-- **Concrete implementation steps** — each step should name the file path + function, not a generic `...`. Example: `Add \`savitzky_golay\` in \`src/mypackage/smoothing.py\``
+- **Concrete implementation steps** — each step should name the file path + function, not a generic `...`. Example: `Add \`savitzky_golay\` in \`src/radtrax/smoothing.py\``
 
 ### Step 4 — Pick labels
 

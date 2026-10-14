@@ -1,19 +1,19 @@
 # Command-line interface
 
-Installing the package puts a `mypackage` executable on your `PATH` via the
+Installing the package puts a `radtrax` executable on your `PATH` via the
 `[project.scripts]` entry point:
 
 ```toml
 [project.scripts]
-mypackage = "mypackage.cli:main"
+radtrax = "radtrax.cli:main"
 ```
 
 It is built on `argparse` from the standard library, so the package still
 declares zero runtime dependencies.
 
 ```bash
-mypackage --help
-mypackage --version
+radtrax --help
+radtrax --version
 ```
 
 ## `summarize`
@@ -21,7 +21,7 @@ mypackage --version
 Print descriptive statistics for a series of numbers.
 
 ```bash
-mypackage summarize [PATH] [--ddof N] [--json]
+radtrax summarize [PATH] [--ddof N] [--json]
 ```
 
 `PATH` is a file of whitespace- or comma-separated numbers, or `-` (the
@@ -33,7 +33,7 @@ represent them in standard JSON.
 :::{tab-item} Table output
 
 ```console
-$ echo "1 2 3 4 5" | mypackage summarize
+$ echo "1 2 3 4 5" | radtrax summarize
 count                  5
 ddof                   1
 maximum                5
@@ -48,7 +48,7 @@ variance             2.5
 :::{tab-item} JSON output
 
 ```console
-$ echo "1 2 3 4 5" | mypackage summarize --json
+$ echo "1 2 3 4 5" | radtrax summarize --json
 {
   "count": 5,
   "ddof": 1,
@@ -65,7 +65,7 @@ $ echo "1 2 3 4 5" | mypackage summarize --json
 :::{tab-item} From a file
 
 ```console
-$ mypackage summarize measurements.txt --ddof 0
+$ radtrax summarize measurements.txt --ddof 0
 ```
 :::
 ::::
@@ -74,7 +74,7 @@ $ mypackage summarize measurements.txt --ddof 0
 `--json` makes the output composable:
 
 ```bash
-mypackage summarize data.txt --json | jq '.mean, .std'
+radtrax summarize data.txt --json | jq '.mean, .std'
 ```
 :::
 
@@ -83,7 +83,7 @@ mypackage summarize data.txt --json | jq '.mean, .std'
 Apply a smoothing filter and print one value per line.
 
 ```bash
-mypackage smooth [PATH] [--method {mean,median,ewma}] [--window N]
+radtrax smooth [PATH] [--method {mean,median,ewma}] [--window N]
                         [--alpha A] [--padding STRATEGY] [--precision D]
 ```
 
@@ -96,7 +96,7 @@ mypackage smooth [PATH] [--method {mean,median,ewma}] [--window N]
 | `--precision` | `6` | — | decimals in the output; must be non-negative |
 
 ```console
-$ printf "1 1 99 1 1" | mypackage smooth --method median --window 3 --precision 1
+$ printf "1 1 99 1 1" | radtrax smooth --method median --window 3 --precision 1
 1.0
 1.0
 1.0
@@ -107,7 +107,7 @@ $ printf "1 1 99 1 1" | mypackage smooth --method median --window 3 --precision 
 With `--padding none` the output is `window - 1` samples shorter:
 
 ```console
-$ echo "1 2 3 4 5" | mypackage smooth --padding none --precision 1
+$ echo "1 2 3 4 5" | radtrax smooth --padding none --precision 1
 2.0
 3.0
 4.0
@@ -125,7 +125,7 @@ Errors go to standard error, prefixed with `error: `, leaving standard output
 clean for pipes:
 
 ```console
-$ echo "1 2 banana" | mypackage summarize
+$ echo "1 2 banana" | radtrax summarize
 error: 'input' must contain only numbers, got 'banana' at index 2
 $ echo $?
 1
@@ -133,14 +133,14 @@ $ echo $?
 
 ## Testing a CLI
 
-[`main`](xref:api#mypackage.cli.main) accepts its streams as arguments and **returns**
+[`main`](xref:api#radtrax.cli.main) accepts its streams as arguments and **returns**
 an exit status rather than calling `sys.exit`. That is what makes the whole
 CLI testable in-process, with no subprocess and no monkeypatching:
 
 ```python
 import io
 
-from mypackage.cli import main
+from radtrax.cli import main
 
 out = io.StringIO()
 status = main(["summarize", "-", "--json"], out=out, stdin=io.StringIO("1 2 3 4"))
@@ -149,10 +149,10 @@ status                                 # 0
 json.loads(out.getvalue())["mean"]     # 2.5
 ```
 
-[`build_parser`](xref:api#mypackage.cli.build_parser) is exposed separately so tests
+[`build_parser`](xref:api#radtrax.cli.build_parser) is exposed separately so tests
 and documentation tooling can introspect the argument structure without
 running anything.
 
 ## API
 
-Full signatures live in the [CLI API reference](xref:api#mypackage.cli).
+Full signatures live in the [CLI API reference](xref:api#radtrax.cli).

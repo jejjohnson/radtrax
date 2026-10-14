@@ -27,7 +27,7 @@ two-tool build.
   `:::{grid-item-card}` (see `docs/index.md` and `docs/guide/*.md`).
 - Maths with `$…$` and `$$…$$`.
 - Link the API with the `xref:` protocol and the **top-level** name:
-  ``[`summarize`](xref:api#mypackage.summarize)``. Links to other prose pages
+  ``[`summarize`](xref:api#radtrax.summarize)``. Links to other prose pages
   are relative paths to their source files (`[CLI](guide/cli.md)`).
 - Code blocks are illustrative (nothing executes them): run every snippet
   yourself and paste real output.

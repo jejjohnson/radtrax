@@ -1,7 +1,7 @@
-"""Exception hierarchy for `mypackage`.
+"""Exception hierarchy for `radtrax`.
 
 Every error raised by this package derives from
-[`MypackageError`][mypackage.MypackageError], so a caller can trap the whole
+[`RadtraxError`][radtrax.RadtraxError], so a caller can trap the whole
 package with a single ``except`` clause while still being able to discriminate
 between failure modes when it matters.
 
@@ -15,29 +15,29 @@ from __future__ import annotations
 
 __all__ = [
     "EmptySeriesError",
-    "MypackageError",
     "NotFittedError",
+    "RadtraxError",
     "ValidationError",
 ]
 
 
-class MypackageError(Exception):
-    """Base class for every exception raised by ``mypackage``.
+class RadtraxError(Exception):
+    """Base class for every exception raised by ``radtrax``.
 
     Examples:
-        >>> from mypackage import EmptySeriesError, MypackageError
-        >>> issubclass(EmptySeriesError, MypackageError)
+        >>> from radtrax import EmptySeriesError, RadtraxError
+        >>> issubclass(EmptySeriesError, RadtraxError)
         True
     """
 
 
-class ValidationError(MypackageError, ValueError):
+class ValidationError(RadtraxError, ValueError):
     """Raised when an argument fails validation.
 
     Also a `ValueError`, so ``except ValueError`` still catches it.
 
     Examples:
-        >>> from mypackage import moving_average
+        >>> from radtrax import moving_average
         >>> try:
         ...     moving_average([1.0, 2.0, 3.0], window=0)
         ... except ValueError as err:
@@ -50,7 +50,7 @@ class EmptySeriesError(ValidationError):
     """Raised when an operation requires at least one observation.
 
     Examples:
-        >>> from mypackage import EmptySeriesError, summarize
+        >>> from radtrax import EmptySeriesError, summarize
         >>> try:
         ...     summarize([])
         ... except EmptySeriesError as err:
@@ -59,11 +59,11 @@ class EmptySeriesError(ValidationError):
     """
 
 
-class NotFittedError(MypackageError, RuntimeError):
+class NotFittedError(RadtraxError, RuntimeError):
     """Raised when a stateful transform is used before it has been fitted.
 
     Examples:
-        >>> from mypackage import NotFittedError, Standardize
+        >>> from radtrax import NotFittedError, Standardize
         >>> try:
         ...     Standardize().apply([1.0, 2.0])
         ... except NotFittedError as err:

@@ -39,7 +39,7 @@ are given. Read "The contracts" in `AGENTS.md`.
    rescaling would not; `x ** 2` raising `OverflowError` where `x * x`
    gives `inf`), `nan` / `inf` inputs, `q` or `alpha` at the ends of their
    ranges, even and odd window lengths, off-by-one in padding.
-5. **Errors.** A bare `except`, an exception that is not a `MypackageError`
+5. **Errors.** A bare `except`, an exception that is not a `RadtraxError`
    (or not its stdlib base), a message that does not name the argument, a
    cause dropped (`raise … from err` missing), an error swallowed in the
    CLI so the exit status is 0.
@@ -56,8 +56,8 @@ are given. Read "The contracts" in `AGENTS.md`.
 ## Verify before reporting
 
 For each candidate, trace a concrete input to the failure and run it:
-`uv run python -c "import mypackage as mp; ..."`, or the doctest with
-`uv run pytest --no-cov src/mypackage/<module>.py`. Report what you ran and
+`uv run python -c "import radtrax as mp; ..."`, or the doctest with
+`uv run pytest --no-cov src/radtrax/<module>.py`. Report what you ran and
 what it printed. Drop anything you cannot substantiate, or report it
 explicitly as unverified.
 

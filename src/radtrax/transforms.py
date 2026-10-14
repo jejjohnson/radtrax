@@ -1,19 +1,19 @@
 """Composable series transforms with a fit / apply lifecycle.
 
-Every transform here satisfies the [`Transform`][mypackage.Transform]
+Every transform here satisfies the [`Transform`][radtrax.Transform]
 protocol — a single `apply` method. Transforms that learn state from data
 (`Standardize`, `MinMaxScale`) additionally satisfy
-[`Fittable`][mypackage.Fittable] and raise
-[`NotFittedError`][mypackage.NotFittedError] if used before `fit`.
+[`Fittable`][radtrax.Fittable] and raise
+[`NotFittedError`][radtrax.NotFittedError] if used before `fit`.
 
-Because the protocols are structural, [`Pipeline`][mypackage.Pipeline] happily
+Because the protocols are structural, [`Pipeline`][radtrax.Pipeline] happily
 composes your own transforms alongside the built-in ones — no base class to
 inherit from, no registry to join:
 
 ```python
 from dataclasses import dataclass
 
-from mypackage import Series, chain, Standardize
+from radtrax import Series, chain, Standardize
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,11 +32,11 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Self
 
-from mypackage._typing import Series, Transform
-from mypackage.exceptions import NotFittedError, ValidationError
-from mypackage.smoothing import Padding, moving_average
-from mypackage.stats import summarize
-from mypackage.utils import as_floats, require_non_empty, require_positive
+from radtrax._typing import Series, Transform
+from radtrax.exceptions import NotFittedError, ValidationError
+from radtrax.smoothing import Padding, moving_average
+from radtrax.stats import summarize
+from radtrax.utils import as_floats, require_non_empty, require_positive
 
 
 __all__ = [
@@ -224,7 +224,7 @@ class Clip:
     """Clamp every value into ``[lower, upper]``.
 
     Stateless: `fit` is a no-op that returns ``self``, so `Clip` drops into a
-    [`Pipeline`][mypackage.Pipeline] next to fitted transforms without special
+    [`Pipeline`][radtrax.Pipeline] next to fitted transforms without special
     casing.
 
     Attributes:
@@ -277,14 +277,14 @@ class Clip:
 
 @dataclass(frozen=True, slots=True)
 class MovingAverage:
-    """Transform adapter around [`moving_average`][mypackage.moving_average].
+    """Transform adapter around [`moving_average`][radtrax.moving_average].
 
     Stateless, so it composes freely inside a
-    [`Pipeline`][mypackage.Pipeline].
+    [`Pipeline`][radtrax.Pipeline].
 
     Attributes:
         window: Number of samples averaged per output point.
-        padding: Boundary strategy, see [`Padding`][mypackage.Padding].
+        padding: Boundary strategy, see [`Padding`][radtrax.Padding].
 
     Examples:
         >>> MovingAverage(window=3).apply([1.0, 2.0, 3.0, 4.0, 5.0])[1:4]
@@ -414,7 +414,7 @@ class Pipeline:
 
 
 def chain(*transforms: Transform) -> Pipeline:
-    """Build a [`Pipeline`][mypackage.Pipeline] from positional transforms.
+    """Build a [`Pipeline`][radtrax.Pipeline] from positional transforms.
 
     A small convenience over ``Pipeline([...])`` that reads better inline.
 

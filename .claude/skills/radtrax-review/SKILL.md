@@ -1,5 +1,5 @@
 ---
-name: mypackage-review
+name: radtrax-review
 description: Review a change or pull request in this repository against its own rules — CODE_REVIEW.md, the contracts in AGENTS.md, reuse of what the package already provides, and correctness at the boundaries (validation, mutation, the fit / apply lifecycle, numeric edge cases, doctest accuracy). Use when asked to review a diff, branch or PR in this repo.
 ---
 
@@ -20,7 +20,7 @@ description: Review a change or pull request in this repository against its own 
    in `AGENTS.md`: the `utils` validators and `'name' must …` messages, new
    lists out, `NotFittedError` before `fit`, `fit` returning `self`,
    frozen stateless transforms, CLI handlers writing only to the injected
-   streams, exceptions deriving from `MypackageError` and their stdlib base.
+   streams, exceptions deriving from `RadtraxError` and their stdlib base.
 5. **Checklist** — the rest of `CODE_REVIEW.md` (public API, API page and
    `docs/api/index.md` row, capability index, MyST prose, tests and tiers),
    skipping what ruff, ty or the tests already enforce.

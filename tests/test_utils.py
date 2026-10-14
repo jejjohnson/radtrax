@@ -1,11 +1,11 @@
-"""Tests for ``mypackage.utils``."""
+"""Tests for ``radtrax.utils``."""
 
 from __future__ import annotations
 
 import pytest
 
-from mypackage import EmptySeriesError, ValidationError, Window, as_floats, timer
-from mypackage.utils import Elapsed, require_non_empty, require_positive
+from radtrax import EmptySeriesError, ValidationError, Window, as_floats, timer
+from radtrax.utils import Elapsed, require_non_empty, require_positive
 
 
 class TestAsFloats:

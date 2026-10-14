@@ -1,6 +1,6 @@
 ---
 name: add-transform
-description: Add a transform to the package — a dataclass that satisfies the runtime-checkable Transform protocol (apply returns a new list), stateless and frozen or fitted with trailing-underscore state, NotFittedError before fit, fit returning self, fit_apply, validation in __post_init__, composition in Pipeline, the protocol tests, docs and the capability index. Use when asked to add a scaler, a filter adapter, an encoder or any step that goes into a Pipeline in src/mypackage/transforms.py.
+description: Add a transform to the package — a dataclass that satisfies the runtime-checkable Transform protocol (apply returns a new list), stateless and frozen or fitted with trailing-underscore state, NotFittedError before fit, fit returning self, fit_apply, validation in __post_init__, composition in Pipeline, the protocol tests, docs and the capability index. Use when asked to add a scaler, a filter adapter, an encoder or any step that goes into a Pipeline in src/radtrax/transforms.py.
 ---
 
 <!-- template-example: this recipe is written for the example package's Transform protocol; rewrite it for your package's extension points. -->
@@ -20,7 +20,7 @@ step-by-step.
   `moving_average`) needs the function first: if it is missing, add it with
   `add-function`, then adapt it here.
 
-## 2. Pick the kind (`src/mypackage/transforms.py`)
+## 2. Pick the kind (`src/radtrax/transforms.py`)
 
 | It… | Kind | Exemplar |
 |---|---|---|
@@ -51,10 +51,10 @@ step-by-step.
 
 ## 4. Export and document
 
-- `__all__` in `transforms.py` and in `src/mypackage/__init__.py` (import
+- `__all__` in `transforms.py` and in `src/radtrax/__init__.py` (import
   and `__all__`, sorted).
 - The API page `docs/api/transforms.md` picks it up from
-  `::: mypackage.transforms`; add the name to the Transforms row of
+  `::: radtrax.transforms`; add the name to the Transforms row of
   `docs/api/index.md` and, if it changes the picture, the "Stateless versus
   fitted" table in `docs/guide/transforms.md`.
 - `make capabilities`.
@@ -74,7 +74,7 @@ step-by-step.
 ## 6. Verify
 
 ```bash
-uv run pytest --no-cov tests/test_transforms.py src/mypackage/transforms.py tests/test_public_api.py tests/test_capabilities.py -v
+uv run pytest --no-cov tests/test_transforms.py src/radtrax/transforms.py tests/test_public_api.py tests/test_capabilities.py -v
 make test-cov
 ```
 

@@ -1,6 +1,6 @@
 ---
 name: add-function
-description: Add a public function, class or module to the package — validation at the boundary with the utils validators, a pure result, an executable Google-style docstring, exports in the module and top-level __all__, a new module in SUBMODULES with its API page, the capability index, and tests. Use when asked to add, port or implement a statistic, a filter, a helper or a new module in src/mypackage.
+description: Add a public function, class or module to the package — validation at the boundary with the utils validators, a pure result, an executable Google-style docstring, exports in the module and top-level __all__, a new module in SUBMODULES with its API page, the capability index, and tests. Use when asked to add, port or implement a statistic, a filter, a helper or a new module in src/radtrax.
 ---
 
 <!-- template-example: this recipe is written for the example package's modules, validators and test files; rewrite it for your package's extension points. -->
@@ -24,11 +24,11 @@ Read "1. Public functions" and "The public API" under "The contracts" in
 
 | It is… | Module | Exemplar |
 |---|---|---|
-| A statistic of a whole series, or a streaming accumulator | `src/mypackage/stats.py` | `quantile`, `RunningStats` |
-| A filter that returns a smoothed series | `src/mypackage/smoothing.py` | `moving_average` (with `Padding`), `exponential_moving_average` |
-| A validator or a helper two modules need | `src/mypackage/utils.py` | `require_positive`, `Window` |
-| A new exception | `src/mypackage/exceptions.py` | `NotFittedError` (derive from `MypackageError` **and** the closest stdlib exception) |
-| A new family of its own | a new `src/mypackage/<name>.py` | `smoothing.py` |
+| A statistic of a whole series, or a streaming accumulator | `src/radtrax/stats.py` | `quantile`, `RunningStats` |
+| A filter that returns a smoothed series | `src/radtrax/smoothing.py` | `moving_average` (with `Padding`), `exponential_moving_average` |
+| A validator or a helper two modules need | `src/radtrax/utils.py` | `require_positive`, `Window` |
+| A new exception | `src/radtrax/exceptions.py` | `NotFittedError` (derive from `RadtraxError` **and** the closest stdlib exception) |
+| A new family of its own | a new `src/radtrax/<name>.py` | `smoothing.py` |
 
 Imports only point down the module table in `AGENTS.md`: a library module
 never imports `cli` or `transforms`.
@@ -51,16 +51,16 @@ never imports `cli` or `transforms`.
 
 ## 4. Export and document
 
-- Add the name to the module's `__all__` and to `src/mypackage/__init__.py`
+- Add the name to the module's `__all__` and to `src/radtrax/__init__.py`
   (import and `__all__`), both sorted (`tests/test_public_api.py` and ruff's
   `RUF022`).
 - A function on an existing module appears on its API page automatically
-  (`::: mypackage.<module>` in `docs/api/<module>.md`); add it to that
+  (`::: radtrax.<module>` in `docs/api/<module>.md`); add it to that
   module's row in `docs/api/index.md`.
 - A **new module**: a module docstring (its first sentence titles the
   capability-index group), a sorted `__all__`, an entry in `SUBMODULES` in
   `tests/test_public_api.py`, a `docs/api/<module>.md` page with a
-  `::: mypackage.<module>` block, a `nav` entry in `mkdocs.yml` and a row in
+  `::: radtrax.<module>` block, a `nav` entry in `mkdocs.yml` and a row in
   `docs/api/index.md`; a guide page if it deserves prose (`add-guide-page`).
 - `make capabilities`.
 
@@ -82,7 +82,7 @@ function:
 ## 6. Verify
 
 ```bash
-uv run pytest --no-cov tests/test_<module>.py src/mypackage/<module>.py tests/test_public_api.py tests/test_capabilities.py -v
+uv run pytest --no-cov tests/test_<module>.py src/radtrax/<module>.py tests/test_public_api.py tests/test_capabilities.py -v
 make test-cov       # the whole suite with the 90 % coverage gate
 ```
 

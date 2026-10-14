@@ -1,4 +1,4 @@
-"""Tests for ``mypackage.stats``."""
+"""Tests for ``radtrax.stats``."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from mypackage import (
+from radtrax import (
     EmptySeriesError,
     RunningStats,
     Summary,

@@ -11,7 +11,7 @@ The essentials, in case you only read this file:
 
 <!-- template-example: the module map and contracts of the example package. -->
 
-- One package, `src/mypackage/`, dependency-free, with modules that import
+- One package, `src/radtrax/`, dependency-free, with modules that import
   only downward: `_typing` → `exceptions` → `utils` → `stats` / `smoothing`
   → `transforms` → `cli`. Search
   [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a
@@ -24,7 +24,7 @@ The essentials, in case you only read this file:
     raise `NotFittedError` before `fit`, and `fit` returns `self`;
   - **CLI** subcommands write to the injected streams and return an exit
     status; library errors become exit 1, usage errors exit 2;
-  - every exception derives from `MypackageError` and its stdlib base.
+  - every exception derives from `RadtraxError` and its stdlib base.
 
 The rules for every project:
 
