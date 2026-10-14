@@ -66,7 +66,7 @@ gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.6.2",
 ]
 lint = [
     "import-linter>=2.1",
