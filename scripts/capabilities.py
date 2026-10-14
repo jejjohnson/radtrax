@@ -64,9 +64,27 @@ PACKAGE = _package_name()
 
 # Libraries the package builds on, as {distribution: [public modules]}, with a
 # one-paragraph blurb each, e.g. {"numpy": ["numpy"]}.
-# template-example: empty because the example package is dependency-free.
-UPSTREAM: dict[str, list[str]] = {}
-UPSTREAM_BLURB: dict[str, str] = {}
+UPSTREAM: dict[str, list[str]] = {
+    "gaussx": ["gaussx"],
+    "lineax": ["lineax"],
+    "optimistix": ["optimistix"],
+}
+UPSTREAM_BLURB: dict[str, str] = {
+    "gaussx": (
+        "Structured Gaussian linear algebra for JAX: low-rank updates and "
+        "Woodbury solves, block-tridiagonal operators, structured Cholesky. "
+        "radtrax uses it for matched-filter and retrieval covariances."
+    ),
+    "lineax": (
+        "Linear solves in JAX with implicit differentiation. radtrax uses it "
+        "for linear systems that are not covariances."
+    ),
+    "optimistix": (
+        "Root finding, least squares and fixed points in JAX. radtrax uses "
+        "its Gauss-Newton and Levenberg-Marquardt solvers for optimal "
+        "estimation."
+    ),
+}
 
 # Names two homes may bind to different objects, and why, e.g.
 # {"Mean": "stats.Mean is the statistic, aggregation.Mean the reducer"}.

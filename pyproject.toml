@@ -1,15 +1,24 @@
 [project]
-name = "mypackage"
-version = "0.1.6"
-description = "My short description for my project."
+name = "radtrax"
+version = "0.0.0"
+description = "Differentiable radiative transfer in JAX and Equinox for methane and multi-gas remote sensing."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
-keywords = []
+keywords = [
+    "radiative-transfer",
+    "remote-sensing",
+    "methane",
+    "matched-filter",
+    "retrieval",
+    "jax",
+    "equinox",
+]
 requires-python = ">=3.12"
 classifiers = [
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
     "Topic :: Scientific/Engineering",
     "Topic :: Software Development :: Libraries",
     "Programming Language :: Python :: 3.12",
@@ -19,13 +28,39 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Development Status :: 2 - Pre-Alpha",
 ]
-dependencies = []
+# The base install is JAX-only: geo carriers, table building and the Bayesian
+# retrievals arrive through extras (package-boundaries rule 3).
+dependencies = [
+    "jax>=0.10",
+    "jaxlib>=0.10",
+    "equinox>=0.13",
+    "jaxtyping>=0.3",
+    "lineax>=0.1",
+    "optimistix>=0.1",
+    "gaussx>=0.6.5",
+    "numpy>=2.0",
+    "xarray",
+    # backs the compressed-NetCDF round-trip of the cross-section tables.
+    "netcdf4",
+]
+
+[project.optional-dependencies]
+# HITRAN cross-section tables through HAPI (offline table building).
+hitran = []
+# GeoTensor operators (radtrax.geo): geotoolz, georeader.
+geo = []
+# scikit-learn background estimators for the matched filter.
+cluster = []
+# NumPyro and optax for Bayesian and MAP retrievals.
+bayes = []
 
 [project.urls]
-Repository = "https://github.com/jejjohnson/mypackage"
+Repository = "https://github.com/jejjohnson/radtrax"
+Documentation = "https://jejjohnson.github.io/radtrax"
 
-[project.scripts]
-mypackage = "mypackage.cli:main"
+# gaussx is not on PyPI yet: resolve it from its tag, as plumax does.
+[tool.uv.sources]
+gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 
 [dependency-groups]
 dev = [
@@ -67,7 +102,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypackage"]
+packages = ["src/radtrax"]
 
 [tool.ruff]
 target-version = "py312"
@@ -75,7 +110,24 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E402", "E721", "E731", "E741"]
+ignore = [
+    "E402",
+    "E721",
+    "E731",
+    "E741",
+    # Matches plumax, whose radiative-transfer code moves here unchanged
+    # (Wave 1): equation-dense docstring and comment lines are not wrapped
+    # mid-formula; `ruff format` still enforces 88 columns on code.
+    "E501",
+    # jaxtyping shape annotations (Float[Array, "L G"]) read as forward refs.
+    "F722",
+    "F821",
+    # Greek and math glyphs (σ, ν, Δ, ×, –) in docstrings and comments are
+    # deliberate.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
@@ -94,10 +146,10 @@ docstring-code-line-length = 72
 python-version = "3.12"
 
 [tool.pytest.ini_options]
-# `src/mypackage` is a testpath so that --doctest-modules collects the
+# `src/radtrax` is a testpath so that --doctest-modules collects the
 # ``Examples:`` blocks in every Google-style docstring. They are executable
 # documentation: if an example in the docs goes stale, CI fails.
-testpaths = ["tests", "src/mypackage"]
+testpaths = ["tests", "src/radtrax"]
 # Test tiers (see "Test tiers" in AGENTS.md). CI runs every tier.
 strict_markers = true
 markers = [
@@ -106,13 +158,13 @@ markers = [
 ]
 addopts = """\
     --doctest-modules \
-    --cov=src/mypackage \
+    --cov=src/radtrax \
     --cov-report=term-missing \
     --cov-report=xml:coverage.xml\
 """
 
 [tool.coverage.run]
-source = ["src/mypackage"]
+source = ["src/radtrax"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

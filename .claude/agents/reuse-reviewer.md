@@ -28,24 +28,20 @@ in `AGENTS.md`.
    - a grep of `src/` for the key operation (`fsum`, `sorted(`, `deque(`,
      `float(`, the error-message text).
 3. Also flag, wherever they appear in the diff:
-   <!-- template-example: these are the example package's usual re-implementations; replace them with your package's. -->
-   - hand-written coercion or validation (`[float(v) for v in series]`,
-     `if not series`, `if window <= 0`, an `isinstance(x, int)` check) →
-     `as_floats`, `require_non_empty`, `require_positive`;
-   - a mean, variance, standard deviation, quantile, median or z-score →
-     `summarize` / `Summary`, `quantile`, `zscores`, `RunningStats`;
-   - a rolling mean or median, an exponential smoother, end padding or
-     reflection → `moving_average`, `median_filter`,
-     `exponential_moving_average`, `Padding` and `smoothing._pad`;
-   - a `deque(maxlen=…)` buffer → `Window`;
-   - standardising, min–max scaling, clamping, or a loop applying steps in
-     order → `Standardize`, `MinMaxScale`, `Clip`, `Pipeline` / `chain`;
-   - a base class or registry for transforms → the structural `Transform`
-     protocol;
-   - a new exception class for invalid input or a missing `fit` →
-     `ValidationError`, `EmptySeriesError`, `NotFittedError`;
-   - number parsing or stream handling in the CLI → `cli._read_values`, the
-     `run`-style injected streams of `main`;
+   - a dense inverse, a hand-written Woodbury identity or Cholesky solve on a
+     covariance → `gaussx` operators and `gx.solve`;
+   - a Gauss–Newton, Levenberg–Marquardt or fixed-point loop →
+     `optimistix` (`GaussNewton`, `LevenbergMarquardt`,
+     `FixedPointIteration`), L-BFGS → `optax.lbfgs`;
+   - a tridiagonal or block-tridiagonal solve → `lineax`,
+     `gaussx.BlockTriDiag`;
+   - a hand-written Jacobian or adjoint → `jax.jacrev` / `jax.jacfwd`;
+   - a matched filter, background covariance estimator, SRF band
+     integration or air-mass factor → the one implementation in radtrax
+     (or, before Wave 1 lands, the one in plumax to port);
+   - plume masks, footprints, IME or flux → plumax, never radtrax;
+   - generic GeoTensor handling (nodata, wrapping, band lookup) → geotoolz's
+     public helpers;
    - a public name that duplicates another public name for a different
      object (`tests/test_capabilities.py` will fail on it).
 

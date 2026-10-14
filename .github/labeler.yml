@@ -50,24 +50,24 @@
 "layer:0-primitives":
   - changed-files:
     - any-glob-to-any-file:
-      - "src/**/_typing.py"
       - "src/**/exceptions.py"
-      - "src/**/utils.py"
-      - "src/**/_primitives/**"
+      - "src/**/atmosphere/**"
+      - "src/**/spectroscopy/**"
 
 "layer:1-components":
   - changed-files:
     - any-glob-to-any-file:
-      - "src/**/stats.py"
-      - "src/**/smoothing.py"
-      - "src/**/_components/**"
+      - "src/**/solvers/**"
+      - "src/**/surface/**"
+      - "src/**/instrument/**"
+      - "src/**/slab/**"
 
 "layer:2-models":
   - changed-files:
     - any-glob-to-any-file:
-      - "src/**/transforms.py"
-      - "src/**/cli.py"
-      - "src/**/_models/**"
+      - "src/**/retrieval/**"
+      - "src/**/geo/**"
+      - "src/**/__init__.py"
 
 # --- Default / legacy labels retained for Dependabot compatibility ---------
 

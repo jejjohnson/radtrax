@@ -12,6 +12,6 @@ for an existing equivalent; then apply [`CODE_REVIEW.md`](../../../CODE_REVIEW.m
 and report in its format.
 
 The full procedure, with the reuse and correctness checklists, is the
-`mypackage-review` recipe in
-[`.claude/skills/mypackage-review/SKILL.md`](../../../.claude/skills/mypackage-review/SKILL.md)
+`radtrax-review` recipe in
+[`.claude/skills/radtrax-review/SKILL.md`](../../../.claude/skills/radtrax-review/SKILL.md)
 and the two reviewers in [`.claude/agents/`](../../../.claude/agents/).

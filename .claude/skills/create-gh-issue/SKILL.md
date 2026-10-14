@@ -49,7 +49,7 @@ Before opening any issue, confirm these five inputs with the user (or infer from
 
 1. **Template** — which of the six (see table above)
 2. **Title** — follow the template's title convention:
-   - Feature / chore: `<scope>: <short description>` — e.g. `feat(smoothing): Savitzky–Golay filter`
+   - Feature / chore: `<scope>: <short description>` — e.g. `feat(spectroscopy): TableOpacity`
    - Design: `[Design] <question>` — e.g. `[Design] per-parameter prior: pytree vs scalar`
    - Research: `research: <topic>` — e.g. `research: parallel-in-time filters vs this project`
    - Bug: `bug: <short description>`
@@ -95,19 +95,17 @@ Fill in sections according to the template's intent. **Minimum required sections
   ````
 
 - **Code-first, prose-last** — Design Snapshot and Proposed API should LEAD with the exact snippet the implementer will reproduce; prose goes after.
-- **Concrete implementation steps** — each step should name the file path + function, not a generic `...`. Example: `Add \`savitzky_golay\` in \`src/mypackage/smoothing.py\``
+- **Concrete implementation steps** — each step should name the file path + function, not a generic `...`. Example: `Add \`TableOpacity\` in \`src/radtrax/spectroscopy/tables.py\``
 
 ### Step 4 — Pick labels
 
 Every issue carries exactly one `type:*`, one or more `area:*`, at most one `layer:*`, one `wave:*`, and one `priority:*`. Common combinations (add the `priority:*` and `wave:*` that fit):
 
-<!-- template-example: the layer column maps the example package's modules onto the template's layer labels; remap it for your package. -->
-
 | Work type | Labels |
 |---|---|
-| L0 primitive (a validator, a statistic, a filter: `utils`, `stats`, `smoothing`) | `type:feature`, `area:code`, `layer:0-primitives`, `wave:N`, `priority:p1` |
-| L1 component (a transform, a pipeline feature: `transforms`) | `type:feature`, `area:code`, `layer:1-components`, `wave:N` |
-| L2 public API / wrapper (a CLI subcommand, a top-level export: `cli`, `__init__`) | `type:feature`, `area:code`, `layer:2-models`, `wave:N` |
+| L0 primitive (a function: a profile, a line shape, an interpolation) | `type:feature`, `area:code`, `layer:0-primitives`, `wave:N`, `priority:p1` |
+| L1 component (a module behind a protocol: an opacity provider, a solver, an instrument) | `type:feature`, `area:code`, `layer:1-components`, `wave:N` |
+| L2 public API / wrapper (a forward model, a retrieval driver, a `radtrax.geo` operator) | `type:feature`, `area:code`, `layer:2-models`, `wave:N` |
 | Test coverage | `type:feature`, `area:testing`, `wave:N` |
 | Notebook / docs page | `type:docs`, `area:docs`, `wave:N` |
 | Design / ADR | `type:design`, `area:code` (or `area:engineering`), `wave:N` |
@@ -124,7 +122,7 @@ Write the drafted body to a temporary file, then:
 
 ```bash
 gh issue create \
-  --title "feat(smoothing): Savitzky–Golay filter" \
+  --title "feat(spectroscopy): TableOpacity" \
   --body-file /tmp/issue-body.md \
   --label "type:feature,area:code,layer:0-primitives,wave:1,priority:p1" \
   --milestone "v0.2-<slug>"
@@ -164,7 +162,7 @@ Confirm the filed issue by URL + a one-line summary. If opening multiple issues 
 
 ```
 Draft ID  → GH issue
-MP-05     → #42   feat(smoothing): ...
+RTX-05    → #42   feat(spectroscopy): ...
 MP-06     → #43   feat(cli): ...
 ```
 

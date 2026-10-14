@@ -4,27 +4,23 @@ Read [`AGENTS.md`](../AGENTS.md) at the repository root first: it is the
 single source of truth for every coding agent working here (the module map,
 "reuse before you write", the contracts, the tests that enforce them,
 commands, the pre-commit checklist, the two-tool docs, git and PR rules).
-Passages marked `<!-- template-example: … -->` there describe the bundled
-example package and are rewritten when the template is adopted.
 
 The essentials, in case you only read this file:
 
-<!-- template-example: the module map and contracts of the example package. -->
-
-- One package, `src/mypackage/`, dependency-free, with modules that import
-  only downward: `_typing` → `exceptions` → `utils` → `stats` / `smoothing`
-  → `transforms` → `cli`. Search
+- One package, `src/radtrax/`: differentiable radiative transfer in JAX and
+  Equinox. It never imports plumax; geo carriers (geotoolz, georeader) arrive
+  only through the `[geo]` extra. Search
   [`docs/api/capabilities.md`](../docs/api/capabilities.md) before writing a
-  helper.
+  helper, and port from plumax or geotoolz rather than rewrite.
 - Keep the contracts in `AGENTS.md`:
-  - **public functions** validate once, at the boundary, with the `utils`
-    validators, raise `ValidationError` naming the argument, and return a
-    new list without mutating their input;
-  - **transforms** satisfy the `Transform` protocol structurally; fitted ones
-    raise `NotFittedError` before `fit`, and `fit` returns `self`;
-  - **CLI** subcommands write to the injected streams and return an exit
-    status; library errors become exit 1, usage errors exit 2;
-  - every exception derives from `MypackageError` and its stdlib base.
+  - **forward-model components** are `eqx.Module`s; arrays are leaves,
+    never static fields; protocols are abstract Equinox modules;
+  - **derivatives** come from `jax.jacrev` / `jax.jacfwd`, and every public
+    differentiable function has a finite-difference gradient test;
+  - **swaths** are `eqx.filter_vmap` outside `jax.jacrev`;
+  - **float64** for spectroscopy; no NaN gradients at safe values
+    (double-where);
+  - every exception derives from `RadtraxError` and its stdlib base.
 
 The rules for every project:
 
@@ -39,8 +35,7 @@ The rules for every project:
 - Partial test runs need `--no-cov` (the 90 % coverage gate fails a subset).
 - Never push or merge to `main` unless told to; never replace an existing PR
   description, only append to it.
-- Step-by-step recipes (adopt the template, add a function, transform, CLI
-  command, guide page or notebook; pre-PR check; review) are plain Markdown
+- Step-by-step recipes (guide page or notebook; pre-PR check; review) are plain Markdown
   in `.claude/skills/<name>/SKILL.md`, and the two review checklists in
   `.claude/agents/`; follow them as written.
 - Path-scoped standards live in `.github/instructions/`; code review follows

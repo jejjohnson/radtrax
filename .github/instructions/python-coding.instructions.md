@@ -31,11 +31,8 @@ applyTo: "src/**/*.py,tests/**/*.py,scripts/**/*.py"
 | HTTP | `httpx` |
 | Testing | `pytest` |
 
-<!-- template-example: this note is about the bundled example package. -->
-
-> The bundled demo package uses stdlib `argparse` for its CLI rather than
-> `cyclopts`, because the template advertises zero runtime dependencies.
-> Prefer `cyclopts` in a real project where a CLI dependency is acceptable.
+> radtrax is a numerical library with no CLI; the table above applies to
+> scripts and tooling around it.
 
 ## Documentation
 

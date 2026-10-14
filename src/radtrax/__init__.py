@@ -1,0 +1,23 @@
+"""Differentiable radiative transfer in JAX and Equinox.
+
+``radtrax`` (formerly rtmx) is the GeoStack's radiative transfer package: a
+forward model ``y = F(x)`` from an atmospheric state to what a sensor
+measures, written so that every Jacobian a retrieval needs comes from
+automatic differentiation. Its first releases port plumax's band-integrated
+Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var
+retrieval, then rebuild them as one layered forward model.
+
+The design and roadmap live in the GeoStack docs (*radtrax · 3*).
+"""
+
+from __future__ import annotations
+
+from radtrax.exceptions import RadtraxError
+
+
+__version__ = "0.0.0"
+
+__all__ = [
+    "RadtraxError",
+    "__version__",
+]
