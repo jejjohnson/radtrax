@@ -68,6 +68,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pre-commit>=4.6.2",
+    "pytest-github-actions-annotate-failures>=0.3",
 ]
 lint = [
     "import-linter>=2.1",
