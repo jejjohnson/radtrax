@@ -42,15 +42,16 @@ dependencies = [
     "xarray",
     # backs the compressed-NetCDF round-trip of the cross-section tables.
     "netcdf4",
+    # the matched filter's background estimators (empirical, Ledoit-Wolf,
+    # OAS, truncated SVD, Gaussian mixtures); imported inside the estimators.
+    "scikit-learn>=1.3",
 ]
 
 [project.optional-dependencies]
 # HITRAN cross-section tables through HAPI (offline table building).
-hitran = []
+hitran = ["hitran-api"]
 # GeoTensor operators (radtrax.geo): geotoolz, georeader.
 geo = []
-# scikit-learn background estimators for the matched filter.
-cluster = []
 # NumPyro and optax for Bayesian and MAP retrievals.
 bayes = []
 
@@ -67,6 +68,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pre-commit>=4.6.2",
+    "pytest-github-actions-annotate-failures>=0.3",
 ]
 lint = [
     "import-linter>=2.1",
@@ -137,6 +139,10 @@ lines-after-imports = 2
 [tool.ruff.lint.per-file-ignores]
 # Tests deliberately construct invalid inputs and assert on the failure.
 "tests/**" = ["B011"]
+# Lazy (PEP 562) packages: their exports are imported under TYPE_CHECKING only,
+# for type checkers, and resolved at runtime by __getattr__.
+"src/radtrax/retrieval/var3d/__init__.py" = ["F401"]
+"src/radtrax/retrieval/matched_filter/__init__.py" = ["F401"]
 
 [tool.ruff.format]
 # Format the code inside ``Examples:`` doctest blocks like real source.
@@ -145,6 +151,20 @@ docstring-code-line-length = 72
 
 [tool.ty.environment]
 python-version = "3.12"
+
+# ty does not see optional extras (`hapi` behind `[hitran]`) and narrows
+# xarray/numpy unions too aggressively; plumax downgrades the same rules for
+# the code ported from it. Add a rule here only with the reason it is a false
+# positive; the test suite is the correctness gate.
+[tool.ty.rules]
+unresolved-import = "ignore"
+unresolved-attribute = "ignore"
+# jaxtyping dimension names (Float[Array, B]) read as undefined names; quoting
+# them instead trips ruff's UP037 under `from __future__ import annotations`.
+unresolved-reference = "ignore"
+# ty does not accept NumPy arrays where a jax.Array is annotated, which the
+# matched filter's xarray glue passes on purpose (JAX converts them).
+invalid-argument-type = "ignore"
 
 [tool.pytest.ini_options]
 # `src/radtrax` is a testpath so that --doctest-modules collects the

@@ -41,11 +41,11 @@ The plan lives in the issues: start at the
 uv add "radtrax @ git+https://github.com/jejjohnson/radtrax.git"
 ```
 
-The base install is JAX-only (JAX, Equinox, jaxtyping, lineax, optimistix,
-gaussx). Extras add the rest as they land: `[hitran]` (HAPI, to build
-cross-section tables), `[geo]` (geotoolz and georeader, for GeoTensor
-operators), `[cluster]` (scikit-learn background estimators), `[bayes]`
-(NumPyro and optax retrievals).
+The base install is the JAX numerics (JAX, Equinox, jaxtyping, lineax,
+optimistix, gaussx) plus NumPy, xarray and scikit-learn for the matched
+filter's background estimators. Extras add the rest as they land: `[hitran]`
+(HAPI, to build cross-section tables), `[geo]` (geotoolz and georeader, for
+GeoTensor operators), `[bayes]` (NumPyro and optax retrievals).
 
 ## Where it sits
 

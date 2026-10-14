@@ -29,12 +29,12 @@ the layout drifts:
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
 | `atmosphere/` | `AtmosphericState`, AFGL profiles, hydrostatics | Wave 3 |
-| `spectroscopy/` | cross-section tables; `hitran/` builds them (`[hitran]`) | Wave 1 |
+| `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
-| `instrument/` | SRF band integration, PSF and ground sampling | Wave 1 |
-| `slab/` | plumax's single-slab models, kept as v0's regression oracle | Wave 1 |
-| `retrieval/` | `matched_filter/` (the one core), `var3d/` (3D-Var) | Wave 1 |
+| `instrument/` | `srf`: SRF band integration; `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
+| `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
+| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O) | ported (#22, #23) |
 | `geo/` | GeoTensor operators and SBMP (`[geo]`) | Wave 2 |
 
 ### Boundaries
@@ -54,7 +54,7 @@ GeoStack package graph gets a cycle.
   georeader; the base install stays JAX-only. Code in `geo/` imports only
   public geotoolz names, never `geotoolz._src`.
 - **Optional dependencies are lazy.** Anything behind an extra (`hitran`,
-  `geo`, `cluster`, `bayes`) is imported inside the function that needs it,
+  `geo`, `bayes`) is imported inside the function that needs it,
   and a missing extra raises an `ImportError` that names the extra.
 
 Whatever the package, dependencies point one way. When other projects build

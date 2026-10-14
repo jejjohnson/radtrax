@@ -43,8 +43,15 @@ def test_version_is_a_dotted_string() -> None:
     assert all(part.isdigit() for part in (major, minor, patch))
 
 
+def _isort_key(name: str) -> tuple[int, str]:
+    """Ruff's RUF022 order: SCREAMING_CASE, then CamelCase, then the rest."""
+    if name.isupper():
+        return (0, name)
+    return (1 if name[:1].isupper() else 2, name)
+
+
 def test_all_is_sorted_and_unique() -> None:
-    assert radtrax.__all__ == sorted(radtrax.__all__)
+    assert radtrax.__all__ == sorted(radtrax.__all__, key=_isort_key)
     assert len(radtrax.__all__) == len(set(radtrax.__all__))
 
 
@@ -70,7 +77,7 @@ def test_no_unexpected_submodules() -> None:
 def test_submodules_declare_all(module: str) -> None:
     imported = importlib.import_module(f"radtrax.{module}")
     assert hasattr(imported, "__all__"), f"radtrax.{module} is missing __all__"
-    assert imported.__all__ == sorted(imported.__all__)
+    assert imported.__all__ == sorted(imported.__all__, key=_isort_key)
 
 
 def test_package_is_typed() -> None:
@@ -92,4 +99,4 @@ def test_subpackages_match_the_layout() -> None:
 def test_subpackages_import_and_declare_all(package: str) -> None:
     imported = importlib.import_module(f"radtrax.{package}")
     assert imported.__doc__, f"radtrax.{package} needs a docstring saying what it owns"
-    assert imported.__all__ == sorted(imported.__all__)
+    assert imported.__all__ == sorted(imported.__all__, key=_isort_key)
