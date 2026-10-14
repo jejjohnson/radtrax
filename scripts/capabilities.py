@@ -88,7 +88,9 @@ UPSTREAM_BLURB: dict[str, str] = {
 
 # Names two homes may bind to different objects, and why, e.g.
 # {"Mean": "stats.Mean is the statistic, aggregation.Mean the reducer"}.
-ALLOWED_SHARED_NAMES: dict[str, str] = {}
+ALLOWED_SHARED_NAMES: dict[str, str] = {
+    "logger": "each module keeps its own logging.getLogger(__name__)",
+}
 
 _AUTOREF = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
 # A full stop that ends a sentence (not "e.g." / "i.e." / "etc.").
