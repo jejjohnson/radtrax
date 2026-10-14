@@ -6,26 +6,30 @@ distinct populations and the MF loses power. Two standard fixes:
 
 - **GMM clustering** — fit a Gaussian mixture on the per-pixel spectra,
   label each pixel, and run the MF with the local cluster's ``(μ_k, Σ_k)``.
-  :func:`gmm_cluster_background` returns the labels and a list of
-  ``(mean, cov_operator)`` pairs, one per cluster.
+  :func:`gmm_cluster_background` returns a :class:`ClusterBackground`: the
+  labels and one ``(mean, cov_operator)`` pair per cluster.
 - **Adaptive spatial windows** — for each pixel, estimate
   ``(μ_{ij}, \\sigma^2_{ij})`` from a local neighbourhood. Only supports a
   diagonal local covariance (keeps memory at ``O(H·W·n_bands)``) — for full
   local covariance, prefer the GMM route.
 
-Both use scikit-learn / scipy under the hood; neither is on a JAX gradient
-path (the MF treats the background as a fixed input).
+Both are *estimated* with scikit-learn / scipy, off the JAX gradient path.
+The fitted :class:`ClusterBackground` is an Equinox module, so the filter can
+still be differentiated with respect to its means and covariances.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/matched_filter/cluster.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/matched_filter/cluster.py``); its frozen
+dataclass became an Equinox module in radtrax#59.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import equinox as eqx
+import jax.numpy as jnp
 import lineax as lx
 import numpy as np
+from jaxtyping import Array, Float, Int
 
 from radtrax.retrieval.matched_filter.background import (
     estimate_cov_empirical,
@@ -39,9 +43,21 @@ else:
     LinearOperator = object
 
 
-@dataclass(frozen=True)
-class ClusterBackground:
+class ClusterBackground(eqx.Module):
     """Per-cluster background model.
+
+    An Equinox module (radtrax#59): the labels, means and covariance operators
+    are leaves. It passes through ``eqx.filter_jit`` with the image, and
+    through ``eqx.filter_vmap`` over a batch of images with
+    ``in_axes=(None, 0)`` (the default would map the background's own arrays).
+    Two backgrounds share one compilation when they have the same number of
+    clusters, operator types and dtypes; the number of clusters depends on
+    the data, not on ``n_clusters``.
+
+    Under-populated clusters reuse the global ``(μ, Σ)``, so one array or
+    operator can appear at several positions. Each position is still its own
+    leaf: ``eqx.tree_at`` and gradients act per position, so the gradient
+    with respect to the shared global mean is the sum over those positions.
 
     Attributes
     ----------
@@ -49,16 +65,16 @@ class ClusterBackground:
         Cluster assignment per pixel, shape ``(H, W)`` with values in
         ``[0, n_clusters)``.
     means
-        List of per-cluster mean spectra.
+        Tuple of per-cluster mean spectra.
     cov_operators
-        List of per-cluster covariance operators (same structure across
+        Tuple of per-cluster covariance operators (same structure across
         clusters — dense from :func:`estimate_cov_empirical` or
         :func:`estimate_cov_shrunk`).
     """
 
-    labels: np.ndarray
-    means: list[np.ndarray]
-    cov_operators: list[LinearOperator]
+    labels: Int[Array, "H W"]
+    means: tuple[Float[Array, " B"], ...]
+    cov_operators: tuple[LinearOperator, ...]
 
 
 def gmm_cluster_background(
@@ -152,10 +168,12 @@ def gmm_cluster_background(
             cov_op = estimate_cov_shrunk(fake_cube, mean=mu_k, method=cov_estimator)  # type: ignore[arg-type]
         means.append(mu_k)
         ops.append(cov_op)
+    # Tuples of JAX arrays: an immutable structure (a list could be appended
+    # to after construction, changing the compile key) with one leaf type.
     return ClusterBackground(
-        labels=labels.reshape(h, w),
-        means=means,
-        cov_operators=ops,
+        labels=jnp.asarray(labels.reshape(h, w)),
+        means=tuple(jnp.asarray(m) for m in means),
+        cov_operators=tuple(ops),
     )
 
 
