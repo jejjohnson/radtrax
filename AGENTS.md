@@ -34,7 +34,7 @@ the layout drifts:
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
 | `instrument/` | `srf`: SRF band integration; `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
 | `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
-| `retrieval/` | `matched_filter/` (the one core), `var3d/` (3D-Var) | Wave 1 |
+| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics), ported (#23); `matched_filter/`: the one core | Wave 1 |
 | `geo/` | GeoTensor operators and SBMP (`[geo]`) | Wave 2 |
 
 ### Boundaries
