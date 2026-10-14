@@ -24,3 +24,5 @@ jobs:
         run: uv run --group lint ruff check .
       - name: Run ruff format check
         run: uv run --group lint ruff format --check .
+      - name: Check import contracts (radtrax never imports plumax)
+        run: uv run --group lint lint-imports
