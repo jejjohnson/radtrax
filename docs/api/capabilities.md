@@ -42,8 +42,6 @@ current).
 | `Literal` | function | Re-exported from `typing`. |
 | `PSFType` | function | Re-exported from `typing`. |
 | `annotations` | constant | Re-exported from `__future__`. |
-| `dataclass` | function | Re-exported from `dataclasses`. |
-| `field` | function | Re-exported from `dataclasses`. |
 
 ## `radtrax.instrument.srf`
 
@@ -58,6 +56,8 @@ current).
 | Name | Kind | What it does |
 |---|---|---|
 | `SRFType` | function | Re-exported from `typing`. |
+| `dataclass` | function | Re-exported from `dataclasses`. |
+| `field` | function | Re-exported from `dataclasses`. |
 
 ## `radtrax.retrieval.matched_filter`
 

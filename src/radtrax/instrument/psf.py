@@ -26,14 +26,20 @@ The numpy reference for the PSF/GSD logic lives in
 ``jej_vc_snippets/methane_retrieval/lut_obs_op.py``; this is the JAX rewrite
 that lets the same operators participate in autodiff-based 3D-Var solves.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/radtran/instrument.py``); only import paths changed.
+Both operators are Equinox modules (radtrax#57): the PSF kernel is a pytree
+leaf, so ``jax.grad`` reaches it, ``jax.vmap`` maps over a batch of PSFs, and
+``eqx.filter_jit`` compiles once per kernel shape rather than once per
+instance.
+
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/radtran/instrument.py``),
+where both were frozen dataclasses.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from typing import Literal
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -53,8 +59,7 @@ LRCube = Float[Array, "ny_lr nx_lr n_lambda"]
 # ── Point Spread Function ────────────────────────────────────────────────────
 
 
-@dataclass(frozen=True, eq=False)
-class PointSpreadFunction:
+class PointSpreadFunction(eqx.Module):
     """2D PSF blur applied independently per spectral channel.
 
     The PSF is a fixed convolution kernel (``kernel_size × kernel_size``,
@@ -62,30 +67,22 @@ class PointSpreadFunction:
     Jacobian is the operator itself; the adjoint is convolution with the
     180°-flipped kernel (real-valued case).
 
-    The class is ``frozen=True, eq=False`` so the default
-    ``object.__eq__`` (identity comparison) and ``object.__hash__``
-    (``id``-based) are retained. An auto-generated dataclass ``__eq__``
-    would do *element-wise* equality on the ``kernel: np.ndarray`` field
-    — ambiguous in bool context — and the corresponding ``__hash__``
-    would crash because numpy arrays are unhashable. Identity semantics
-    are what ``jax.jit`` static-arg caching actually wants: a PSF
-    instance is re-used as-is or replaced wholesale; it never needs
-    structural equality.
+    The kernel is a pytree leaf: differentiate through it with
+    ``eqx.filter_grad``, map over a stack of PSFs with ``eqx.filter_vmap``.
+    Unlike the plumax dataclass, an instance is not hashable (its kernel is an
+    array), so it cannot be a static ``jit`` argument or a dict key; pass it
+    to ``eqx.filter_jit`` instead.
 
     Attributes
     ----------
-    kernel : np.ndarray
+    kernel : Array
         L1-normalised 2-D kernel, shape ``(kernel_size, kernel_size)``.
-        Stored as numpy for transparent inspection; the JAX copies used by
-        :meth:`apply` / :meth:`adjoint` are cached as private fields below.
     """
 
-    kernel: np.ndarray
-    _kernel_jax: Array = field(init=False, repr=False, compare=False)
-    _kernel_adj: Array = field(init=False, repr=False, compare=False)
+    kernel: Float[Array, "k k"]
 
-    def __post_init__(self) -> None:
-        k = np.asarray(self.kernel, dtype=np.float64)
+    def __init__(self, kernel: Float[Array, "k k"] | np.ndarray) -> None:
+        k = jnp.asarray(kernel, dtype=jnp.float64)
         if k.ndim != 2:
             raise ValueError(
                 f"PointSpreadFunction: kernel must be 2-D, got shape {k.shape}."
@@ -98,23 +95,36 @@ class PointSpreadFunction:
             raise ValueError(
                 f"PointSpreadFunction: kernel side length must be odd ≥ 3 (got {k.shape[0]})."
             )
-        s = float(k.sum())
-        if s == 0.0:
-            raise ValueError(
-                "PointSpreadFunction: kernel sums to zero; cannot normalise."
-            )
-        # Frozen dataclass — bypass __setattr__ for derived fields.
-        normalised = k / s
-        object.__setattr__(self, "kernel", normalised)
-        object.__setattr__(self, "_kernel_jax", jnp.asarray(normalised))
-        object.__setattr__(self, "_kernel_adj", jnp.asarray(normalised[::-1, ::-1]))
+        s = k.sum()
+        try:
+            sums_to_zero = float(s) == 0.0
+        except jax.errors.ConcretizationTypeError:
+            # A traced kernel has no value to check here; fail at run time.
+            k = eqx.error_if(k, s == 0.0, "PointSpreadFunction: kernel sums to zero.")
+        else:
+            if sums_to_zero:
+                raise ValueError(
+                    "PointSpreadFunction: kernel sums to zero; cannot normalise."
+                )
+        self.kernel = k / s
+
+    @property
+    def normalised_kernel(self) -> Float[Array, "k k"]:
+        """The kernel divided by its sum, as ``apply`` and ``adjoint`` use it.
+
+        ``__init__`` stores a normalised kernel, but an update that skips
+        ``__init__`` (an optimiser step, ``eqx.tree_at``) need not keep the sum
+        at 1; normalising at use keeps the blur radiance-conserving and makes
+        the kernel's gradient tangent to the ``Σ K = 1`` constraint.
+        """
+        return self.kernel / jnp.sum(self.kernel)
 
     @classmethod
     def gaussian(cls, fwhm_pixels: float, kernel_size: int = 9) -> PointSpreadFunction:
         """Build an isotropic Gaussian PSF.
 
         ``FWHM = 2.355 σ``; the kernel is sampled on the discrete pixel grid
-        and L1-normalised in ``__post_init__``.
+        and L1-normalised in ``__init__``.
         """
         if fwhm_pixels <= 0.0:
             raise ValueError("PointSpreadFunction.gaussian: `fwhm_pixels` must be > 0.")
@@ -156,7 +166,7 @@ class PointSpreadFunction:
                 f"PointSpreadFunction.apply: input must be 3-D (ny, nx, n_lambda), "
                 f"got shape {x.shape}."
             )
-        return _convolve_channels(x, self._kernel_jax)
+        return _convolve_channels(x, self.normalised_kernel)
 
     def jacobian(self, tangent: HRCube) -> HRCube:
         """JVP — same as :meth:`apply` because the operator is linear."""
@@ -174,7 +184,7 @@ class PointSpreadFunction:
             raise ValueError(
                 f"PointSpreadFunction.adjoint: input must be 3-D, got shape {u.shape}."
             )
-        return _convolve_channels(u, self._kernel_adj)
+        return _convolve_channels(u, self.normalised_kernel[::-1, ::-1])
 
 
 def _convolve_channels(cube: Array, kernel: Array) -> Array:
@@ -202,8 +212,7 @@ def _convolve_channels(cube: Array, kernel: Array) -> Array:
 # ── Ground Sampling Distance (block-mean down-sampling) ─────────────────────
 
 
-@dataclass(frozen=True)
-class GroundSamplingDistance:
+class GroundSamplingDistance(eqx.Module):
     """Block-mean down-sampling operator for a fixed integer factor.
 
     Maps an HR cube ``(ny, nx, n_lambda)`` to LR
@@ -218,7 +227,8 @@ class GroundSamplingDistance:
     Attributes
     ----------
     downsample_factor : int
-        Integer block size ``f``.
+        Integer block size ``f``. Static: it fixes the output shape, so a new
+        factor is a new compiled function.
 
     Notes
     -----
@@ -230,9 +240,9 @@ class GroundSamplingDistance:
     factors.
     """
 
-    downsample_factor: int
+    downsample_factor: int = eqx.field(static=True)
 
-    def __post_init__(self) -> None:
+    def __check_init__(self) -> None:
         if self.downsample_factor < 1:
             raise ValueError(
                 f"GroundSamplingDistance: `downsample_factor` must be ≥ 1 "
