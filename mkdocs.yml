@@ -70,6 +70,10 @@ plugins:
 nav:
   - Overview: index.md
   - Capability index: capabilities.md
+  - Spectroscopy: spectroscopy.md
+  - Slab models: slab.md
+  - Instrument: instrument.md
+  - Retrieval: retrieval.md
   - Exceptions: exceptions.md
 
 markdown_extensions:
