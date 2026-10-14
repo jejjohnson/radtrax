@@ -10,7 +10,9 @@ of the finite-difference Jacobian is
     ∂F/∂xⱼ ≈ (F(x + hⱼ eⱼ) − F(x − hⱼ eⱼ)) / (2 hⱼ),   hⱼ = ε^{1/3} max(1, |xⱼ|),
 
 with ε the float64 machine epsilon, the step that balances the O(h²)
-truncation error against the O(ε / h) rounding error. Each entry is compared
+truncation error against the O(ε / h) rounding error. The step never falls
+below ε^{1/3} ≈ 6e-6, so check a physically small variable (a VMR of 1e-7, a
+column in kg/m²) in units that make it O(1), e.g. ppm. Each entry is compared
 as |J^ad − J^fd| / max(|J^fd|, floor), where floor = ``floor_ratio`` ·
 max|J^fd|. The central difference carries an absolute error near
 ε^{2/3} |F| ≈ 4e-11 |F|, so an entry far below the Jacobian's scale cannot be

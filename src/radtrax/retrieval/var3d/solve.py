@@ -19,15 +19,16 @@ target spectrum ``t`` falls out as ``H'`` applied to a unit increment, and
 the PSAS solution ``δx̂ = B H'ᵀ (H'BH'ᵀ + R)⁻¹ d`` is the BLUE estimator that
 the pixel-wise matched filter approximates with ``B = ∞ I, R = Σ_pixel``.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/solve.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/solve.py``); its frozen
+dataclasses became Equinox modules in radtrax#58.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import lineax as lx
@@ -39,8 +40,7 @@ if TYPE_CHECKING:
     from radtrax.retrieval.var3d.cost import Cost
 
 
-@dataclass(frozen=True)
-class SolveResult:
+class SolveResult(eqx.Module):
     """Common result type for all three solvers.
 
     Attributes

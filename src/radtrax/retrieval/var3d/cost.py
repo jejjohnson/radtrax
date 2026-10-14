@@ -21,15 +21,16 @@ adjoint of the observation operator. The :class:`Cost` bundle bundles
 ``J``, ``∇J`` and a Hessian-vector product ``Hv`` so the optimiser /
 posterior-covariance machinery downstream can pick whichever it needs.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/cost.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/cost.py``); its frozen
+dataclasses became Equinox modules in radtrax#58.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import equinox as eqx
 import gaussx as gx
 import jax
 import jax.numpy as jnp
@@ -45,12 +46,17 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(frozen=True)
-class Cost:
+class Cost(eqx.Module):
     """Bundle of (value, gradient, Hessian-vector product) for an optimiser.
 
     The three callables share the same input signature — a 1-D state vector —
     so the optimiser doesn't have to know which control-space we're working in.
+
+    The observation, background and forward model live inside the closures,
+    not as array leaves, so a ``Cost`` is a static bundle of functions: one
+    compilation per ``build_cost_*`` call, and not differentiable as data.
+    Differentiate with respect to the model through ``make_forward``'s model
+    argument instead (see ``RadianceObservationModel.make_forward``).
     """
 
     value: Callable[[jax.Array], jax.Array]
