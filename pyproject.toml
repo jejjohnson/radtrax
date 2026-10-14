@@ -50,8 +50,15 @@ dependencies = [
 [project.optional-dependencies]
 # HITRAN cross-section tables through HAPI (offline table building).
 hitran = ["hitran-api"]
-# GeoTensor operators (radtrax.geo): geotoolz, georeader.
-geo = []
+# Sensor tables and GeoTensor operators (radtrax.geo). georeader 2.4.1 imports
+# typing_extensions and tqdm without declaring them, and its read_srf needs
+# openpyxl for the bundled Sentinel-2 workbook.
+geo = [
+    "georeader-spaceml>=2.4.1",
+    "openpyxl>=3.1",
+    "tqdm>=4",
+    "typing-extensions>=4",
+]
 # NumPyro and optax for Bayesian and MAP retrievals.
 bayes = []
 
@@ -69,6 +76,8 @@ dev = [
     "pytest-cov>=7.1.0",
     "pre-commit>=4.6.2",
     "pytest-github-actions-annotate-failures>=0.3",
+    # The [geo] tests run in CI; the base install stays without it (gate P5).
+    "radtrax[geo]",
 ]
 lint = [
     "import-linter>=2.1",

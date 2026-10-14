@@ -75,6 +75,7 @@ nav:
   - Slab models: slab.md
   - Instrument: instrument.md
   - Retrieval: retrieval.md
+  - Geo: geo.md
   - Exceptions: exceptions.md
 
 markdown_extensions:

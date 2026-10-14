@@ -45,6 +45,8 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
+from radtrax.instrument.srf import FWHM_PER_SIGMA
+
 
 PSFType = Literal["gaussian", "airy"]
 
@@ -123,7 +125,7 @@ class PointSpreadFunction(eqx.Module):
     def gaussian(cls, fwhm_pixels: float, kernel_size: int = 9) -> PointSpreadFunction:
         """Build an isotropic Gaussian PSF.
 
-        ``FWHM = 2.355 σ``; the kernel is sampled on the discrete pixel grid
+        ``FWHM = 2√(2 ln 2) σ``; the kernel is sampled on the discrete pixel grid
         and L1-normalised in ``__init__``.
         """
         if fwhm_pixels <= 0.0:
@@ -131,7 +133,7 @@ class PointSpreadFunction(eqx.Module):
         c = kernel_size // 2
         y, x = np.ogrid[-c : c + 1, -c : c + 1]
         r2 = x * x + y * y
-        sigma = fwhm_pixels / 2.355
+        sigma = fwhm_pixels / FWHM_PER_SIGMA
         k = np.exp(-r2 / (2.0 * sigma * sigma))
         return cls(kernel=k)
 
