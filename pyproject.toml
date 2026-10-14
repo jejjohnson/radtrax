@@ -67,14 +67,14 @@ gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
-    "pre-commit>=4.6.0",
+    "pre-commit>=4.6.2",
 ]
 lint = [
     "import-linter>=2.1",
     "ruff>=0.15.22",
 ]
 typecheck = [
-    "ty>=0.0.83",
+    "ty>=0.0.86",
 ]
 docs = [
     # The prose half of the site is built by mystmd, a Node CLI installed with
@@ -83,10 +83,10 @@ docs = [
     # lets the MyST prose cross-reference into it.
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.7",
-    "mkdocstrings[python]>=1.0.6",
+    "mkdocstrings[python]>=1.0.7",
     "jupytext>=1.19.3",
     "ipykernel>=7.3.0",
-    "nbconvert>=7.16.6",
+    "nbconvert>=7.17.1",
     # matplotlib + watermark used by the example notebooks during local
     # re-execution. The guarded watermark cell in each notebook no-ops
     # if the package is missing, but installing it here lets the version
