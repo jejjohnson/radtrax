@@ -746,3 +746,34 @@ def test_matched_filter_keeps_the_carrier_contract() -> None:
     gt, _, _ = _fill_cube(-9999.0)
     gt.attrs = {"band_names": ["b1", "b2", "b3"]}
     check_operator(rg.MatchedFilter(target=np.array([1.0, 0.5, -1.0])), gt)
+
+
+def test_traceable_callable_target_is_the_exact_jvp() -> None:
+    """A JAX-traceable callable is differentiated, not finite-differenced: at a
+    zero state with exp(1e4·x) a 1e-4 step would give ~11752, the JVP 1e4."""
+
+    def obs_model(x: jax.Array) -> jax.Array:
+        return jnp.exp(1e4 * x).mean(axis=(1, 2))
+
+    target = rg.LinearTargetFromObs(obs_model=obs_model)(np.zeros((3, 2, 2)))
+    np.testing.assert_allclose(target, np.full(3, 1e4), rtol=1e-14)
+
+
+def test_callable_target_state_has_no_nodata() -> None:
+    """Fill pixels become the band means, so an aggregating callable stays finite."""
+    gt, _, _ = _fill_cube(-9999.0)
+    target = rg.LinearTargetFromObs(obs_model=lambda x: x.sum(axis=(1, 2)))(gt)
+    # d/dα Σ (x + α) over the 16 pixels of each band.
+    np.testing.assert_allclose(target, np.full(3, 16.0), rtol=1e-14)
+
+
+def test_cube_shaped_background_keeps_its_band_axis() -> None:
+    """An impulse at a two-coordinate pixel perturbs every band there."""
+    background = np.ones((3, 4, 5))
+    op = rg.LinearTargetFromObs(
+        obs_model=lambda x: x[:, 1, 2] * jnp.array([1.0, 2.0, 3.0]),
+        vmr_background=background,
+        pattern="impulse",
+        pixel=(1, 2),
+    )
+    np.testing.assert_allclose(op(np.zeros((3, 4, 5))), [1.0, 2.0, 3.0], rtol=1e-14)
