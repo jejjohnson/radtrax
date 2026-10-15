@@ -680,8 +680,8 @@ wheels = [
 
 [[package]]
 name = "geotoolz"
-version = "0.10.2"
-source = { git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&rev=ec3a1c0c592765afd54eeaa1e080993981354511#ec3a1c0c592765afd54eeaa1e080993981354511" }
+version = "0.10.3"
+source = { git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&tag=geotoolz-v0.10.3#9c41acdfa546f9405fb3f53b320cc7d7be814337" }
 dependencies = [
     { name = "affine" },
     { name = "einx" },
@@ -2474,7 +2474,7 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
     { name = "georeader-spaceml", marker = "extra == 'geo'", specifier = ">=2.4.1" },
-    { name = "geotoolz", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&rev=ec3a1c0c592765afd54eeaa1e080993981354511" },
+    { name = "geotoolz", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&tag=geotoolz-v0.10.3" },
     { name = "hitran-api", marker = "extra == 'hitran'" },
     { name = "jax", specifier = ">=0.10" },
     { name = "jaxlib", specifier = ">=0.10" },

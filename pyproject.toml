@@ -56,7 +56,7 @@ hitran = ["hitran-api"]
 # Operators built with geotoolz's public carrier helpers.
 geo = [
     "georeader-spaceml>=2.4.1",
-    "geotoolz>=0.10.2",
+    "geotoolz>=0.10.3",
     "openpyxl>=3.1",
     "pipekit>=0.0.2",
     "tqdm>=4",
@@ -69,12 +69,13 @@ bayes = []
 Repository = "https://github.com/jejjohnson/radtrax"
 Documentation = "https://jejjohnson.github.io/radtrax"
 
-# gaussx and geotoolz are not on PyPI yet: resolve them from git, as plumax
-# does. geotoolz is pinned to the commit that publishes the helpers radtrax.geo
-# imports (geotoolz#480); move it to the release tag once that is cut.
+# gaussx and geotoolz are not on PyPI yet: resolve them from their release
+# tags, as plumax does. geotoolz 0.10.3 publishes the helpers radtrax.geo
+# imports (geotoolz#480). A plain `pip install` reads only the PyPI-style
+# requirements above, so radtrax installs with uv until both are on PyPI (#25).
 [tool.uv.sources]
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
-geotoolz = { git = "https://github.com/jejjohnson/geotoolz", rev = "ec3a1c0c592765afd54eeaa1e080993981354511", subdirectory = "packages/geotoolz" }
+geotoolz = { git = "https://github.com/jejjohnson/geotoolz", tag = "geotoolz-v0.10.3", subdirectory = "packages/geotoolz" }
 
 [dependency-groups]
 dev = [

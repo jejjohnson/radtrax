@@ -834,13 +834,16 @@ class LinearTargetFromObs(Operator):
     (:func:`radtrax.retrieval.matched_filter.linear_target_from_obs`) about
     ``vmr_background`` (default: the model's reference VMR on the cube's
     grid; pass it on the high-resolution grid when the model has a GSD).
-    Any other callable, mapping a state cube to a response with its band
-    axis at ``axis`` (or to a ``(B,)`` vector), is linearised by a central
-    difference about ``vmr_background`` (default: the cube itself), with a
-    step ``1e-4`` times the state's largest magnitude; a cube response is
-    averaged over its valid pixels. (geotoolz took a one-sided step of
-    ``1e-4`` in the state's own units, far outside the linear regime for a
-    VMR of ~2e-6.)
+    Any other callable maps a state cube to a response with its band axis at
+    ``axis`` (or to a ``(B,)`` vector), about ``vmr_background`` (default:
+    the cube itself, its nodata pixels set to the band means of the valid
+    ones); a cube response is averaged over the valid pixels. A JAX-traceable
+    callable is linearised exactly with :func:`jax.jvp`; one that is not
+    (NumPy code converting its input) by a central difference with a step
+    ``1e-4`` times the state's largest magnitude (absolute when the state is
+    zero), which is only as good as that step. (geotoolz always took a
+    one-sided step of ``1e-4`` in the state's own units, far outside the
+    linear regime for a VMR of ~2e-6.)
 
     Args:
         obs_model: An observation model, or a callable.
@@ -880,16 +883,30 @@ class LinearTargetFromObs(Operator):
                     pixel=self.pixel,
                 )
             )
-        base, direction = _callable_state(
+        base, direction, valid = _callable_state(
             self.obs_model, gt, self.vmr_background, self.pattern, self.pixel, self.axis
         )
-        scale = float(np.max(np.abs(base), initial=0.0))
-        h = TARGET_FINITE_DIFFERENCE_EPSILON * (scale if scale > 0.0 else 1.0)
-        response = (
-            np.asarray(self.obs_model(base + h * direction), dtype=float)
-            - np.asarray(self.obs_model(base - h * direction), dtype=float)
-        ) / (2.0 * h)
-        return _response_vector(response, gt, self.axis)
+        try:
+            _, tangent = jax.jvp(
+                lambda state: jnp.asarray(self.obs_model(state), dtype=float),
+                (jnp.asarray(base),),
+                (jnp.asarray(direction),),
+            )
+            response = np.asarray(tangent)
+        except (
+            jax.errors.TracerArrayConversionError,
+            jax.errors.ConcretizationTypeError,
+            jax.errors.TracerBoolConversionError,
+            jax.errors.TracerIntegerConversionError,
+        ):
+            # Not JAX-traceable: a central difference instead.
+            scale = float(np.max(np.abs(base), initial=0.0))
+            h = TARGET_FINITE_DIFFERENCE_EPSILON * (scale if scale > 0.0 else 1.0)
+            response = (
+                np.asarray(self.obs_model(base + h * direction), dtype=float)
+                - np.asarray(self.obs_model(base - h * direction), dtype=float)
+            ) / (2.0 * h)
+        return _response_vector(response, gt, self.axis, valid)
 
     def get_config(self) -> dict[str, Any]:
         return _target_config(self)
@@ -903,8 +920,9 @@ class NonlinearTargetFromObs(Operator):
     :func:`radtrax.retrieval.matched_filter.nonlinear_target_from_obs` about
     ``vmr_background`` (default: the model's reference VMR on the cube's
     grid). Any other callable maps a state cube to a response with its band
-    axis at ``axis`` (or to a ``(B,)`` vector); a cube response is averaged
-    over its valid pixels.
+    axis at ``axis`` (or to a ``(B,)`` vector), about ``vmr_background``
+    (default: the cube, nodata pixels set to the valid band means); a cube
+    response is averaged over the valid pixels.
 
     Args:
         obs_model: An observation model, or a callable.
@@ -948,13 +966,13 @@ class NonlinearTargetFromObs(Operator):
                     pixel=self.pixel,
                 )
             )
-        base, direction = _callable_state(
+        base, direction, valid = _callable_state(
             self.obs_model, gt, self.vmr_background, self.pattern, self.pixel, self.axis
         )
         response = np.asarray(
             self.obs_model(base + self.amplitude * direction), dtype=float
         ) - np.asarray(self.obs_model(base), dtype=float)
-        return _response_vector(response, gt, self.axis)
+        return _response_vector(response, gt, self.axis, valid)
 
     def get_config(self) -> dict[str, Any]:
         return _target_config(self) | {"amplitude": self.amplitude}
@@ -1182,24 +1200,51 @@ def _callable_state(
     pattern: str | np.ndarray,
     pixel: tuple[int, ...] | None,
     axis: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """``(base, direction)`` for a callable: the state and its perturbation."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+    """``(base, direction, valid)`` for a callable.
+
+    The state, its perturbation, and the validity map of ``gt``'s pixels
+    (``None`` when all are valid, or for an explicit ``vmr_background``).
+    The cube as a state has its nodata pixels set to the band means of the
+    valid ones, so a callable that aggregates over pixels sees no ``NaN``.
+    """
     if not callable(obs_model):
         raise TypeError("obs_model must be an observation model or a callable")
     if vmr_background is None:
-        base, band_axis = _masked(gt, axis, "target")[0], axis
+        base, valid = _masked(gt, axis, "target")
+        if valid is not None:
+            band_means = np.nanmean(np.moveaxis(base, axis, -1)[valid], axis=0)
+            base = np.where(np.isnan(base), _along(band_means, axis, base.ndim), base)
+        band_axis: int | None = axis
     else:
-        base, band_axis = np.asarray(vmr_background, dtype=float), None
-    return base, _target_pattern(base, pattern=pattern, pixel=pixel, axis=band_axis)
+        base, valid = np.asarray(vmr_background, dtype=float), None
+        # A cube-shaped background keeps its band axis; an (H, W) one has none.
+        band_axis = axis if base.ndim == np.ndim(gt) else None
+    direction = _target_pattern(base, pattern=pattern, pixel=pixel, axis=band_axis)
+    return base, direction, valid
 
 
-def _response_vector(response: np.ndarray, gt: Carrier, axis: int) -> np.ndarray:
-    """A callable's response as the ``(B,)`` target, checked against ``gt``'s bands."""
+def _along(vector: np.ndarray, axis: int, ndim: int) -> np.ndarray:
+    """``vector`` shaped to broadcast along ``axis`` of an ``ndim``-D array."""
+    shape = [1] * ndim
+    shape[axis % ndim] = vector.shape[0]
+    return vector.reshape(shape)
+
+
+def _response_vector(
+    response: np.ndarray, gt: Carrier, axis: int, valid: np.ndarray | None = None
+) -> np.ndarray:
+    """A callable's response as the ``(B,)`` target, checked against ``gt``'s bands.
+
+    A cube response is averaged over its finite pixels that are also valid
+    in ``gt`` (when it is on ``gt``'s grid).
+    """
     if response.ndim > 1:
-        # Average over the valid (finite) pixels.
-        samples, _ = cube_to_samples(response, band_axis=axis)
-        finite = np.isfinite(samples).all(axis=1)
-        response = np.mean(samples if finite.all() else samples[finite], axis=0)
+        samples, layout = cube_to_samples(response, band_axis=axis)
+        keep = np.isfinite(samples).all(axis=1)
+        if valid is not None and tuple(layout.sample_shape) == valid.shape:
+            keep &= valid.reshape(-1)
+        response = np.mean(samples if keep.all() else samples[keep], axis=0)
     vector = response.reshape(-1)
     n_bands = np.shape(gt)[axis]
     if vector.shape[0] != n_bands:
