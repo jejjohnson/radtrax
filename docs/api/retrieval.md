@@ -102,9 +102,9 @@ Variational methane retrieval: the radiance observation operator, background cov
 
 # MBMP
 
-The Sentinel-2 multi-band multi-pass methane signal and the single-pass SWIR
-contrast, as differentiable JAX functions; the GeoTensor operator is
-[`MBMP`](geo.md) in `radtrax.geo`.
+The Sentinel-2 multi-band multi-pass methane signal, *radtrax · 2*'s multi-pass family with per-pass scale factors (SBMP, MBSP, MBMP) and the single-pass SWIR
+contrast, as differentiable JAX functions; the GeoTensor operators are
+[`MBMP`, `SBMP` and `MBSP`](geo.md) in `radtrax.geo`.
 
 ::: radtrax.retrieval.mbmp
     options:

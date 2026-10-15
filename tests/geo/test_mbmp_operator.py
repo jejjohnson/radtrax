@@ -21,7 +21,7 @@ from geotoolz.carrier import SENTINEL2_L2A_BANDS
 from pipekit import Operator
 
 from geo._carriers import TRANSFORM
-from radtrax.geo import MBMP
+from radtrax.geo import MBMP, MBSP, SBMP
 
 
 TRUTH = np.linspace(0.0, 0.2, 25).reshape(5, 5)
@@ -145,3 +145,93 @@ def test_keeps_the_carrier_contract() -> None:
     reference.attrs = {"band_names": ["B11", "B12"]}
     check_operator(MBMP(), gt)
     check_operator(MBMP(), gt, reference)
+
+
+# ── scale factors, SBMP and MBSP (radtrax#111) ─────────────────────────────
+
+SURFACE = np.random.default_rng(2).uniform(0.2, 0.4, size=(5, 5))
+
+
+def _passes(brighten: float) -> tuple[np.ndarray, np.ndarray]:
+    """A reference pass and a brighter plume pass: B11 = A, B12 = 0.8 A e^(−s)."""
+    reference = np.stack([SURFACE, 0.8 * SURFACE])
+    scene = brighten * np.stack([SURFACE, 0.8 * SURFACE * np.exp(-TRUTH)])
+    return scene, reference
+
+
+def test_scale_factors_remove_a_scene_wide_change() -> None:
+    """Fitted on every pixel (the plume included), the factor moves with the
+    plume: MBMP without factors reads the 5 % brightening as nothing, with
+    factors the plume less its scene mean."""
+    scene, reference = _passes(1.05)
+    plain = np.asarray(MBMP(swir1=0, swir2=1)(scene, reference))
+    scaled = np.asarray(MBMP(swir1=0, swir2=1, scale_factors=True)(scene, reference))
+    np.testing.assert_allclose(plain, TRUTH, atol=ATOL)
+    # c / c′ = Σ x y / Σ x² of each pass: the scaled signal is TRUTH less ln(c/c′)
+    c = (scene[1] * scene[0]).sum() / (scene[1] ** 2).sum()
+    c_ref = (reference[1] * reference[0]).sum() / (reference[1] ** 2).sum()
+    np.testing.assert_allclose(scaled, TRUTH - np.log(c / c_ref), atol=ATOL)
+
+
+def test_sbmp_removes_brightening_and_keeps_the_plume() -> None:
+    scene, reference = _passes(1.05)
+    out = np.asarray(SBMP(swir2=1)(scene, reference))
+    c = (scene[1] * reference[1]).sum() / (scene[1] ** 2).sum()
+    expected = -np.log(c * scene[1] / reference[1])
+    np.testing.assert_allclose(out, expected, atol=ATOL)
+    # the factor is fitted on the plume too, so the plume reads relative to it
+    np.testing.assert_allclose(out - out.min(), TRUTH - TRUTH.min(), atol=ATOL)
+
+
+def test_mbsp_reads_the_band_ratio_on_one_pass() -> None:
+    scene, _ = _passes(1.0)
+    out = np.asarray(MBSP(swir1=0, swir2=1)(scene))
+    c = (scene[1] * scene[0]).sum() / (scene[1] ** 2).sum()
+    np.testing.assert_allclose(out, -np.log(c * scene[1] / scene[0]), atol=ATOL)
+
+
+def test_scale_factors_are_fitted_per_time_step() -> None:
+    scene, reference = _passes(1.05)
+    stack = np.stack([scene, 2.0 * scene])  # the second step: another brightening
+    refs = np.stack([reference, reference])
+    out = np.asarray(MBMP(swir1=0, swir2=1, scale_factors=True)(stack, refs))
+    single = np.asarray(MBMP(swir1=0, swir2=1, scale_factors=True)(scene, reference))
+    np.testing.assert_allclose(out[0, 0], single, atol=ATOL)
+    np.testing.assert_allclose(out[1, 0], single, atol=ATOL)
+
+
+def test_nodata_is_nan_and_stays_out_of_the_fit() -> None:
+    scene, reference = _passes(1.05)
+    scene[:, 0, 0] = -9999.0
+    for out in (
+        np.asarray(
+            MBMP(swir1=0, swir2=1, scale_factors=True)(_gt(scene), _gt(reference))
+        ),
+        np.asarray(SBMP(swir2=1)(_gt(scene), _gt(reference))),
+        np.asarray(MBSP(swir1=0, swir2=1)(_gt(scene))),
+    ):
+        assert np.isnan(out[0, 0]) and np.isfinite(out[1:]).all()
+
+
+def test_new_operators_round_trip_their_config() -> None:
+    for op in (
+        MBMP(scale_factors=True),
+        SBMP(swir2="B12", eps=1e-6),
+        MBSP(swir1=0, swir2=1),
+    ):
+        clone = Operator.from_state(json.loads(json.dumps(op.state, allow_nan=False)))
+        assert clone.get_config() == op.get_config()
+
+
+def test_new_operators_keep_the_carrier_contract() -> None:
+    from geotoolz.testing import check_operator
+
+    values = np.random.default_rng(1).uniform(0.1, 1.0, size=(2, 4, 4))
+    values[:, 0, 0] = -9999.0
+    gt = _gt(values)
+    gt.attrs = {"band_names": ["B11", "B12"]}
+    reference = _gt(np.random.default_rng(2).uniform(0.1, 1.0, size=(2, 4, 4)))
+    reference.attrs = {"band_names": ["B11", "B12"]}
+    check_operator(MBSP(), gt)
+    check_operator(SBMP(), gt, reference)
+    check_operator(MBMP(scale_factors=True), gt, reference)
