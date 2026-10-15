@@ -56,9 +56,13 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "estimate_cov_empirical": ("background", "estimate_cov_empirical"),
     "estimate_cov_shrunk": ("background", "estimate_cov_shrunk"),
     "estimate_cov_lowrank": ("background", "estimate_cov_lowrank"),
+    "shrink_covariance": ("background", "shrink_covariance"),
     # cluster
     "gmm_cluster_background": ("cluster", "gmm_cluster_background"),
     "adaptive_window_background": ("cluster", "adaptive_window_background"),
+    "apply_adaptive_mf": ("cluster", "apply_adaptive_mf"),
+    "apply_cluster_mf": ("cluster", "apply_cluster_mf"),
+    "ClusterBackground": ("cluster", "ClusterBackground"),
     # streaming
     "WelfordAccumulator": ("streaming", "WelfordAccumulator"),
     "streaming_background": ("streaming", "streaming_background"),
@@ -91,9 +95,13 @@ if TYPE_CHECKING:  # static type checkers see eagerly-imported symbols
         estimate_cov_lowrank,
         estimate_cov_shrunk,
         estimate_mean,
+        shrink_covariance,
     )
     from radtrax.retrieval.matched_filter.cluster import (
+        ClusterBackground,
         adaptive_window_background,
+        apply_adaptive_mf,
+        apply_cluster_mf,
         gmm_cluster_background,
     )
     from radtrax.retrieval.matched_filter.core import (

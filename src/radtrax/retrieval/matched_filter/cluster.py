@@ -32,9 +32,11 @@ import numpy as np
 from jaxtyping import Array, Float, Int
 
 from radtrax.retrieval.matched_filter.background import (
+    _finite_pixels,
     estimate_cov_empirical,
     estimate_cov_shrunk,
 )
+from radtrax.retrieval.matched_filter.core import _check_target_energy, apply_image
 
 
 if TYPE_CHECKING:
@@ -63,7 +65,8 @@ class ClusterBackground(eqx.Module):
     ----------
     labels
         Cluster assignment per pixel, shape ``(H, W)`` with values in
-        ``[0, n_clusters)``.
+        ``[0, n_clusters)``; ``-1`` marks a pixel with a non-finite band,
+        left out of the fit (:func:`apply_cluster_mf` scores it ``NaN``).
     means
         Tuple of per-cluster mean spectra.
     cov_operators
@@ -109,6 +112,8 @@ def gmm_cluster_background(
     Returns
     -------
     ClusterBackground
+        The mixture is fitted on the pixels whose bands are all finite; the
+        rest are labelled ``-1``.
     """
     arr = np.asarray(cube)
     if arr.ndim != 3:
@@ -116,7 +121,14 @@ def gmm_cluster_background(
             f"gmm_cluster_background: cube must be (H, W, n_bands); got {arr.shape}."
         )
     h, w, _ = arr.shape
-    X = arr.reshape(-1, arr.shape[-1])
+    X_all = arr.reshape(-1, arr.shape[-1])
+    valid = _finite_pixels(X_all)
+    X = X_all[valid]
+    if X.shape[0] < max(2, n_clusters):
+        raise ValueError(
+            f"gmm_cluster_background: {X.shape[0]} finite pixel(s) cannot fit "
+            f"{n_clusters} cluster(s)."
+        )
     if bayesian:
         from sklearn.mixture import BayesianGaussianMixture
 
@@ -133,7 +145,7 @@ def gmm_cluster_background(
             covariance_type="full",
             random_state=random_state,
         )
-    labels = gmm.fit_predict(X)
+    labels_valid = gmm.fit_predict(X)
     # Pre-compute a global (μ, Σ) fallback once so under-populated clusters
     # get a *consistent* pair — the old code returned the per-cluster mean
     # paired with a scene-wide Ledoit–Wolf Σ, which biases scores.
@@ -148,8 +160,8 @@ def gmm_cluster_background(
         )
     means: list[np.ndarray] = []
     ops: list[LinearOperator] = []
-    for k in range(int(labels.max()) + 1):
-        mask = labels == k
+    for k in range(int(labels_valid.max()) + 1):
+        mask = labels_valid == k
         if mask.sum() < 2:
             # Under-populated cluster: return the *same* (μ, Σ) pair for both
             # attributes so callers that use (means[k], cov_operators[k])
@@ -168,6 +180,8 @@ def gmm_cluster_background(
             cov_op = estimate_cov_shrunk(fake_cube, mean=mu_k, method=cov_estimator)  # type: ignore[arg-type]
         means.append(mu_k)
         ops.append(cov_op)
+    labels = np.full(X_all.shape[0], -1, dtype=int)
+    labels[valid] = labels_valid
     # Tuples of JAX arrays: an immutable structure (a list could be appended
     # to after construction, changing the compile key) with one leaf type.
     return ClusterBackground(
@@ -210,7 +224,11 @@ def adaptive_window_background(
     local_mean
         Per-pixel mean spectrum, shape ``(H, W, n_bands)``.
     local_variance
-        Per-pixel per-band variance, shape ``(H, W, n_bands)``.
+        Per-pixel per-band (population) variance, shape ``(H, W, n_bands)``.
+        Window statistics use valid pixels only (a pixel with any non-finite
+        band carries no weight); invalid pixels, and pixels whose window
+        holds fewer than two valid pixels (variance) or none (mean), are
+        ``NaN``.
     """
     if window_size < 3 or window_size % 2 == 0:
         raise ValueError(
@@ -235,26 +253,172 @@ def adaptive_window_background(
     # Annulus counts: outer window minus the excluded central guard region.
     n_out = window_size**2
     n_in = guard_size**2 if guard_size > 0 else 0
-    n_ann = n_out - n_in
+    size_out = (window_size, window_size, 1)
+    size_in = (guard_size, guard_size, 1)
 
-    def window_mean(plane: np.ndarray) -> np.ndarray:
-        # Uniform (box) mean over the window, excluding the central guard region
-        # when guard_size > 0: annulus_sum / annulus_count via box-sum difference.
-        out_sum = uniform_filter(plane, size=window_size, mode="reflect") * n_out
+    def window_sum(field: np.ndarray) -> np.ndarray:
+        # Box sum over the annulus (outer window minus the guard region),
+        # band by band; reflecting at the scene edges.
+        total = uniform_filter(field, size=size_out, mode="reflect") * n_out
         if guard_size > 0:
-            in_sum = uniform_filter(plane, size=guard_size, mode="reflect") * n_in
-            return (out_sum - in_sum) / n_ann
-        return out_sum / n_out
+            total = total - uniform_filter(field, size=size_in, mode="reflect") * n_in
+        return total
 
-    # Apply a 2-D moving average independently to each band — scipy handles
-    # the reflect-boundary by default, matching how most MF codes handle
-    # scene edges.
-    mean = np.empty_like(arr)
-    var = np.empty_like(arr)
-    for b in range(arr.shape[-1]):
-        m = window_mean(arr[..., b])
-        m2 = window_mean(arr[..., b] ** 2)
-        mean[..., b] = m
-        # Population variance — E[x²] - E[x]². Clipped to zero for numerics.
-        var[..., b] = np.maximum(m2 - m * m, 0.0)
+    # Normalised convolution: invalid pixels (any band non-finite) get zero
+    # weight, so a NaN fill never leaks into its neighbours' statistics.
+    valid = _finite_pixels(arr)[..., None]
+    weights = np.broadcast_to(valid, arr.shape).astype(float)
+    # Shift each band by a reference level before forming E[x²] − E[x]²: the
+    # variance is shift-invariant, and without the shift a radiance offset
+    # large against its spread cancels catastrophically (4e-4 relative error
+    # at mean 1e4, std 1e-2).
+    ref = np.median(arr[valid[..., 0]], axis=0) if valid.any() else 0.0
+    filled = np.where(valid, arr - ref, 0.0)
+    count = np.rint(window_sum(weights))
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean = window_sum(filled) / count
+        mean_sq = window_sum(filled * filled) / count
+    # Population variance — E[x²] − E[x]², clipped at zero for round-off.
+    var = np.maximum(mean_sq - mean * mean, 0.0)
+    mean = mean + ref
+    mean = np.where((count >= 1) & valid, mean, np.nan)
+    var = np.where((count >= 2) & valid, var, np.nan)
     return mean, var
+
+
+# ── application ──────────────────────────────────────────────────────────────
+
+
+def apply_cluster_mf(
+    cube: Float[Array, "H W B"],
+    cluster: ClusterBackground,
+    target: Float[Array, " B"],
+) -> Float[Array, "H W"]:
+    """Matched-filter scores with each pixel's own cluster background.
+
+    Pixel ``(i, j)`` with label ``k`` scores
+    ``(x − μ_k)ᵀ Σ_k⁻¹ t / (tᵀ Σ_k⁻¹ t)``, the
+    :func:`~radtrax.retrieval.matched_filter.core.apply_image` score with
+    the cluster's ``(μ_k, Σ_k)``. One solve per cluster; the dispatch is a
+    ``jnp.where`` per cluster, so the function runs under
+    ``eqx.filter_jit`` and is differentiable in the cube, the target and the
+    background.
+
+    Parameters
+    ----------
+    cube
+        Radiance cube ``(H, W, n_bands)``, the same spatial shape as
+        ``cluster.labels``.
+    cluster
+        Background from :func:`gmm_cluster_background`.
+    target
+        Target signature ``(n_bands,)``.
+
+    Returns
+    -------
+    Float[Array, "H W"]
+        Score map; ``NaN`` where the label is outside ``[0, n_clusters)``
+        (the ``-1`` of a pixel with a non-finite band).
+
+    Raises
+    ------
+    ValueError
+        If the label map does not match the cube, or (outside ``jit``) a
+        cluster's ``tᵀ Σ_k⁻¹ t`` is not positive.
+    """
+    cube = jnp.asarray(cube)
+    if cube.shape[:2] != tuple(cluster.labels.shape):
+        raise ValueError(
+            f"apply_cluster_mf: labels shape {tuple(cluster.labels.shape)} does not "
+            f"match the cube's spatial shape {cube.shape[:2]}."
+        )
+    # Zero the residual of a pixel with a non-finite band before scoring: a
+    # NaN there would reach the gradient in w (0 · NaN) even though the
+    # where() below never selects that pixel's score.
+    finite = jnp.isfinite(cube).all(axis=-1, keepdims=True)
+    scores = jnp.full(cube.shape[:2], jnp.nan, dtype=cube.dtype)
+    for k, (mean_k, cov_k) in enumerate(
+        zip(cluster.means, cluster.cov_operators, strict=True)
+    ):
+        # A non-finite pixel is replaced by the mean: a zero residual.
+        score_k = apply_image(jnp.where(finite, cube, mean_k), mean_k, cov_k, target)
+        scores = jnp.where((cluster.labels == k) & finite[..., 0], score_k, scores)
+    return scores
+
+
+def apply_adaptive_mf(
+    cube: Float[Array, "H W B"],
+    mean: Float[Array, "H W B"],
+    variance: Float[Array, "H W B"],
+    target: Float[Array, " B"],
+    *,
+    ridge: float = 0.0,
+) -> Float[Array, "H W"]:
+    """Matched filter against a local diagonal-covariance background.
+
+    Scores every pixel against its own window statistics from
+    :func:`adaptive_window_background`, ``μ(r)`` and
+    ``Λ(r) = diag(σ²(r) + ridge)``, with the amplitude normalisation of
+    :func:`~radtrax.retrieval.matched_filter.core.apply_image`::
+
+        α(r) = tᵀ Λ(r)⁻¹ (x(r) − μ(r)) / (tᵀ Λ(r)⁻¹ t)
+             = Σ_b t_b (x_b − μ_b) / σ²_b  /  Σ_b t_b² / σ²_b
+
+    the per-pixel maximum-likelihood amplitude under an independent-band
+    Gaussian background. Runs in JAX and is differentiable; a band with
+    ``σ² + ridge ≤ 0`` makes its pixel unscoreable without putting a NaN in
+    the gradient of the others (double-``where``).
+
+    Parameters
+    ----------
+    cube
+        Radiance cube ``(H, W, n_bands)``.
+    mean, variance
+        Local statistics of the same shape, from
+        :func:`adaptive_window_background`.
+    target
+        Target signature ``(n_bands,)``; must not be all zero.
+    ridge
+        Non-negative variance floor added to every ``σ²``; use it when flat
+        windows give zero variance.
+
+    Returns
+    -------
+    Float[Array, "H W"]
+        Score map; ``NaN`` where the pixel, its local mean or its local
+        variance is non-finite, or a band's ``σ² + ridge`` is not positive.
+
+    Raises
+    ------
+    ValueError
+        If the shapes disagree, ``ridge`` is negative, or (outside ``jit``)
+        the target is all zero.
+    """
+    # ridge is a configuration value: checked when concrete; a traced ridge
+    # (jax.jit with ridge as an argument) skips the check.
+    if isinstance(ridge, (int, float)) and ridge < 0:
+        raise ValueError(f"apply_adaptive_mf: ridge must be ≥ 0, got {ridge}.")
+    cube, mean, variance = (jnp.asarray(a) for a in (cube, mean, variance))
+    target = jnp.asarray(target)
+    for name, stat in (("mean", mean), ("variance", variance)):
+        if stat.shape != cube.shape:
+            raise ValueError(
+                f"apply_adaptive_mf: background {name} shape {stat.shape} does not "
+                f"match the cube shape {cube.shape}."
+            )
+    if target.shape != cube.shape[-1:]:
+        raise ValueError(
+            f"apply_adaptive_mf: target shape {target.shape} does not match "
+            f"{cube.shape[-1]} bands."
+        )
+    _check_target_energy(target, jnp.asarray(1.0))
+    v = variance + ridge
+    residual = cube - mean
+    # Double where: unscoreable bands get a safe 1/1 and a zero residual, so
+    # neither the value nor the gradient of any pixel picks up a NaN.
+    ok = (v > 0) & jnp.isfinite(residual)  # v > 0 is False for NaN too
+    inv_var = jnp.where(ok, 1.0 / jnp.where(ok, v, 1.0), 0.0)
+    numer = jnp.einsum("ijb,b->ij", jnp.where(ok, residual, 0.0) * inv_var, target)
+    denom = jnp.einsum("ijb,b->ij", inv_var, target * target)
+    scoreable = ok.all(axis=-1) & (denom > 0)
+    return jnp.where(scoreable, numer / jnp.where(scoreable, denom, 1.0), jnp.nan)
