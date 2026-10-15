@@ -26,6 +26,7 @@ rasterio = pytest.importorskip("rasterio")
 from pipekit import Operator
 
 import radtrax.geo as rg
+from geo._carriers import fill_pixel_mask, toy_geotensor
 from radtrax.retrieval.matched_filter import (
     apply_image,
     apply_pixel,
@@ -33,36 +34,6 @@ from radtrax.retrieval.matched_filter import (
     nonlinear_target_from_obs,
 )
 from radtrax.retrieval.var3d import RadianceObservationModel
-
-
-# ── carriers ─────────────────────────────────────────────────────────────────
-
-TRANSFORM = rasterio.Affine(10.0, 0.0, 500_000.0, 0.0, -10.0, 4_000_000.0)
-
-
-def toy_geotensor(
-    values: np.ndarray,
-    *,
-    fill_value_default: float = -9999.0,
-    with_fill_pixels: bool = False,
-) -> GeoTensor:
-    """A GeoTensor on a 10 m UTM grid; optionally the two corner pixels filled."""
-    if with_fill_pixels:
-        values = np.array(values, copy=True)
-        values[..., fill_pixel_mask(values.shape)] = fill_value_default
-    return GeoTensor(
-        values,
-        transform=TRANSFORM,
-        crs="EPSG:32629",
-        fill_value_default=fill_value_default,
-    )
-
-
-def fill_pixel_mask(shape: tuple[int, ...]) -> np.ndarray:
-    """``(H, W)`` mask of the first and last pixel."""
-    mask = np.zeros(shape[-2:], dtype=bool)
-    mask[0, 0] = mask[-1, -1] = True
-    return mask
 
 
 def _matrix(op) -> np.ndarray:
