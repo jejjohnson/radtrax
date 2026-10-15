@@ -70,6 +70,7 @@ plugins:
 nav:
   - Overview: index.md
   - Capability index: capabilities.md
+  - Atmosphere: atmosphere.md
   - Spectroscopy: spectroscopy.md
   - Slab models: slab.md
   - Instrument: instrument.md
