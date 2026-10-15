@@ -52,10 +52,13 @@ dependencies = [
 hitran = ["hitran-api"]
 # Sensor tables and GeoTensor operators (radtrax.geo). georeader 2.4.1 imports
 # typing_extensions and tqdm without declaring them, and its read_srf needs
-# openpyxl for the bundled Sentinel-2 workbook.
+# openpyxl for the bundled Sentinel-2 workbook. The operators are pipekit
+# Operators built with geotoolz's public carrier helpers.
 geo = [
     "georeader-spaceml>=2.4.1",
+    "geotoolz>=0.10.3",
     "openpyxl>=3.1",
+    "pipekit>=0.0.2",
     "tqdm>=4",
     "typing-extensions>=4",
 ]
@@ -66,9 +69,13 @@ bayes = []
 Repository = "https://github.com/jejjohnson/radtrax"
 Documentation = "https://jejjohnson.github.io/radtrax"
 
-# gaussx is not on PyPI yet: resolve it from its tag, as plumax does.
+# gaussx and geotoolz are not on PyPI yet: resolve them from their release
+# tags, as plumax does. geotoolz 0.10.3 publishes the helpers radtrax.geo
+# imports (geotoolz#480). A plain `pip install` reads only the PyPI-style
+# requirements above, so radtrax installs with uv until both are on PyPI (#25).
 [tool.uv.sources]
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+geotoolz = { git = "https://github.com/jejjohnson/geotoolz", tag = "geotoolz-v0.10.3", subdirectory = "packages/geotoolz" }
 
 [dependency-groups]
 dev = [

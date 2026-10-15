@@ -17,6 +17,8 @@ One package, `radtrax`, installed from GitHub: `uv add "radtrax @ git+https://gi
 
 - [Overview](https://jejjohnson.github.io/radtrax/reference/)
 - [Exceptions](https://jejjohnson.github.io/radtrax/reference/exceptions/): `RadtraxError`
+- [Retrieval](https://jejjohnson.github.io/radtrax/reference/retrieval/): the one matched-filter core (backgrounds, shrinkage, cluster and adaptive filters, streaming) and 3D-Var
+- [Geo](https://jejjohnson.github.io/radtrax/reference/geo/): `[geo]` extra — Sentinel-2 SRFs and the matched filter as pipekit operators on GeoTensors (`MatchedFilter`, `ColumnEnhancement`, …)
 
 ## Optional
 
