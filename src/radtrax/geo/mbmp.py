@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 import jax
 import numpy as np
+from jaxtyping import Float
 
 from radtrax.retrieval.mbmp import mbmp_log_signal, swir_contrast
 
@@ -35,12 +36,20 @@ except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
     ) from err
 
 
+# Shapes: B bands, H W pixels; the band axis is ``axis`` (default -3).
+Cube = Float[np.ndarray, "*time B H W"]
+Plane = Float[np.ndarray, "*time H W"]
+
 if TYPE_CHECKING:
     from georeader.geotensor import GeoTensor
 
-    Carrier = GeoTensor | np.ndarray
+    #: A Sentinel-2 cube: a GeoTensor or a plain array.
+    Carrier = GeoTensor | Cube
+    #: The single-band signal: ``(H, W)``, or ``(T, 1, H, W)`` for a stack.
+    ScoreMap = GeoTensor | Plane
 else:
     Carrier = Any
+    ScoreMap = Any
 
 
 __all__ = ["MBMP"]
@@ -101,7 +110,7 @@ class MBMP(Operator):
         self.axis = axis
         self.eps = eps
 
-    def _apply(self, gt: Carrier, reference_scene: Carrier | None = None) -> Carrier:
+    def _apply(self, gt: Carrier, reference_scene: Carrier | None = None) -> ScoreMap:
         r11, r12 = self._bands(gt, gt)
         invalid = np.asarray(invalid_values(gt)).any(axis=self.axis)
         if reference_scene is None:
@@ -129,9 +138,7 @@ class MBMP(Operator):
             gt, keep_band_axis(out, gt), fill_value_default=np.nan, valid=~invalid
         )
 
-    def _bands(
-        self, values: Carrier, names_from: Carrier
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def _bands(self, values: Carrier, names_from: Carrier) -> tuple[Plane, Plane]:
         """Bands ``swir1`` and ``swir2`` of ``values``, positions resolved on ``names_from``."""
         # Only an unnamed 12-band array falls back to the L2A order.
         unnamed_l2a = getattr(names_from, "attrs", None) is None and np.shape(
