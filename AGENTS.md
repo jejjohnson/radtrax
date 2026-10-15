@@ -20,10 +20,9 @@ primitives**: new code composes what is here, and anything new lands where
 the next person will find and reuse it.
 
 It is one package, `src/radtrax/`. The public API is `radtrax.__all__`,
-re-exported from `src/radtrax/__init__.py`. Today it holds the exception
-base and the layout below; each subpackage is empty until its issue lands
-(issues #1–#4 are the wave epics), and `tests/test_public_api.py` fails if
-the layout drifts:
+re-exported from `src/radtrax/__init__.py`. It holds v0, the layered forward
+model, in the layout below (issues #1–#4 are the wave epics of v0, #100 is
+v1's), and `tests/test_public_api.py` fails if the layout drifts:
 
 | Module | Owns | Lands in |
 |---|---|---|
@@ -198,7 +197,8 @@ agent can read and follow them), and two read-only review checklists in
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
 Recipes for radtrax's extension points (a new opacity provider, solver,
-surface or instrument) arrive with their protocols in Wave 3.
+surface, instrument or noise model) are tracked in #118; until then, follow
+the existing implementation behind each protocol.
 
 Downstream users get the package's guidance through `docs/llms.txt`
 (copied to the site root by `ROOT_FILES` in `scripts/build_docs.py`); update

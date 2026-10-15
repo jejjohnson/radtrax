@@ -10,17 +10,22 @@ $K = \partial F / \partial x$, from automatic differentiation rather than
 hand-derived code.
 
 :::{note} Status
-radtrax is being assembled. Its first releases move code that already exists
-elsewhere in the stack, then rebuild it as one layered forward model:
+radtrax moved the code that already existed elsewhere in the stack, then
+rebuilt it as one layered forward model; all three steps are on `main`, and
+the first release is pending:
 
-| Release | What lands |
-|---|---|
-| 0.1 | plumax's band-integrated Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, ported unchanged |
-| 0.2 | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators behind `radtrax[geo]` |
-| 0.3 | the layered v0 forward model and matched-filter targets from autodiff |
+| Release | What lands | State |
+|---|---|---|
+| 0.1 | plumax's band-integrated Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, ported with their tests | on `main` |
+| 0.2 | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators (from geotoolz) behind `radtrax[geo]` | on `main` |
+| 0.3 | the layered v0 forward model (atmosphere → opacity → Beer–Lambert → instrument) and matched-filter targets from autodiff | on `main`; gate V2 against HITRAN pending ([#89](https://github.com/jejjohnson/radtrax/issues/89)) |
+| 0.4 | v1: a spherical air mass, kernel BRDFs and spectral albedo, a calibrated instrument and noise model, and optimal estimation, closed against EMIT's operational product | planned: [Wave 4](https://github.com/jejjohnson/radtrax/issues/100) |
 
-The plan is tracked in the [Wave 0 epic](https://github.com/jejjohnson/radtrax/issues/1)
-and its sub-issues; the design is *radtrax · 3* in the GeoStack docs.
+The plan is tracked in one epic per wave, the next being
+[Wave 4](https://github.com/jejjohnson/radtrax/issues/100); the design is
+*radtrax · 3* in the GeoStack docs, and the v0 notebook,
+[Why layers](notebooks/v0_layers_vs_slab.ipynb), shows what the layered model
+changes.
 :::
 
 ## Installation
