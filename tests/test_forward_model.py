@@ -13,7 +13,6 @@ import numpy as np
 import pytest
 import xarray as xr
 from _gradcheck import assert_gradients_match
-from _synthetic_table import NU
 from _v0 import GEOMETRY, SURFACE, theta_to_bands, v0_atmosphere, v0_model
 
 from radtrax import ForwardModel, unit_absorption_target
@@ -28,6 +27,7 @@ from radtrax.retrieval.matched_filter import (
     matched_filter_snr,
 )
 from radtrax.solvers import BeerLambert
+from radtrax.spectroscopy.synthetic import NU_CM as NU
 from radtrax.surface import Lambertian
 
 

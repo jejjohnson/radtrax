@@ -18,7 +18,7 @@ from radtrax.exceptions import GridError, MissingExtraError, MissingKeyError
 from radtrax.instrument.srf import SpectralResponseFunction, _bin_widths
 
 
-__all__ = ["sentinel2_srf"]
+__all__ = ["sentinel2_band_responses", "sentinel2_srf"]
 
 
 def _read_srf_table(satellite: str):  # -> pandas.DataFrame
@@ -132,3 +132,31 @@ def sentinel2_srf(
         srf_type="custom",
         custom_srfs=responses,
     )
+
+
+def sentinel2_band_responses(
+    satellite: str = "S2A", wavelengths_nm: Float[ArrayLike, " G"] | None = None
+) -> tuple[Float[np.ndarray, " G"], Float[np.ndarray, " G"]]:
+    """Sentinel-2 band 11 and 12 responses, interpolated onto a wavelength grid.
+
+    The raw agency responses (not normalised), zero outside the table, as
+    :func:`radtrax.spectroscopy.synthetic.methane_cross_section` takes them
+    (*radtrax · 1* and *· 2*).
+
+    Args:
+        satellite: ``"S2A"``, ``"S2B"`` or ``"S2C"``.
+        wavelengths_nm: The grid [nm], ``(G,)``; by default
+            :data:`radtrax.spectroscopy.synthetic.WL_NM`.
+
+    Returns:
+        ``(f11, f12)``, each ``(G,)``.
+    """
+    if wavelengths_nm is None:
+        from radtrax.spectroscopy.synthetic import WL_NM
+
+        wavelengths_nm = WL_NM
+    wl = np.asarray(wavelengths_nm, dtype=float)
+    table = _read_srf_table(satellite)
+    f11 = np.interp(wl, table.index.values, table["B11"].values, left=0, right=0)
+    f12 = np.interp(wl, table.index.values, table["B12"].values, left=0, right=0)
+    return f11, f12

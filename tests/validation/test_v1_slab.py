@@ -15,7 +15,6 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 import xarray as xr
-from _synthetic_table import P_ATM, T_K
 
 from radtrax.atmosphere import (
     ATM_TO_PA,
@@ -27,6 +26,7 @@ from radtrax.optics import OpticalProperties
 from radtrax.slab.forward import ForwardResult, forward_nonlinear
 from radtrax.solvers import BeerLambert
 from radtrax.spectroscopy import TableOpacity
+from radtrax.spectroscopy.synthetic import P_ATM, T_K
 from radtrax.surface import Lambertian
 
 

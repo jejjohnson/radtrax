@@ -1,7 +1,8 @@
 """Sensor data and GeoTensor operators, behind the ``[geo]`` extra.
 
 - :func:`sentinel2_srf` reads the Sentinel-2 SRF table georeader bundles
-  into radtrax's SRF (radtrax#28).
+  into radtrax's SRF (radtrax#28); :func:`sentinel2_band_responses` gives
+  its raw B11 and B12 responses on a wavelength grid (radtrax#115).
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
   the one matched-filter core (radtrax#29), ported from geotoolz.
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
@@ -16,7 +17,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from radtrax.geo.srf import sentinel2_srf
+from radtrax.geo.srf import sentinel2_band_responses, sentinel2_srf
 
 
 _OPERATORS = {
@@ -102,5 +103,6 @@ __all__ = [
     "StreamingBackground",
     "StreamingBackgroundResult",
     "ValidateMFInputs",
+    "sentinel2_band_responses",
     "sentinel2_srf",
 ]

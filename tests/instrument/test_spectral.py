@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 from _bands import emit_like_srf
 from _gradcheck import assert_gradients_match
-from _synthetic_table import NU
 
 from radtrax.instrument import BandInstrument, Instrument, SpectralResponseFunction
+from radtrax.spectroscopy.synthetic import NU_CM as NU
 
 
 STEP = 0.01  # the synthetic grid's spacing [cm⁻¹]

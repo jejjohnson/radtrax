@@ -9,10 +9,10 @@ import numpy as np
 import pytest
 import xarray as xr
 from _gradcheck import assert_gradients_match
-from _synthetic_table import P_ATM, T_K  # the radtrax · 3 notebook's grid
 
 from radtrax.atmosphere import ATM_TO_PA, AtmosphericState, afgl_us_standard
 from radtrax.spectroscopy import CrossSectionTable, OpacityProvider, TableOpacity
+from radtrax.spectroscopy.synthetic import P_ATM, T_K  # the radtrax · 3 notebook's grid
 
 
 G = 7
