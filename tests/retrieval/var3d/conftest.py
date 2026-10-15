@@ -116,3 +116,19 @@ def obs_model_with_gsd(synthetic_lut, hyperspectral_srf):
         vmr_reference=0.0,
         gsd=GroundSamplingDistance(downsample_factor=2),
     )
+
+
+@pytest.fixture
+def obs_model_with_psf_and_gsd(synthetic_lut, hyperspectral_srf):
+    """Obs operator with a Gaussian PSF and then a 2× GSD, as a real sensor."""
+    return RadianceObservationModel.from_lut(
+        synthetic_lut,
+        srf=hyperspectral_srf,
+        T_K=280.0,
+        p_atm=1.0,
+        path_length_cm=8.4e5,
+        amf=2.0,
+        vmr_reference=0.0,
+        psf=PointSpreadFunction.gaussian(fwhm_pixels=1.5, kernel_size=5),
+        gsd=GroundSamplingDistance(downsample_factor=2),
+    )

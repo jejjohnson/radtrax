@@ -861,8 +861,9 @@ class LinearTargetFromObs(Operator):
         vmr_background: Background state; see above.
         pattern: ``"uniform"`` (default), ``"impulse"`` or an explicit
             perturbation array.
-        pixel: Impulse location (and, for an observation model, the output
-            pixel read).
+        pixel: Impulse location on the state's grid; an observation model
+            reads the target at the output pixel holding it (``pixel // f``
+            for a GSD of factor ``f``).
         axis: Position of the band axis. Default ``-3``.
         fd_step: Absolute central-difference step for a callable that JAX
             cannot trace; see above.
@@ -1012,7 +1013,8 @@ class ColumnEnhancement(Operator):
         vmr_background: Background state of the target, forwarded to
             :class:`LinearTargetFromObs`; pass it on the model's
             high-resolution grid when the observation model has a GSD.
-        target_pixel: Impulse location / output pixel of the target.
+        target_pixel: The target's ``pixel``: impulse location on the state's
+            grid, read at the output pixel holding it.
         fd_step: Central-difference step of the target for an ``obs_model``
             JAX cannot trace, forwarded to :class:`LinearTargetFromObs`.
         rank: Rank for ``"lowrank"`` (default 10 when ``None``).

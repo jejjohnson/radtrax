@@ -24,6 +24,7 @@ from retrieval.var3d.conftest import (  # noqa: F401
     obs_model_no_optics,
     obs_model_with_gsd,
     obs_model_with_psf,
+    obs_model_with_psf_and_gsd,
     synthetic_lut,
 )
 

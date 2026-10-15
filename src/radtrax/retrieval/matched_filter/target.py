@@ -14,7 +14,8 @@ in the original snippet). Instead:
   strong plumes. For small ``α`` this reduces to ``α · t_linear`` and the MF
   score becomes scale-invariant to that choice.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/matched_filter/target.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/matched_filter/target.py``); the read-out
+pixel follows a GSD since radtrax#80.
 """
 
 from __future__ import annotations
@@ -62,41 +63,55 @@ def _build_pattern(
     return arr
 
 
-def _extract_pixel(
-    cube: Float[Array, "H W B"],
+def _vmr_pixel(
+    vmr_field: Float[Array, "H W"],
     pattern: Pattern | Float[Array, "H W"],
     pixel: tuple[int, int] | None,
-) -> Float[Array, B]:
-    """Pick one pixel spectrum out of a response cube.
+) -> tuple[int, int]:
+    """The pixel the target is read at, on the **VMR** grid.
 
     Resolution rules (explicit first):
 
-    1. If ``pixel`` is given, use it directly (after bounds checking).
-    2. Otherwise, for ``pattern='uniform'``, use the scene centre — every
-       pixel sees the same signature so the choice doesn't matter.
-    3. For ``pattern='impulse'``, the impulse location is not available in
-       this helper (it was consumed by ``_build_pattern``), so we also fall
-       back to the scene centre — callers should pass ``pixel`` explicitly
-       when the impulse is off-centre.
-    4. For a custom array pattern, pick the pixel with the largest
-       absolute-value weight (``argmax(|pattern|)``) — the natural choice
-       of a "perturbation location" for an arbitrary 2-D pattern.
+    1. If ``pixel`` is given, use it (after bounds checking).
+    2. Otherwise, for ``'uniform'`` and ``'impulse'``, the scene centre — the
+       impulse's default location.
+    3. For a custom array pattern, the pixel with the largest absolute weight
+       (``argmax(|pattern|)``), its natural "perturbation location".
     """
-    h, w, _ = cube.shape
+    h, w = vmr_field.shape
     if pixel is not None:
         i, j = pixel
     elif isinstance(pattern, str):
-        # 'uniform' → centre (any pixel would do); 'impulse' → centre as
-        # documented default when no pixel override was supplied.
         i, j = h // 2, w // 2
     else:
-        arr = jnp.asarray(pattern)
-        idx = jnp.argmax(jnp.abs(arr))
-        i = int(idx // w)
-        j = int(idx % w)
+        idx = int(jnp.argmax(jnp.abs(jnp.asarray(pattern))))
+        i, j = idx // w, idx % w
     if not (0 <= i < h and 0 <= j < w):
         raise ValueError(
-            f"target: pixel {(i, j)} is out of bounds for cube shape ({h}, {w})."
+            f"target: pixel {(i, j)} is out of bounds for vmr_field shape ({h}, {w})."
+        )
+    return i, j
+
+
+def _read_out(
+    cube: Float[Array, "h w B"],
+    vmr_pixel: tuple[int, int],
+    obs: RadianceObservationModel,
+) -> Float[Array, " B"]:
+    """The response at the output pixel that contains ``vmr_pixel``.
+
+    A GSD block-averages ``f × f`` VMR pixels into one output pixel, so VMR
+    pixel ``(i, j)`` lands in output pixel ``(i // f, j // f)``; without a
+    GSD ``f = 1`` and the grids coincide (radtrax#80).
+    """
+    factor = 1 if obs.gsd is None else int(obs.gsd.downsample_factor)
+    i, j = vmr_pixel[0] // factor, vmr_pixel[1] // factor
+    h, w, _ = cube.shape
+    if not (0 <= i < h and 0 <= j < w):
+        raise ValueError(
+            f"target: VMR pixel {vmr_pixel} maps to output pixel {(i, j)}, out of "
+            f"bounds for the output shape ({h}, {w}): the GSD crops the VMR rows "
+            "and columns past the last whole block."
         )
     return cube[i, j]
 
@@ -135,8 +150,11 @@ def linear_target_from_obs(
         ``'uniform'`` (default), ``'impulse'``, or an explicit 2-D perturbation
         pattern of the same shape as ``vmr_background``.
     pixel
-        Output pixel ``(i, j)`` at which to read the signature. Defaults to
-        the scene centre, or the impulse location if applicable.
+        Pixel ``(i, j)`` **of the VMR grid**: the impulse location, and the
+        place the signature is read — at the output pixel containing it,
+        ``(i // f, j // f)`` for a GSD of factor ``f``. Defaults to the scene
+        centre (or a custom pattern's peak). ``pattern`` and ``pixel`` must be
+        concrete (static, or closed over under ``jax.jit``).
     linear_forward
         If True, use the linearised forward ``1 - Δτ`` instead of
         ``exp(-Δτ)``. For small ``vmr_background`` the two agree to within
@@ -150,7 +168,7 @@ def linear_target_from_obs(
     dx = _build_pattern(vmr_background, pattern, pixel)
     fwd = obs.make_forward(linear=linear_forward)
     _, dL = jax.jvp(fwd, (vmr_background,), (dx,))
-    return _extract_pixel(dL, pattern, pixel)
+    return _read_out(dL, _vmr_pixel(vmr_background, pattern, pixel), obs)
 
 
 def nonlinear_target_from_obs(
@@ -174,4 +192,6 @@ def nonlinear_target_from_obs(
     fwd = obs.make_forward(linear=False)
     L_perturbed = fwd(vmr_background + amplitude * dx)
     L_base = fwd(vmr_background)
-    return _extract_pixel(L_perturbed - L_base, pattern, pixel)
+    return _read_out(
+        L_perturbed - L_base, _vmr_pixel(vmr_background, pattern, pixel), obs
+    )
