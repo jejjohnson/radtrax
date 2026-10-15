@@ -28,10 +28,11 @@ the layout drifts:
 | Module | Owns | Lands in |
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
-| `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) | now |
+| `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) and `ViewingGeometry`, the JAX geometry surfaces and solvers take (#35) | now |
 | `spectroscopy/` | `opacity`: the `OpacityProvider` protocol and `TableOpacity`, per-layer τ (L, G) bilinear in (ln p, T) (#33); `tables`: single-slab cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `table_cache`: v0's tables in the user cache, `load_opacity`; `hitran/`: offline table building through HAPI (`[hitran]`, `python -m radtrax.spectroscopy.hitran GAS ...`) | ported (#20); `opacity`, `table_cache` (#33, #34) |
-| `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
-| `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
+| `optics/` | `properties`: `OpticalProperties`, τ (L, G) on its grid between opacity and solver (#35); Rayleigh, aerosols, delta-M from v3 | now |
+| `solvers/` | `beer_lambert`: the `RTSolver` protocol and `BeerLambert`, radiance (G,) from optics, surface and geometry (#35); scattering solvers from v3 | now |
+| `surface/` | `lambertian`: the `Surface` protocol and `Lambertian` (#35); kernel BRDFs from v1 | now |
 | `instrument/` | `srf`: the one SRF band integration (exact Gaussian FWHM, #28); `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
 | `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
 | `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O); `mbmp`: the Sentinel-2 MBMP signal (#30) | ported (#22, #23) |

@@ -1,8 +1,11 @@
-"""Surface reflectance models: Lambertian first (Wave 3, issue #35), kernel
-BRDFs later.
+"""Surface reflectance behind the ``Surface`` protocol: Lambertian in v0
+(radtrax#35), kernel BRDFs from v1.
 """
 
 from __future__ import annotations
 
+from radtrax.surface import lambertian
+from radtrax.surface.lambertian import Lambertian, Surface
 
-__all__: list[str] = []
+
+__all__ = ["Lambertian", "Surface", "lambertian"]

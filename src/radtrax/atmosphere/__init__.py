@@ -6,7 +6,9 @@
   hydrostatic balance;
 - ``afgl``: :func:`afgl_us_standard`, the AFGL (1986) US Standard profile;
 - ``gas``: the ideal-gas constants and number density, and ``geometry``:
-  the air-mass factor, each the one implementation in radtrax (radtrax#27).
+  the air-mass factor, each the one implementation in radtrax (radtrax#27),
+  and :class:`ViewingGeometry`, the geometry surfaces and solvers take
+  (radtrax#35).
 """
 
 from __future__ import annotations
@@ -22,7 +24,7 @@ from radtrax.atmosphere.gas import (
     STANDARD_GRAVITY_M_PER_S2,
     number_density,
 )
-from radtrax.atmosphere.geometry import air_mass_factor
+from radtrax.atmosphere.geometry import ViewingGeometry, air_mass_factor
 from radtrax.atmosphere.hydrostatics import layers_from_levels
 from radtrax.atmosphere.state import AtmosphericState
 
@@ -36,6 +38,7 @@ __all__ = [
     "DRY_AIR_MOLAR_MASS_KG_PER_MOL",
     "STANDARD_GRAVITY_M_PER_S2",
     "AtmosphericState",
+    "ViewingGeometry",
     "afgl",
     "afgl_us_standard",
     "air_mass_factor",
