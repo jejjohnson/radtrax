@@ -35,7 +35,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 from radtrax.atmosphere.gas import (
     AVOGADRO_PER_MOL,
@@ -57,8 +57,8 @@ _SERIES_GAP = 1e-6
 
 
 def layers_from_levels(
-    p_levels_pa: Float[Array, " L1"],
-    t_levels_k: Float[Array, " L1"],
+    p_levels_pa: Real[ArrayLike, " L1"],
+    t_levels_k: Real[ArrayLike, " L1"],
     vmr_levels: dict[str, Float[Array, " L1"]],
     *,
     z_surface_m: float | Float[Array, ""] = 0.0,

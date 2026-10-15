@@ -229,6 +229,7 @@ def test_rejects_nonmonotonic_wavelengths():
         )
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_rejects_unknown_srf_type():
     wl = np.linspace(1400.0, 2500.0, 101)
     with pytest.raises(ValueError, match="unknown srf_type"):

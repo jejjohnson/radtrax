@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 from radtrax.exceptions import ShapeError
 
@@ -45,7 +45,7 @@ class OpticalProperties(eqx.Module):
     tau: Float[Array, "L G"]
 
     def __init__(
-        self, nu_cm: Float[ArrayLike, " G"], tau: Float[ArrayLike, "L G"]
+        self, nu_cm: Real[ArrayLike, " G"], tau: Real[ArrayLike, "L G"]
     ) -> None:
         self.nu_cm = jnp.asarray(nu_cm, dtype=float)
         self.tau = jnp.asarray(tau, dtype=float)

@@ -85,6 +85,8 @@ dev = [
     "pytest-github-actions-annotate-failures>=0.3",
     # The [geo] tests run in CI; the base install stays without it (gate P5).
     "radtrax[geo]",
+    # jaxtyping's pytest hook checks every radtrax shape at run time (#81).
+    "beartype>=0.23.1",
 ]
 lint = [
     "import-linter>=2.1",
@@ -195,6 +197,7 @@ markers = [
 ]
 addopts = """\
     --doctest-modules \
+    --jaxtyping-packages=radtrax,beartype.beartype \
     --cov=src/radtrax \
     --cov-report=term-missing \
     --cov-report=xml:coverage.xml\

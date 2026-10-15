@@ -13,6 +13,8 @@ table.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import jax
 import pytest
 import xarray as xr
@@ -20,6 +22,15 @@ import xarray as xr
 
 # Before anything imports radtrax (which builds JAX arrays at import).
 jax.config.update("jax_enable_x64", True)
+
+
+@pytest.fixture
+def shapes_unchecked() -> Iterator[None]:
+    """Switch off jaxtyping's run-time checks for a test of radtrax's own validation."""
+    from _typecheck import shapes_unchecked
+
+    with shapes_unchecked():
+        yield
 
 
 @pytest.fixture(scope="session")

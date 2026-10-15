@@ -75,7 +75,7 @@ on a swath, under `jit` or in CI.
 |---|---|---|
 | **JAX** | every forward model and its derivatives | Pure functions of arrays; no Python side effects or data-dependent Python control flow inside traced code. Float64 for spectroscopy (`jax_enable_x64`; `tests/conftest.py` sets it). |
 | **Equinox** | modules for state (tables, SRFs, profiles, noise models) | Arrays are leaves, never `eqx.field(static=True)` (Equinox warns and hashing breaks under `filter_jit`); choose what is not differentiated with `eqx.partition` or `jax.lax.stop_gradient`. |
-| **jaxtyping** | shape annotations on every public array argument | Name dimensions once and reuse them: `L` layers, `G` wavenumbers, `B` bands, `N` pixels. |
+| **jaxtyping** | shape annotations on every public array argument | Name dimensions once and reuse them (the vocabulary is under "Shapes" below); the test suite checks every shape at run time. |
 | **lineax**, **optimistix** | linear solves, fixed points, Gauss–Newton and Levenberg–Marquardt with `ImplicitAdjoint` | Use them rather than hand-written iterations; JAXopt is unmaintained. |
 | **gaussx** | structured covariances (`LowRankUpdate`, Woodbury), block-tridiagonal solves | A structured operator, never a dense inverse; `gx.solve` dispatches on structure. |
 | **NumPy**, **xarray** | offline table building and I/O | Off the gradient path only; nothing differentiable is NumPy. |
@@ -154,6 +154,37 @@ Everything composes because it keeps these contracts.
   under `jit` (`eqx.error_if`) raise a `RuntimeError` at run time
   (`equinox.EquinoxRuntimeError` under `eqx.filter_jit`,
   `jax.errors.JaxRuntimeError` under `jax.jit`); say so in the docstring.
+
+### 4. Shapes
+
+- Every public function and method annotates its array arguments and
+  returns with a jaxtyping shape (`Float[Array, " B"]`), callables
+  included (`Callable[[Float[Array, " N"]], Float[Array, " B"]]`).
+  `tests/test_annotations.py` checks it, and jaxtyping's pytest hook
+  (`--jaxtyping-packages=radtrax,beartype.beartype` in `addopts`) checks
+  the shapes themselves on every test run.
+- Quote every dimension string, with a leading space for a single name
+  (`" B"`). Don't write `...` or `"..."`; use a named variadic such as
+  `"*shape"` (element-wise functions take and return
+  `Float[ArrayLike, "*shape"]`) or `"*batch"`.
+- When a shape recurs in a module, give it an alias
+  (`Spectrum = Float[np.ndarray, " B"]`).
+- The names, reused everywhere:
+
+  | Name | Axis |
+  |---|---|
+  | `L` | atmospheric layers (`L1` = `L + 1` levels) |
+  | `G` | wavenumbers of the model grid |
+  | `Ghr` | the high-resolution grid an SRF integrates over |
+  | `B` | instrument bands |
+  | `P`, `T` | pressures and temperatures of a cross-section table |
+  | `H`, `W` | image rows and columns (`h`, `w` after ground sampling) |
+  | `N` | pixels, flattened |
+  | `S` | samples (draws, ensemble members) |
+  | `time` | time steps or scenes |
+  | `K` | clusters |
+  | `r` | rank of a low-rank factor |
+  | `k` | side of a convolution kernel |
 
 ### The public API
 

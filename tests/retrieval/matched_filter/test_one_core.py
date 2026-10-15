@@ -18,6 +18,7 @@ import lineax as lx
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
+from _typecheck import shapes_unchecked
 from scipy.stats import norm
 
 from radtrax.retrieval.matched_filter import (
@@ -95,7 +96,7 @@ def test_shrink_covariance_ledoit_wolf_properties() -> None:
 
     with pytest.raises(ValueError, match="fourth_moment"):
         shrink_covariance(cov, method="ledoit_wolf", n_samples=10)
-    with pytest.raises(ValueError, match="method"):
+    with pytest.raises(ValueError, match="method"), shapes_unchecked():
         shrink_covariance(cov, method="nope", n_samples=10)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="square"):
         shrink_covariance(np.ones((2, 3)), method="oas", n_samples=10)
@@ -183,6 +184,7 @@ def test_welford_third_and_fourth_moments_merge_exactly() -> None:
         WelfordAccumulator(n_bands=p).fourth_moment()
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_streaming_rejects_unknown_cov_kind() -> None:
     with pytest.raises(ValueError, match="cov_kind"):
         streaming_background([np.ones((3, 2))], n_bands=2, cov_kind="nope")  # type: ignore[arg-type]
@@ -434,6 +436,7 @@ def test_adaptive_window_variance_survives_a_large_offset() -> None:
     np.testing.assert_allclose(var[7, 7], expected, rtol=1e-9)
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_apply_adaptive_mf_validation_and_unscoreable_pixels() -> None:
     rng = np.random.default_rng(1)
     cube = rng.normal(size=(8, 8, 3))

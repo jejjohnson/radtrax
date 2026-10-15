@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 from radtrax.atmosphere.gas import (
     ATM_TO_PA,
@@ -59,10 +59,10 @@ class AtmosphericState(eqx.Module):
         '5.105e+18'
     """
 
-    p_pa: Float[Array, " L"]
-    t_k: Float[Array, " L"]
-    z_m: Float[Array, " L"]
-    dz_m: Float[Array, " L"]
+    p_pa: Real[Array, " L"]
+    t_k: Real[Array, " L"]
+    z_m: Real[Array, " L"]
+    dz_m: Real[Array, " L"]
     vmr: dict[str, Float[Array, " L"]]
 
     def __check_init__(self) -> None:

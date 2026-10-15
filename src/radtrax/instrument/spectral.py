@@ -63,7 +63,7 @@ class Instrument(eqx.Module):
     nu_cm: eqx.AbstractVar[Float[Array, " G"]]
 
     @abc.abstractmethod
-    def __call__(self, radiance: Float[Array, " G"]) -> Float[Array, " B"]:
+    def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
         """Band values ``(B,)`` from radiance on :attr:`nu_cm`, ``(G,)``."""
 
 
@@ -135,7 +135,7 @@ class BandInstrument(Instrument):
         """Number of bands ``B``."""
         return int(self.response.shape[0])
 
-    def __call__(self, radiance: Float[Array, " G"]) -> Float[Array, " B"]:
+    def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
         # L(ν_g + δ), linear on the grid, edge values beyond it            (G,)
         # On ν − ν₀, so δ is resolved to its own precision, not to ν's ulp
         # (4.9e-4 cm⁻¹ at 4300 cm⁻¹ in float32).

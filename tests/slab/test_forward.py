@@ -167,6 +167,7 @@ def test_jacobian_matches_finite_difference(synthetic_lut):
     np.testing.assert_allclose(r.jacobian, fd, rtol=1e-4, atol=1e-5)
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_forward_rejects_bad_order():
     with pytest.raises(ValueError, match="order"):
         forward_maclaurin(

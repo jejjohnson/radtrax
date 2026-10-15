@@ -132,6 +132,7 @@ def test_from_datasets_reads_the_hitran_lut_format() -> None:
         TableOpacity.from_datasets({"CH4": ds}, var="sigma")
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_validation() -> None:
     state = _state()
     with pytest.raises(KeyError, match="CO2"):

@@ -32,20 +32,20 @@ should mask such pixels (:class:`radtrax.geo.MBMP` does); ``ε = 0`` gives
 from __future__ import annotations
 
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float
 
 
 __all__ = ["mbmp_log_signal", "swir_contrast"]
 
 
 def mbmp_log_signal(
-    swir1: Float[Array, ...],
-    swir2: Float[Array, ...],
-    ref_swir1: Float[Array, ...],
-    ref_swir2: Float[Array, ...],
+    swir1: Float[ArrayLike, "*#shape"],
+    swir2: Float[ArrayLike, "*#shape"],
+    ref_swir1: Float[ArrayLike, "*#shape"],
+    ref_swir2: Float[ArrayLike, "*#shape"],
     *,
     eps: float = 1e-10,
-) -> Float[Array, ...]:
+) -> Float[Array, "*#shape"]:
     """MBMP log signal ``ln(R₁₁/R₁₂) − ln(R′₁₁/R′₁₂)``, no scale factors.
 
     Args:
@@ -69,11 +69,11 @@ def mbmp_log_signal(
 
 
 def swir_contrast(
-    swir1: Float[Array, ...],
-    swir2: Float[Array, ...],
+    swir1: Float[ArrayLike, "*#shape"],
+    swir2: Float[ArrayLike, "*#shape"],
     *,
     eps: float = 1e-10,
-) -> Float[Array, ...]:
+) -> Float[Array, "*#shape"]:
     """Single-pass normalised SWIR contrast ``(R₁₁ − R₁₂) / (R₁₁ + R₁₂ + ε)``.
 
     The normalised difference of bands 11 and 12 (the NBR2 index, as in
@@ -88,11 +88,11 @@ def swir_contrast(
     return (r1 - r2) / (r1 + r2 + eps)
 
 
-def _clip(band: Float[Array, ...]) -> Float[Array, ...]:
+def _clip(band: Float[ArrayLike, "*#shape"]) -> Float[Array, "*#shape"]:
     return jnp.maximum(jnp.asarray(band), 0.0)
 
 
 def _log_ratio(
-    swir1: Float[Array, ...], swir2: Float[Array, ...], eps: float
-) -> Float[Array, ...]:
+    swir1: Float[ArrayLike, "*#shape"], swir2: Float[ArrayLike, "*#shape"], eps: float
+) -> Float[Array, "*#shape"]:
     return jnp.log(_clip(swir1) + eps) - jnp.log(_clip(swir2) + eps)

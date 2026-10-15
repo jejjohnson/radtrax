@@ -23,6 +23,7 @@ pytestmark = pytest.mark.integration
 GeoTensor = pytest.importorskip("georeader.geotensor").GeoTensor
 rasterio = pytest.importorskip("rasterio")
 
+from _typecheck import shapes_unchecked
 from pipekit import Operator
 
 import radtrax.geo as rg
@@ -207,7 +208,7 @@ def test_every_cov_method_scores(cov_method: str) -> None:
     cube = rng.normal(size=(4, 6, 6))
     out = rg.MatchedFilter(target=np.ones(4), cov_method=cov_method)(cube)
     assert np.isfinite(out).all()
-    with pytest.raises(ValueError, match="cov_method"):
+    with pytest.raises(ValueError, match="cov_method"), shapes_unchecked():
         rg.MatchedFilter(target=np.ones(4), cov_method="nope")(cube)  # type: ignore[arg-type]
 
 
@@ -716,9 +717,11 @@ def test_config_reload_restores_arrays_and_operators() -> None:
 def test_obs_model_operators_are_forbid_in_yaml() -> None:
     assert rg.LinearTargetFromObs.forbid_in_yaml is True
     assert rg.NonlinearTargetFromObs.forbid_in_yaml is True
-    op = rg.NonlinearTargetFromObs(obs_model=np.sum, amplitude=0.5, pattern=np.ones(2))
+    op = rg.NonlinearTargetFromObs(
+        obs_model=np.sum, amplitude=0.5, pattern=np.ones((1, 2))
+    )
     assert op.get_config()["obs_model"] == "sum"
-    assert op.get_config()["pattern"] == [1.0, 1.0]
+    assert op.get_config()["pattern"] == [[1.0, 1.0]]
 
 
 def test_column_enhancement_obs_model_refuses_reload() -> None:

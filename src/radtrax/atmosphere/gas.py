@@ -7,7 +7,7 @@ in ``hapi_lut.beers`` and ``radtran.config`` (radtrax#27).
 
 from __future__ import annotations
 
-import numpy as np
+from jaxtyping import ArrayLike, Float
 
 
 __all__ = [
@@ -31,8 +31,8 @@ DRY_AIR_MOLAR_MASS_KG_PER_MOL: float = 28.9644e-3  # [kg/mol], US Standard 1976
 
 
 def number_density(
-    p_atm: float | np.ndarray, T_K: float | np.ndarray
-) -> float | np.ndarray:
+    p_atm: Float[ArrayLike, "*#shape"], T_K: Float[ArrayLike, "*#shape"]
+) -> Float[ArrayLike, "*#shape"]:
     """Total number density from the ideal-gas law [molecules / cm³].
 
     $$
