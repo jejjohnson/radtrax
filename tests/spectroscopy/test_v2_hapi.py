@@ -3,7 +3,7 @@
 Through the AFGL US Standard atmosphere, the two-way transmittance from the
 cached v0 tables (bilinear in ln p, T) against HAPI's line-by-line cross
 sections evaluated at each layer's own (p, T), integrated over EMIT-like
-Gaussian bands (8.5 nm FWHM) with radtrax's ``SpectralResponseFunction``:
+Gaussian bands (8.5 nm FWHM, ``tests/_bands.py``):
 within 0.1 % (absolute in band transmittance) in every band, as the plan's
 V2 reads. HAPI is called as the table builder calls it, on the table's own
 wavenumbers, so the difference is the table's interpolation.
@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from _bands import emit_like_srf
 
 from radtrax.atmosphere import ATM_TO_PA, afgl_us_standard, air_mass_factor
-from radtrax.instrument import SpectralResponseFunction
 from radtrax.spectroscopy import TableOpacity, load_table
 from radtrax.spectroscopy.hitran import LUTGridConfig, default_cache_dir
 from radtrax.spectroscopy.hitran.build import fetch_lines
@@ -36,24 +36,8 @@ pytestmark = [pytest.mark.slow, pytest.mark.integration]
 
 GASES = ["CH4", "H2O", "CO2", "N2O", "CO"]
 WINDOWS_CM = ((4300.0, 4400.0), (6000.0, 6100.0))
-FWHM_NM = 8.5
-BAND_STEP_NM = 7.5
 #: Two-way air-mass factor: a 35° Sun, a nadir view.
 AMF = float(air_mass_factor(35.0, 0.0))
-
-
-def _bands(nu_cm: np.ndarray) -> tuple[SpectralResponseFunction, np.ndarray]:
-    """Gaussian bands inside a window, on its ascending-wavelength grid."""
-    order = np.argsort(1e7 / nu_cm)
-    wl = (1e7 / nu_cm)[order]
-    centers = np.arange(wl[0] + 2 * FWHM_NM, wl[-1] - 2 * FWHM_NM, BAND_STEP_NM)
-    srf = SpectralResponseFunction(
-        wavelengths_hr_nm=wl,
-        band_centers_nm=centers,
-        band_widths_nm=np.full(centers.size, FWHM_NM),
-        band_names=tuple(f"{c:.1f}" for c in centers),
-    )
-    return srf, order
 
 
 def test_band_transmittance_matches_hapi_on_afgl_us_standard(
@@ -98,8 +82,8 @@ def test_band_transmittance_matches_hapi_on_afgl_us_standard(
         t_table, t_ref = np.exp(-AMF * tau_table), np.exp(-AMF * tau_ref)
         monochromatic = float(np.max(np.abs(t_table - t_ref)))
         record_property(f"monochromatic_{lo:.0f}", monochromatic)
-        srf, order = _bands(nu)
-        band_error = np.abs(srf.apply(t_table[order]) - srf.apply(t_ref[order]))
+        srf = emit_like_srf(nu)  # on the window's wavelengths, ascending
+        band_error = np.abs(srf.apply(t_table[::-1]) - srf.apply(t_ref[::-1]))
         worst = int(np.argmax(band_error))
         assert band_error[worst] < 1e-3, (
             f"{lo}–{hi} cm⁻¹: band {srf.band_names[worst]} nm |ΔT| = "
