@@ -44,6 +44,12 @@ from radtrax.retrieval.matched_filter.background import (
 )
 
 
+__all__ = [
+    "WelfordAccumulator",
+    "streaming_background",
+]
+
+
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:

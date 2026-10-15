@@ -32,6 +32,12 @@ from jaxtyping import ArrayLike, Float
 from radtrax.exceptions import MissingFileError, ShapeError
 
 
+__all__ = [
+    "apply_image_xarray",
+    "open_multi_scene",
+]
+
+
 if TYPE_CHECKING:
     import lineax as lx
     import xarray as xr

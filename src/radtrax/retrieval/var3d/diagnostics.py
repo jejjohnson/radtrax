@@ -37,6 +37,13 @@ from radtrax.exceptions import ParameterError
 from radtrax.retrieval.var3d.cost import ForwardFn, ObsInvVariance, StateVector
 
 
+__all__ = [
+    "degrees_of_freedom_for_signal",
+    "posterior_covariance_proxy",
+    "reduced_chi_squared",
+]
+
+
 if TYPE_CHECKING:
     from radtrax.retrieval.var3d.control import WhiteningTransform
 
