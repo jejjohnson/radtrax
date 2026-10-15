@@ -29,7 +29,7 @@ import equinox as eqx
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
-from jaxtyping import Array, Float, Int
+from jaxtyping import Array, ArrayLike, Float, Int
 
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.retrieval.matched_filter.background import (
@@ -38,6 +38,15 @@ from radtrax.retrieval.matched_filter.background import (
     estimate_cov_shrunk,
 )
 from radtrax.retrieval.matched_filter.core import _check_target_energy, apply_image
+
+
+__all__ = [
+    "ClusterBackground",
+    "adaptive_window_background",
+    "apply_adaptive_mf",
+    "apply_cluster_mf",
+    "gmm_cluster_background",
+]
 
 
 if TYPE_CHECKING:
@@ -291,9 +300,9 @@ def adaptive_window_background(
 
 
 def apply_cluster_mf(
-    cube: Float[Array, "H W B"],
+    cube: Float[ArrayLike, "H W B"],
     cluster: ClusterBackground,
-    target: Float[Array, " B"],
+    target: Float[ArrayLike, " B"],
 ) -> Float[Array, "H W"]:
     """Matched-filter scores with each pixel's own cluster background.
 
@@ -348,12 +357,12 @@ def apply_cluster_mf(
 
 
 def apply_adaptive_mf(
-    cube: Float[Array, "H W B"],
-    mean: Float[Array, "H W B"],
-    variance: Float[Array, "H W B"],
-    target: Float[Array, " B"],
+    cube: Float[ArrayLike, "H W B"],
+    mean: Float[ArrayLike, "H W B"],
+    variance: Float[ArrayLike, "H W B"],
+    target: Float[ArrayLike, " B"],
     *,
-    ridge: float = 0.0,
+    ridge: float | Float[Array, ""] = 0.0,
 ) -> Float[Array, "H W"]:
     """Matched filter against a local diagonal-covariance background.
 

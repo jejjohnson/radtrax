@@ -19,7 +19,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 
 __all__ = ["ViewingGeometry", "air_mass_factor"]
@@ -87,9 +87,9 @@ class ViewingGeometry(eqx.Module):
 
     def __init__(
         self,
-        mu0: Float[ArrayLike, ""],
-        mu: Float[ArrayLike, ""],
-        relative_azimuth_rad: Float[ArrayLike, ""] = 0.0,
+        mu0: Real[ArrayLike, ""],
+        mu: Real[ArrayLike, ""],
+        relative_azimuth_rad: Real[ArrayLike, ""] = 0.0,
     ) -> None:
         self.mu0 = _cosine("mu0", mu0)
         self.mu = _cosine("mu", mu)
@@ -98,9 +98,9 @@ class ViewingGeometry(eqx.Module):
     @classmethod
     def from_angles(
         cls,
-        sza_deg: Float[ArrayLike, ""],
-        vza_deg: Float[ArrayLike, ""],
-        raa_deg: Float[ArrayLike, ""] = 0.0,
+        sza_deg: Real[ArrayLike, ""],
+        vza_deg: Real[ArrayLike, ""],
+        raa_deg: Real[ArrayLike, ""] = 0.0,
     ) -> ViewingGeometry:
         """From solar and viewing zenith angles and relative azimuth [degrees]."""
         return cls(
@@ -114,7 +114,7 @@ class ViewingGeometry(eqx.Module):
         return 1.0 / self.mu0 + 1.0 / self.mu
 
 
-def _cosine(name: str, value: Float[ArrayLike, ""]) -> Float[Array, ""]:
+def _cosine(name: str, value: Real[ArrayLike, ""]) -> Float[Array, ""]:
     """``value`` as a float array, raising (also under ``jit``) outside ``(0, 1]``."""
     x = jnp.asarray(value, dtype=float)
     valid = (x > 0.0) & (x <= 1.0 + _COSINE_SLACK)  # NaN compares False

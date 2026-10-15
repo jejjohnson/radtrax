@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
+import numpy as np
 import pytest
 from _synthetic_table import P_ATM, T_K
 
@@ -25,15 +26,17 @@ def test_built_from_an_opacity_provider() -> None:
 
 
 def test_integer_inputs_are_promoted_to_float() -> None:
-    optics = OpticalProperties([4300, 4301], [[0, 1]])
+    optics = OpticalProperties(np.array([4300, 4301]), np.array([[0, 1]]))
     assert optics.nu_cm.dtype == optics.tau.dtype == jnp.float64
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_the_grid_must_be_one_dimensional() -> None:
     with pytest.raises(ValueError, match="nu_cm must be"):
         OpticalProperties(jnp.zeros((2, 2)), jnp.zeros((1, 2)))
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 @pytest.mark.parametrize("shape", [(3,), (2, 4), (2, 3, 1)])
 def test_tau_must_be_layers_by_the_grid(shape: tuple[int, ...]) -> None:
     with pytest.raises(ValueError, match="tau must be"):

@@ -134,6 +134,7 @@ def test_afgl_us_standard_layers_and_gases() -> None:
 # ── the state ────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_with_vmr_and_shape_checks() -> None:
     atm = afgl_us_standard(z_top_km=5.0, gases=[])
     filled = atm.with_vmr("CH4", 1.9e-6)
@@ -164,6 +165,7 @@ def test_with_vmr_and_shape_checks() -> None:
         )
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_level_validation() -> None:
     with pytest.raises(ValueError, match="strictly"):
         layers_from_levels(jnp.array([5e4, 1e5]), jnp.array([250.0, 260.0]), {})

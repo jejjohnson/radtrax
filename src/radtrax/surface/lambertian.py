@@ -18,7 +18,7 @@ import abc
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, ArrayLike, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 from radtrax.atmosphere.geometry import ViewingGeometry
 
@@ -66,7 +66,7 @@ class Lambertian(Surface):
 
     albedo: Float[Array, "*G"]
 
-    def __init__(self, albedo: Float[ArrayLike, "*G"]) -> None:
+    def __init__(self, albedo: Real[ArrayLike, "*G"]) -> None:
         self.albedo = jnp.asarray(albedo, dtype=float)
 
     def reflectance(

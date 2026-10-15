@@ -104,6 +104,7 @@ def test_nonlinear_target_saturates_at_large_amplitude(obs_model_no_optics):
     )
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_custom_pattern_shape_check(obs_model_no_optics):
     obs = obs_model_no_optics
     x_b = jnp.full((4, 4), 1e-6)
@@ -112,6 +113,7 @@ def test_custom_pattern_shape_check(obs_model_no_optics):
         linear_target_from_obs(obs, x_b, pattern=bad)
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_bad_pattern_name_raises(obs_model_no_optics):
     obs = obs_model_no_optics
     x_b = jnp.full((4, 4), 1e-6)

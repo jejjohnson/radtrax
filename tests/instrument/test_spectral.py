@@ -142,6 +142,7 @@ def test_default_band_names() -> None:
     assert instrument.band_names == ("B0", "B1")
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 @pytest.mark.parametrize(
     ("nu", "response", "shift", "names", "match"),
     [

@@ -181,7 +181,11 @@ def test_the_target_feeds_the_matched_filter(
     # The noiseless score of the plume (ln A cancels): ΔX less the curve of
     # growth, which a linear target cannot see.
     signal = np.asarray(batch(jnp.array([plume_column, 0.0]), jnp.array([0.25, 0.25])))
-    expected = float(apply_pixel(jnp.asarray(signal[0] - signal[1]), 0.0, cov, t))
+    expected = float(
+        apply_pixel(
+            jnp.asarray(signal[0] - signal[1]), np.zeros_like(signal[0]), cov, t
+        )
+    )
     assert 0 < 1 - expected / plume_column < 0.03
     # The mean of 9 plume pixels within 5 of its standard errors (se / 3).
     assert abs(scores[plume].mean() - expected) < 5 * se / 3

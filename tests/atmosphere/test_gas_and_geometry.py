@@ -81,6 +81,15 @@ def test_number_density_one_implementation_two_front_ends() -> None:
     )
 
 
+def test_number_density_takes_integer_arrays() -> None:
+    """Whole-unit profiles (integer dtypes) pass the run-time shape check."""
+    np.testing.assert_allclose(
+        atmosphere.number_density(np.array([1, 2]), np.array([296, 296])),
+        atmosphere.number_density(np.array([1.0, 2.0]), 296.0),
+        rtol=1e-15,
+    )
+
+
 def test_number_density_against_the_ideal_gas_law() -> None:
     # n = p / (k_B T): 1 atm at 273.15 K is the Loschmidt constant, 2.686780111e25 m⁻³ (CODATA).
     np.testing.assert_allclose(

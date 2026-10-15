@@ -40,8 +40,8 @@ from __future__ import annotations
 
 import functools
 import itertools
-from collections.abc import Callable, Iterable, Iterator
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple, Self
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, NamedTuple
 
 import equinox as eqx
 import jax
@@ -115,6 +115,10 @@ VMRField = Float[np.ndarray, "H W"]
 ScoreArray = Float[np.ndarray, "*time H W"]
 ValidMap = Bool[np.ndarray, "*time H W"]
 Samples = Float[np.ndarray, "N 1 B"]
+# What an operator's constructor takes: an array, or the list a config reload
+# gives back.
+SpectrumLike = Spectrum | Sequence[float]
+Pixel = tuple[int, int] | list[int]
 
 if TYPE_CHECKING:
     from georeader.geotensor import GeoTensor
@@ -155,7 +159,7 @@ MeanMethod = Literal["mean", "median", "trimmed", "huber"]
 CovMethod = Literal["empirical", "ledoit_wolf", "oas", "lowrank"]
 ShrinkMethod = Literal["ledoit_wolf", "oas"]
 #: A covariance: a lineax / gaussx operator or a dense ``(B, B)`` matrix.
-CovLike = lx.AbstractLinearOperator | CovMatrix
+CovLike = lx.AbstractLinearOperator | CovMatrix | Sequence[Sequence[float]]
 
 #: Step of the central-difference target for a plain callable ``obs_model``,
 #: relative to the largest magnitude in the background state (absolute when the
@@ -243,9 +247,9 @@ class MatchedFilter(Operator):
     def __init__(
         self,
         *,
-        mean: Spectrum | None = None,
+        mean: SpectrumLike | None = None,
         cov_op: CovLike | None = None,
-        target: Spectrum | None = None,
+        target: SpectrumLike | None = None,
         fit_on_call: bool = False,
         mean_method: MeanMethod = "median",
         cov_method: CovMethod = "ledoit_wolf",
@@ -273,7 +277,7 @@ class MatchedFilter(Operator):
         return np.asarray(mean, dtype=float), cov_op
 
     @_float64
-    def fit(self, gt: Carrier) -> Self:
+    def fit(self, gt: Carrier) -> MatchedFilter:
         """Estimate the unset background statistics from the valid pixels of ``gt``.
 
         Returns:
@@ -364,7 +368,9 @@ class MatchedFilterPixel(Operator):
 
     _terminal: ClassVar[bool] = True
 
-    def __init__(self, *, mean: Spectrum, cov_op: CovLike, target: Spectrum) -> None:
+    def __init__(
+        self, *, mean: SpectrumLike, cov_op: CovLike, target: SpectrumLike
+    ) -> None:
         self.mean = np.asarray(mean, dtype=float)
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
@@ -403,7 +409,9 @@ class MatchedFilterSNR(Operator):
 
     _terminal: ClassVar[bool] = True
 
-    def __init__(self, *, amplitude: float, cov_op: CovLike, target: Spectrum) -> None:
+    def __init__(
+        self, *, amplitude: float, cov_op: CovLike, target: SpectrumLike
+    ) -> None:
         self.amplitude = amplitude
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
@@ -439,7 +447,7 @@ class DetectionThreshold(Operator):
     _terminal: ClassVar[bool] = True
 
     def __init__(
-        self, *, false_alarm_rate: float, cov_op: CovLike, target: Spectrum
+        self, *, false_alarm_rate: float, cov_op: CovLike, target: SpectrumLike
     ) -> None:
         self.false_alarm_rate = false_alarm_rate
         self.cov_op = _as_cov(cov_op)
@@ -472,7 +480,7 @@ class ValidateMFInputs(Operator):
         target: Target signature ``(B,)``.
     """
 
-    def __init__(self, *, cov_op: CovLike, target: Spectrum) -> None:
+    def __init__(self, *, cov_op: CovLike, target: SpectrumLike) -> None:
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
 
@@ -538,7 +546,7 @@ class EstimateCovEmpirical(Operator):
     """
 
     def __init__(
-        self, *, mean: Spectrum | None = None, ridge: float = 0.0, axis: int = -3
+        self, *, mean: SpectrumLike | None = None, ridge: float = 0.0, axis: int = -3
     ) -> None:
         self.mean = None if mean is None else np.asarray(mean, dtype=float)
         self.ridge = ridge
@@ -570,7 +578,7 @@ class EstimateCovShrunk(Operator):
     def __init__(
         self,
         *,
-        mean: Spectrum | None = None,
+        mean: SpectrumLike | None = None,
         method: ShrinkMethod = "ledoit_wolf",
         axis: int = -3,
     ) -> None:
@@ -607,7 +615,7 @@ class EstimateCovLowRank(Operator):
     def __init__(
         self,
         *,
-        mean: Spectrum | None = None,
+        mean: SpectrumLike | None = None,
         rank: int = LOWRANK_RANK,
         tikhonov: float = LOWRANK_TIKHONOV,
         seed: int | None = 0,
@@ -702,7 +710,7 @@ class ApplyClusterMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
-    def __init__(self, *, target: Spectrum, axis: int = -3) -> None:
+    def __init__(self, *, target: SpectrumLike, axis: int = -3) -> None:
         self.target = np.asarray(target, dtype=float)
         self.axis = axis
 
@@ -770,7 +778,9 @@ class ApplyAdaptiveMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
-    def __init__(self, *, target: Spectrum, ridge: float = 0.0, axis: int = -3) -> None:
+    def __init__(
+        self, *, target: SpectrumLike, ridge: float = 0.0, axis: int = -3
+    ) -> None:
         self.target = np.asarray(target, dtype=float)
         self.ridge = ridge
         self.axis = axis
@@ -886,7 +896,7 @@ class LinearTargetFromObs(Operator):
         obs_model: Any,
         vmr_background: VMRField | Cube | None = None,
         pattern: str | VMRField | Cube = "uniform",
-        pixel: tuple[int, int] | None = None,
+        pixel: Pixel | None = None,
         axis: int = -3,
         fd_step: float | None = None,
     ) -> None:
@@ -971,7 +981,7 @@ class NonlinearTargetFromObs(Operator):
         vmr_background: VMRField | Cube | None = None,
         amplitude: float = 1.0,
         pattern: str | VMRField | Cube = "uniform",
-        pixel: tuple[int, int] | None = None,
+        pixel: Pixel | None = None,
         axis: int = -3,
     ) -> None:
         self.obs_model = obs_model
@@ -1041,7 +1051,7 @@ class ColumnEnhancement(Operator):
         cov_method: ShrinkMethod | Literal["lowrank"] = "ledoit_wolf",
         target_pattern: str = "uniform",
         vmr_background: VMRField | Cube | None = None,
-        target_pixel: tuple[int, int] | None = None,
+        target_pixel: Pixel | None = None,
         fd_step: float | None = None,
         rank: int | None = None,
         tikhonov: float | None = None,

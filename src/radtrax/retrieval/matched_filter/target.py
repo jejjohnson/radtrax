@@ -28,14 +28,12 @@ from typing import TYPE_CHECKING, Literal
 
 import jax
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float
 
 from radtrax.exceptions import ParameterError, ShapeError
 
 
 if TYPE_CHECKING:
-    from jaxtyping import ArrayLike
-
     from radtrax.atmosphere.geometry import ViewingGeometry
     from radtrax.atmosphere.state import AtmosphericState
     from radtrax.forward_model import ForwardModel
@@ -43,12 +41,18 @@ if TYPE_CHECKING:
     from radtrax.surface.lambertian import Surface
 
 
+__all__ = [
+    "linear_target_from_obs",
+    "nonlinear_target_from_obs",
+    "unit_absorption_target",
+]
+
 Pattern = Literal["uniform", "impulse"]
 
 
 def _build_pattern(
     vmr_field: Float[Array, "H W"],
-    pattern: Pattern | Float[Array, "H W"],
+    pattern: Pattern | Float[ArrayLike, "H W"],
     pixel: tuple[int, int] | None,
 ) -> Float[Array, "H W"]:
     if isinstance(pattern, str):
@@ -77,7 +81,7 @@ def _build_pattern(
 
 def _vmr_pixel(
     vmr_field: Float[Array, "H W"],
-    pattern: Pattern | Float[Array, "H W"],
+    pattern: Pattern | Float[ArrayLike, "H W"],
     pixel: tuple[int, int] | None,
 ) -> tuple[int, int]:
     """The pixel the target is read at, on the **VMR** grid.
@@ -132,10 +136,10 @@ def linear_target_from_obs(
     obs: RadianceObservationModel,
     vmr_background: Float[Array, "H W"],
     *,
-    pattern: Pattern | Float[Array, "H W"] = "uniform",
+    pattern: Pattern | Float[ArrayLike, "H W"] = "uniform",
     pixel: tuple[int, int] | None = None,
     linear_forward: bool = False,
-) -> Float[Array, B]:
+) -> Float[Array, " B"]:
     """Matched-filter target via the tangent-linear of the forward operator.
 
     Computes
@@ -188,9 +192,9 @@ def nonlinear_target_from_obs(
     vmr_background: Float[Array, "H W"],
     *,
     amplitude: float = 1.0,
-    pattern: Pattern | Float[Array, "H W"] = "uniform",
+    pattern: Pattern | Float[ArrayLike, "H W"] = "uniform",
     pixel: tuple[int, int] | None = None,
-) -> Float[Array, B]:
+) -> Float[Array, " B"]:
     """Matched-filter target via a finite-amplitude difference.
 
     Computes ``t = H(x_b + α·δx) − H(x_b)`` without linearising Beer–Lambert.
