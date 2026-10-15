@@ -56,7 +56,7 @@ else:
 
 
 def build_diagonal_background(
-    variance: float | Float[ArrayLike, " N"], n_pixels: int | None = None
+    variance: Float[ArrayLike, ""] | Float[ArrayLike, " N"], n_pixels: int | None = None
 ) -> LinearOperator:
     """Build ``B = diag(σ²)`` as a :class:`lineax.DiagonalLinearOperator`.
 
