@@ -51,6 +51,7 @@ def test_estimate_mean_robust_to_outliers(rng):
         assert abs(mu[0] - 1.0) < 0.2, f"robust method drifted: {mu[0]}"
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_estimate_mean_rejects_bad_shape():
     with pytest.raises(ValueError, match="must be"):
         estimate_mean(np.zeros((3, 4)), method="mean")  # 2-D: missing band axis

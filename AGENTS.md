@@ -167,6 +167,8 @@ Everything composes because it keeps these contracts.
   (`" B"`). Don't write `...` or `"..."`; use a named variadic such as
   `"*shape"` (element-wise functions take and return
   `Float[ArrayLike, "*shape"]`) or `"*batch"`.
+- A name with a leading `_` (`"*_batch B"`) is not checked across
+  arguments; use it for the items of an iterable whose shapes differ.
 - When a shape recurs in a module, give it an alias
   (`Spectrum = Float[np.ndarray, " B"]`).
 - The names, reused everywhere:

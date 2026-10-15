@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Literal
 
 import lineax as lx
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.retrieval.matched_filter.background import (
@@ -41,6 +42,12 @@ from radtrax.retrieval.matched_filter.background import (
     _finite_pixels,
     shrink_covariance,
 )
+
+
+__all__ = [
+    "WelfordAccumulator",
+    "streaming_background",
+]
 
 
 if TYPE_CHECKING:
@@ -95,7 +102,7 @@ class WelfordAccumulator:
         self._M3 = np.zeros(self.n_bands, dtype=float)
         self._M4 = 0.0
 
-    def update(self, batch: np.ndarray) -> WelfordAccumulator:
+    def update(self, batch: Float[ArrayLike, "*batch B"]) -> WelfordAccumulator:
         """Ingest a batch of pixel spectra (shape ``(n_samples, n_bands)`` or ``(H, W, n_bands)``)."""
         arr = np.asarray(batch, dtype=float)
         if arr.ndim == 3:
@@ -164,13 +171,13 @@ class WelfordAccumulator:
         self.count = n
         return self
 
-    def mean(self) -> np.ndarray:
+    def mean(self) -> Float[np.ndarray, " B"]:
         """Mean spectrum of the samples seen so far."""
         if self.count == 0:
             raise DegenerateInputError("WelfordAccumulator.mean: no data yet.")
         return self._mean.copy()
 
-    def covariance(self, ddof: int = 1) -> np.ndarray:
+    def covariance(self, ddof: int = 1) -> Float[np.ndarray, "B B"]:
         """Covariance ``M₂ / (count − ddof)``."""
         if self.count <= ddof:
             raise DegenerateInputError(
@@ -186,13 +193,13 @@ class WelfordAccumulator:
 
 
 def streaming_background(
-    batches: Iterable[np.ndarray],
+    batches: Iterable[Float[ArrayLike, "*_batch B"]],
     *,
     n_bands: int,
     ridge: float = 0.0,
     ddof: int = 0,
     cov_kind: Literal["empirical", "ledoit_wolf", "oas"] = "empirical",
-) -> tuple[np.ndarray, LinearOperator]:
+) -> tuple[Float[np.ndarray, " B"], LinearOperator]:
     """Streamed ``(μ, Σ)`` from an iterable of batches.
 
     Convenience wrapper for the common pattern of looping over scenes/tiles.
