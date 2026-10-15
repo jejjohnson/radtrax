@@ -839,9 +839,10 @@ class LinearTargetFromObs(Operator):
     the cube itself, its nodata pixels set to the band means of the valid
     ones); a cube response is averaged over the valid pixels. A JAX-traceable
     callable is linearised exactly with :func:`jax.jvp`; one that is not
-    (NumPy code converting its input) by a central difference with a step
-    ``1e-4`` times the state's largest magnitude (absolute when the state is
-    zero), which is only as good as that step. (geotoolz always took a
+    (NumPy code converting its input) by a central difference, which is only
+    as good as its step: ``fd_step`` when given, else ``1e-4`` times the
+    state's largest magnitude (``1e-4`` itself for an all-zero state, where
+    the state carries no scale — set ``fd_step`` from the model's then). (geotoolz always took a
     one-sided step of ``1e-4`` in the state's own units, far outside the
     linear regime for a VMR of ~2e-6.)
 
@@ -853,6 +854,8 @@ class LinearTargetFromObs(Operator):
         pixel: Impulse location (and, for an observation model, the output
             pixel read).
         axis: Position of the band axis. Default ``-3``.
+        fd_step: Absolute central-difference step for a callable that JAX
+            cannot trace; see above.
     """
 
     forbid_in_yaml: ClassVar[bool] = True
@@ -865,12 +868,14 @@ class LinearTargetFromObs(Operator):
         pattern: str | np.ndarray = "uniform",
         pixel: tuple[int, int] | None = None,
         axis: int = -3,
+        fd_step: float | None = None,
     ) -> None:
         self.obs_model = obs_model
         self.vmr_background = vmr_background
         self.pattern = pattern
         self.pixel = pixel
         self.axis = axis
+        self.fd_step = fd_step
 
     @_float64
     def _apply(self, gt: Carrier) -> np.ndarray:
@@ -900,8 +905,10 @@ class LinearTargetFromObs(Operator):
             jax.errors.TracerIntegerConversionError,
         ):
             # Not JAX-traceable: a central difference instead.
-            scale = float(np.max(np.abs(base), initial=0.0))
-            h = TARGET_FINITE_DIFFERENCE_EPSILON * (scale if scale > 0.0 else 1.0)
+            h = self.fd_step
+            if h is None:
+                scale = float(np.max(np.abs(base), initial=0.0))
+                h = TARGET_FINITE_DIFFERENCE_EPSILON * (scale if scale > 0.0 else 1.0)
             response = (
                 np.asarray(self.obs_model(base + h * direction), dtype=float)
                 - np.asarray(self.obs_model(base - h * direction), dtype=float)
@@ -909,7 +916,7 @@ class LinearTargetFromObs(Operator):
         return _response_vector(response, gt, self.axis, valid)
 
     def get_config(self) -> dict[str, Any]:
-        return _target_config(self)
+        return _target_config(self) | {"fd_step": self.fd_step}
 
 
 class NonlinearTargetFromObs(Operator):
@@ -992,6 +999,10 @@ class ColumnEnhancement(Operator):
         mean_method: Mean estimator. Default ``"median"``.
         cov_method: ``"ledoit_wolf"`` (default), ``"oas"`` or ``"lowrank"``.
         target_pattern: Perturbation pattern of the target.
+        vmr_background: Background state of the target, forwarded to
+            :class:`LinearTargetFromObs`; pass it on the model's
+            high-resolution grid when the observation model has a GSD.
+        target_pixel: Impulse location / output pixel of the target.
         rank: Rank for ``"lowrank"`` (default 10 when ``None``).
         tikhonov: Floor for ``"lowrank"`` (default ``1e-3`` when ``None``).
         axis: Position of the band axis. Default ``-3``.
@@ -1006,6 +1017,8 @@ class ColumnEnhancement(Operator):
         mean_method: MeanMethod = "median",
         cov_method: ShrinkMethod | Literal["lowrank"] = "ledoit_wolf",
         target_pattern: str = "uniform",
+        vmr_background: np.ndarray | None = None,
+        target_pixel: tuple[int, int] | None = None,
         rank: int | None = None,
         tikhonov: float | None = None,
         axis: int = -3,
@@ -1016,6 +1029,10 @@ class ColumnEnhancement(Operator):
         self.mean_method = mean_method
         self.cov_method = cov_method
         self.target_pattern = target_pattern
+        self.vmr_background = (
+            None if vmr_background is None else np.asarray(vmr_background, dtype=float)
+        )
+        self.target_pixel = None if target_pixel is None else tuple(target_pixel)
         self.rank = rank
         self.tikhonov = tikhonov
         self.axis = axis
@@ -1035,7 +1052,11 @@ class ColumnEnhancement(Operator):
             target = np.ones_like(mean)
         else:
             target = LinearTargetFromObs(
-                obs_model=self.obs_model, pattern=self.target_pattern, axis=self.axis
+                obs_model=self.obs_model,
+                vmr_background=self.vmr_background,
+                pattern=self.target_pattern,
+                pixel=self.target_pixel,
+                axis=self.axis,
             )(gt)
         return MatchedFilter(mean=mean, cov_op=cov_op, target=target, axis=self.axis)(
             gt
@@ -1053,6 +1074,10 @@ class ColumnEnhancement(Operator):
             "mean_method": self.mean_method,
             "cov_method": self.cov_method,
             "target_pattern": self.target_pattern,
+            "vmr_background": _array_config(self.vmr_background),
+            "target_pixel": None
+            if self.target_pixel is None
+            else list(self.target_pixel),
             "rank": self.rank,
             "tikhonov": self.tikhonov,
             "axis": self.axis,
