@@ -110,8 +110,10 @@ class ForwardModel(eqx.Module):
             )
 
     def optics(self, state: AtmosphericState) -> OpticalProperties:
-        """Per-layer optical depth on the model's grid."""
-        return OpticalProperties(self.opacity.nu_cm, self.opacity(state))
+        """Per-layer optical depth on the model's grid, with the layers' altitudes."""
+        return OpticalProperties(
+            self.opacity.nu_cm, self.opacity(state), z_m=state.z_m, dz_m=state.dz_m
+        )
 
     def radiance(
         self, state: AtmosphericState, surface: Surface, geometry: ViewingGeometry

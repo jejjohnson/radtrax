@@ -31,6 +31,7 @@ import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Float
 
 from radtrax.atmosphere.geometry import ViewingGeometry
+from radtrax.exceptions import ParameterError
 from radtrax.optics.properties import OpticalProperties
 from radtrax.surface.lambertian import Surface
 
@@ -65,12 +66,18 @@ class RTSolver(eqx.Module):
 class BeerLambert(RTSolver):
     """Beer–Lambert along the two-way path; no scattering, no emission.
 
-    ``L = (E₀ μ₀ / π) R exp(−(1/μ₀ + 1/μ) Σ_l τ_l)``.
+    ``L = (E₀ μ₀ / π) R exp(−Σ_l m_l τ_l)``, with the plane-parallel air mass
+    ``m_l = 1/μ₀ + 1/μ`` for every layer, or with ``spherical=True`` each
+    layer's spherical-shell air mass
+    (:meth:`~radtrax.atmosphere.ViewingGeometry.layer_air_mass`), which needs
+    the optics to carry the layers' altitudes (``ForwardModel.optics`` does).
 
     Attributes:
         solar_irradiance: Solar irradiance at the top of the atmosphere
             ``E₀``, a scalar or one value per wavenumber, ``(G,)``. The
             default, 1, gives radiance per unit irradiance.
+        spherical: Use each layer's spherical-shell air mass rather than the
+            plane-parallel one (static; the default is plane parallel).
 
     Examples:
         >>> import jax.numpy as jnp
@@ -88,15 +95,29 @@ class BeerLambert(RTSolver):
     """
 
     solar_irradiance: Float[Array, "*G"]
+    spherical: bool = eqx.field(static=True)
 
-    def __init__(self, solar_irradiance: Float[ArrayLike, "*G"] = 1.0) -> None:
+    def __init__(
+        self, solar_irradiance: Float[ArrayLike, "*G"] = 1.0, *, spherical: bool = False
+    ) -> None:
         self.solar_irradiance = jnp.asarray(solar_irradiance, dtype=float)
+        self.spherical = spherical
 
     def __call__(
         self, optics: OpticalProperties, surface: Surface, geometry: ViewingGeometry
     ) -> Float[Array, " G"]:
-        # T = exp(−m Σ_l τ_l)                                              (G,)
-        transmittance = jnp.exp(-geometry.air_mass() * jnp.sum(optics.tau, axis=0))
+        if self.spherical:
+            if optics.z_m is None or optics.dz_m is None:
+                raise ParameterError(
+                    "BeerLambert(spherical=True): the optics carry no layer "
+                    "altitudes (z_m, dz_m); build them with ForwardModel.optics."
+                )
+            # T = exp(−Σ_l m_l τ_l)                                          (G,)
+            m = geometry.layer_air_mass(optics.z_m, optics.dz_m)
+            transmittance = jnp.exp(-(m @ optics.tau))
+        else:
+            # T = exp(−m Σ_l τ_l)                                            (G,)
+            transmittance = jnp.exp(-geometry.air_mass() * jnp.sum(optics.tau, axis=0))
         # E₀ μ₀ R / π                                                      (*G)
         reflected = (
             self.solar_irradiance
