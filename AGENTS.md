@@ -180,6 +180,7 @@ Everything composes because it keeps these contracts.
   | `P`, `T` | pressures and temperatures of a cross-section table |
   | `H`, `W` | image rows and columns (`h`, `w` after ground sampling) |
   | `N` | pixels, flattened |
+  | `M` | observations or residuals, flattened |
   | `S` | samples (draws, ensemble members) |
   | `time` | time steps or scenes |
   | `K` | clusters |

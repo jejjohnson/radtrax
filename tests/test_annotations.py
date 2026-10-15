@@ -40,27 +40,6 @@ JAXTYPING_DTYPES = {
 # its subpackage's block.
 ALLOWED: frozenset[str] = frozenset(
     {
-        # retrieval/var3d
-        "retrieval/var3d/background.py::build_diagonal_background",
-        "retrieval/var3d/background.py::build_lowrank_background",
-        "retrieval/var3d/control.py::IdentityTransform.apply",
-        "retrieval/var3d/control.py::IdentityTransform.apply_inverse",
-        "retrieval/var3d/control.py::IdentityTransform.project_gradient",
-        "retrieval/var3d/control.py::WhiteningTransform.apply",
-        "retrieval/var3d/control.py::WhiteningTransform.apply_inverse",
-        "retrieval/var3d/control.py::WhiteningTransform.project_gradient",
-        "retrieval/var3d/cost.py::build_cost_x",
-        "retrieval/var3d/cost.py::build_cost_xi",
-        "retrieval/var3d/cost.py::finite_difference_grad",
-        "retrieval/var3d/diagnostics.py::degrees_of_freedom_for_signal",
-        "retrieval/var3d/diagnostics.py::posterior_covariance_proxy",
-        "retrieval/var3d/diagnostics.py::reduced_chi_squared",
-        "retrieval/var3d/obs_operator.py::RadianceObservationModel.__init__",
-        "retrieval/var3d/obs_operator.py::RadianceObservationModel.forward",
-        "retrieval/var3d/obs_operator.py::RadianceObservationModel.make_forward",
-        "retrieval/var3d/solve.py::run_dual_psas",
-        "retrieval/var3d/solve.py::run_gauss_newton",
-        "retrieval/var3d/solve.py::run_lbfgs",
         # retrieval/matched_filter
         "retrieval/matched_filter/background.py::estimate_cov_empirical",
         "retrieval/matched_filter/background.py::estimate_cov_lowrank",

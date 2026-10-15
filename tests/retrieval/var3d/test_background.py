@@ -34,6 +34,11 @@ def test_diagonal_solve_is_per_element_division():
     np.testing.assert_allclose(np.asarray(x), np.asarray(r) / 0.5, atol=1e-12)
 
 
+def test_diagonal_takes_a_zero_dimensional_variance():
+    B = build_diagonal_background(np.array(0.5), n_pixels=3)
+    np.testing.assert_allclose(np.asarray(B.diagonal), [0.5, 0.5, 0.5])
+
+
 def test_diagonal_rejects_negative_variance():
     with pytest.raises(ValueError, match="> 0"):
         build_diagonal_background(-1.0, n_pixels=3)

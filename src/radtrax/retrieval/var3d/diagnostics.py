@@ -31,8 +31,17 @@ import jax
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import ParameterError
+from radtrax.retrieval.var3d.cost import ForwardFn, ObsInvVariance, StateVector
+
+
+__all__ = [
+    "degrees_of_freedom_for_signal",
+    "posterior_covariance_proxy",
+    "reduced_chi_squared",
+]
 
 
 if TYPE_CHECKING:
@@ -41,10 +50,10 @@ if TYPE_CHECKING:
 
 def reduced_chi_squared(
     *,
-    forward_fn: Callable[[jax.Array], jax.Array],
-    estimated_state: jax.Array,
-    observation: jax.Array,
-    obs_inv_variance: float | jax.Array,
+    forward_fn: ForwardFn,
+    estimated_state: Float[ArrayLike, "H W"],
+    observation: Float[ArrayLike, "h w B"],
+    obs_inv_variance: ObsInvVariance,
 ) -> float:
     """``χ²_red = (y - H(x̂))ᵀ R⁻¹ (y - H(x̂)) / dim(y)``.
 
@@ -54,14 +63,14 @@ def reduced_chi_squared(
     """
     y = jnp.asarray(observation)
     R_inv = jnp.asarray(obs_inv_variance)
-    residual = y - forward_fn(estimated_state)
+    residual = y - forward_fn(jnp.asarray(estimated_state))
     chi2 = float(jnp.sum(R_inv * residual * residual))
     return chi2 / int(y.size)
 
 
 def degrees_of_freedom_for_signal(
     *,
-    hessian_vector_product: Callable[[jax.Array], jax.Array],
+    hessian_vector_product: Callable[[StateVector], StateVector],
     state_size: int,
     background_op: lx.AbstractLinearOperator | None = None,
     whitened: bool = False,
@@ -149,13 +158,13 @@ def degrees_of_freedom_for_signal(
 
 def posterior_covariance_proxy(
     *,
-    hessian_vector_product: Callable[[jax.Array], jax.Array],
+    hessian_vector_product: Callable[[StateVector], StateVector],
     state_size: int,
     whitening: WhiteningTransform | None = None,
     cg_rtol: float = 1e-6,
     cg_atol: float = 1e-9,
     cg_max_steps: int = 200,
-) -> Callable[[jax.Array], jax.Array]:
+) -> Callable[[StateVector], StateVector]:
     """Return a callable ``v → Bₐ v`` (model-space posterior covariance) via CG.
 
     ``Bₐ ≈ Hess⁻¹`` is the Laplace-approximation posterior covariance. We

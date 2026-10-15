@@ -39,6 +39,19 @@ def test_chi2_at_truth_is_zero(obs_model_no_optics):
     assert chi2 < 1e-10
 
 
+def test_chi2_takes_a_numpy_state(obs_model_no_optics):
+    """A NumPy state reaches the JAX-only forward closure as a JAX array."""
+    model = obs_model_no_optics
+    truth = np.full((3, 3), 1e-7)
+    chi2 = reduced_chi_squared(
+        forward_fn=model.make_forward(linear=False),
+        estimated_state=truth,
+        observation=model.forward(jnp.asarray(truth), linear=False),
+        obs_inv_variance=1e8,
+    )
+    assert chi2 < 1e-10
+
+
 def test_dfs_zero_in_no_information_limit(obs_model_no_optics):
     """When the prior dominates (obs infinitely noisy), Hess → B⁻¹ and DFS → 0.
 

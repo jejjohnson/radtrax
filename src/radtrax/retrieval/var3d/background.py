@@ -34,8 +34,16 @@ import jax
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
+
+
+__all__ = [
+    "build_diagonal_background",
+    "build_kronecker_background",
+    "build_lowrank_background",
+]
 
 
 if TYPE_CHECKING:
@@ -48,7 +56,7 @@ else:
 
 
 def build_diagonal_background(
-    variance: float | np.ndarray, n_pixels: int | None = None
+    variance: Float[ArrayLike, ""] | Float[ArrayLike, " N"], n_pixels: int | None = None
 ) -> LinearOperator:
     """Build ``B = diag(σ²)`` as a :class:`lineax.DiagonalLinearOperator`.
 
@@ -130,7 +138,7 @@ def build_kronecker_background(
 
 def build_lowrank_background(
     *,
-    samples: np.ndarray,
+    samples: Float[ArrayLike, "S N"],
     rank: int,
     regularization: float = 1e-6,
     random_state: int = 0,
