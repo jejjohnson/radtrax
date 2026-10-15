@@ -33,6 +33,15 @@ from jaxtyping import Array, ArrayLike, Float
 from radtrax.exceptions import DegenerateInputError, ParameterError
 
 
+__all__ = [
+    "apply_image",
+    "apply_pixel",
+    "detection_threshold",
+    "matched_filter_snr",
+    "validate_mf_inputs",
+]
+
+
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:

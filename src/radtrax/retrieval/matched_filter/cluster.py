@@ -40,6 +40,15 @@ from radtrax.retrieval.matched_filter.background import (
 from radtrax.retrieval.matched_filter.core import _check_target_energy, apply_image
 
 
+__all__ = [
+    "ClusterBackground",
+    "adaptive_window_background",
+    "apply_adaptive_mf",
+    "apply_cluster_mf",
+    "gmm_cluster_background",
+]
+
+
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:
