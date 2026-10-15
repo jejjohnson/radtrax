@@ -34,8 +34,8 @@ the layout drifts:
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
 | `instrument/` | `srf`: the one SRF band integration (exact Gaussian FWHM, #28); `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
 | `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
-| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O) | ported (#22, #23) |
-| `geo/` | `sentinel2_srf`: Sentinel-2 SRFs from georeader's bundled table (#28); `matched_filter`: pipekit operators on GeoTensors around the one core (#29); later SBMP (`[geo]`) | `srf`, `matched_filter` now; SBMP in Wave 2 |
+| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O); `mbmp`: the Sentinel-2 MBMP signal (#30) | ported (#22, #23) |
+| `geo/` | `sentinel2_srf`: Sentinel-2 SRFs from georeader's bundled table (#28); `matched_filter`: pipekit operators on GeoTensors around the one core (#29); `mbmp`: the MBMP operator, geotoolz's former SBMP (#30) (`[geo]`) | ported (#28–#30) |
 
 ### Boundaries
 

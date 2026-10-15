@@ -27,7 +27,7 @@ FORBIDDEN = ("georeader", "geotoolz", "pipekit", "plumax")
 #: The only modules that may refuse to import in the base install, each with
 #: the extra its ImportError must name. Anything else that fails to import
 #: (including a module that imports one of these eagerly) breaks the gate.
-EXTRA_ONLY = {"radtrax.geo.matched_filter": "geo"}
+EXTRA_ONLY = {"radtrax.geo.matched_filter": "geo", "radtrax.geo.mbmp": "geo"}
 
 
 def main() -> int:
