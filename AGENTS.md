@@ -33,8 +33,8 @@ the layout drifts:
 | `optics/` | `properties`: `OpticalProperties`, τ (L, G) on its grid between opacity and solver (#35); Rayleigh, aerosols, delta-M from v3 | now |
 | `solvers/` | `beer_lambert`: the `RTSolver` protocol and `BeerLambert`, radiance (G,) from optics, surface and geometry (#35); scattering solvers from v3 | now |
 | `surface/` | `lambertian`: the `Surface` protocol and `Lambertian` (#35); kernel BRDFs from v1 | now |
-| `instrument/` | `srf`: the one SRF band integration (exact Gaussian FWHM, #28); `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
-| `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
+| `instrument/` | `spectral`: the `Instrument` protocol and `BandInstrument`, JAX band integration with a spectral shift (#36); `srf`: the one SRF band integration (exact Gaussian FWHM, #28), whose matrix `BandInstrument.from_srf` takes; `psf`: JAX point-spread and ground-sampling operators | ported (#21); `spectral` (#36) |
+| `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table (relative to a background column, #36), observation config; v0's regression oracle | ported (#21) |
 | `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O); `mbmp`: the Sentinel-2 MBMP signal (#30) | ported (#22, #23) |
 | `geo/` | `sentinel2_srf`: Sentinel-2 SRFs from georeader's bundled table (#28); `matched_filter`: pipekit operators on GeoTensors around the one core (#29); `mbmp`: the MBMP operator, geotoolz's former SBMP (#30) (`[geo]`) | ported (#28–#30) |
 
