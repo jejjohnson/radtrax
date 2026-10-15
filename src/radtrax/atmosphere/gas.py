@@ -12,14 +12,20 @@ import numpy as np
 
 __all__ = [
     "ATM_TO_PA",
+    "AVOGADRO_PER_MOL",
     "BOLTZMANN_J_PER_K",
     "CM3_PER_M3",
+    "DRY_AIR_MOLAR_MASS_KG_PER_MOL",
+    "STANDARD_GRAVITY_M_PER_S2",
     "number_density",
 ]
 
 BOLTZMANN_J_PER_K: float = 1.380649e-23  # [J/K], exact (SI 2019)
 ATM_TO_PA: float = 101325.0  # [Pa/atm], exact
 CM3_PER_M3: float = 1e6
+AVOGADRO_PER_MOL: float = 6.02214076e23  # [1/mol], exact (SI 2019)
+STANDARD_GRAVITY_M_PER_S2: float = 9.80665  # [m/s²], exact (CGPM 1901)
+DRY_AIR_MOLAR_MASS_KG_PER_MOL: float = 28.9644e-3  # [kg/mol], US Standard 1976
 
 
 def number_density(

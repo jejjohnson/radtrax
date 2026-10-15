@@ -28,7 +28,7 @@ the layout drifts:
 | Module | Owns | Lands in |
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
-| `atmosphere/` | `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27); later `AtmosphericState`, AFGL profiles, hydrostatics | `gas`, `geometry` now; the state in Wave 3 |
+| `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) | now |
 | `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
