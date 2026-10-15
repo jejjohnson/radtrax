@@ -21,7 +21,7 @@ interface used by the observation-operator classes in the original
 
 Three parametric SRF shapes are supported:
 
-- ``'gaussian'``   : ``exp[-(λ-λ_c)² / (2 σ²)]`` with ``FWHM = 2.355 σ``.
+- ``'gaussian'``   : ``exp[-(λ-λ_c)² / (2 σ²)]`` with ``FWHM = 2√(2 ln 2) σ``.
 - ``'rectangular'`` : 1 inside ``[λ_c − W/2, λ_c + W/2]``, 0 outside.
 - ``'triangular'``  : linear ramp peaking at ``λ_c``, zero at the edges.
 
@@ -33,11 +33,18 @@ Ported from plumax 0.1.2 at 28f257e (``src/plumax/radtran/srf.py``); only import
 
 from __future__ import annotations
 
+import math
 import warnings
 from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
+
+
+# FWHM of a Gaussian in units of σ, exact: 2√(2 ln 2) ≈ 2.35482. plumax used
+# the rounded 2.355, which made σ 7.6e-5 too small relative to georeader's
+# Gaussian SRF (radtrax#28).
+FWHM_PER_SIGMA: float = 2.0 * math.sqrt(2.0 * math.log(2.0))
 
 
 SRFType = Literal["gaussian", "rectangular", "triangular", "custom"]
@@ -185,7 +192,7 @@ class SpectralResponseFunction:
         dwl = wl - centers
 
         if self.srf_type == "gaussian":
-            sigma = widths / 2.355  # FWHM → σ
+            sigma = widths / FWHM_PER_SIGMA
             return np.exp(-(dwl**2) / (2.0 * sigma**2))
         if self.srf_type == "rectangular":
             return (np.abs(dwl) <= widths / 2.0).astype(float)

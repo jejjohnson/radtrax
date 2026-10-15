@@ -13,6 +13,7 @@ a one-line summary each.
 | [Slab models](slab.md) | single-slab forward models, the nB table, observation config |
 | [Instrument](instrument.md) | `SpectralResponseFunction`, `PointSpreadFunction`, `GroundSamplingDistance` |
 | [Retrieval](retrieval.md) | the matched filter; 3D-Var |
+| [Geo](geo.md) | `sentinel2_srf` (the `[geo]` extra) |
 | [Exceptions](exceptions.md) | `RadtraxError` |
 
 ## Package overview

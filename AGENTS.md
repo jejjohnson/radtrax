@@ -32,10 +32,10 @@ the layout drifts:
 | `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
-| `instrument/` | `srf`: SRF band integration; `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
+| `instrument/` | `srf`: the one SRF band integration (exact Gaussian FWHM, #28); `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
 | `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table, observation config; v0's regression oracle | ported (#21) |
 | `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O) | ported (#22, #23) |
-| `geo/` | GeoTensor operators and SBMP (`[geo]`) | Wave 2 |
+| `geo/` | `sentinel2_srf`: Sentinel-2 SRFs from georeader's bundled table (#28); later GeoTensor operators and SBMP (`[geo]`) | `srf` now; operators in Wave 2 |
 
 ### Boundaries
 
@@ -50,8 +50,10 @@ GeoStack package graph gets a cycle.
   (gaussx, lineax, optimistix) and, through extras, GeoStack (geotoolz,
   georeader). finitevolx, spectraldiffx and somax are not dependencies: a
   layer grid is three arrays and a band integration is a matrix product.
-- **Geo carriers arrive through extras.** `radtrax[geo]` adds geotoolz and
-  georeader; the base install stays JAX-only. Code in `geo/` imports only
+- **Geo carriers arrive through extras.** `radtrax[geo]` adds georeader
+  (with the `openpyxl`, `tqdm` and `typing-extensions` it needs but does not
+  declare) and, from #29, geotoolz; the base install stays JAX-only. The
+  dev group installs `radtrax[geo]`, so CI runs the geo tests. Code in `geo/` imports only
   public geotoolz names, never `geotoolz._src`.
 - **Optional dependencies are lazy.** Anything behind an extra (`hitran`,
   `geo`, `bayes`) is imported inside the function that needs it,
