@@ -12,12 +12,13 @@ The design and roadmap live in the GeoStack docs (*radtrax · 3*).
 
 from __future__ import annotations
 
-from radtrax.exceptions import RadtraxError
+from radtrax.exceptions import MissingTableError, RadtraxError
 
 
 __version__ = "0.0.0"
 
 __all__ = [
+    "MissingTableError",
     "RadtraxError",
     "__version__",
 ]

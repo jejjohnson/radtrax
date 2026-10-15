@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -367,21 +368,40 @@ def build_lut_dataset(
     return ds
 
 
-def save_lut(ds: xr.Dataset, output_dir: Path | str, gas_name: str) -> Path:
-    """Persist ``ds`` to ``<output_dir>/<gas_name>_absorption_lut.nc`` (zlib)."""
+def save_lut(
+    ds: xr.Dataset,
+    output_dir: Path | str,
+    gas_name: str,
+    *,
+    filename: str | None = None,
+) -> Path:
+    """Persist ``ds`` to ``<output_dir>/<filename>`` (zlib, σ as float32).
+
+    ``filename`` defaults to ``<gas_name>_absorption_lut.nc``. The table is
+    written to a temporary file in ``output_dir`` and renamed into place, so
+    a crashed or concurrent write never leaves a half table under the name.
+    """
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
-    path = out / f"{gas_name.lower()}_absorption_lut.nc"
-    ds.to_netcdf(
-        path,
-        encoding={
-            "absorption_cross_section": {
-                "zlib": True,
-                "complevel": 4,
-                "dtype": "float32",
-            }
-        },
-    )
+    path = out / (filename or f"{gas_name.lower()}_absorption_lut.nc")
+    with tempfile.NamedTemporaryFile(
+        dir=out, prefix=f".{path.name}.", suffix=".partial", delete=False
+    ) as tmp:
+        partial = Path(tmp.name)
+    try:
+        ds.to_netcdf(
+            partial,
+            encoding={
+                "absorption_cross_section": {
+                    "zlib": True,
+                    "complevel": 4,
+                    "dtype": "float32",
+                }
+            },
+        )
+        partial.replace(path)
+    finally:
+        partial.unlink(missing_ok=True)
     logger.info(
         "Saved %s LUT to %s (%.1f MB)", gas_name, path, path.stat().st_size / 1e6
     )
