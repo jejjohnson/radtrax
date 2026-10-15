@@ -110,3 +110,12 @@ contrast, as differentiable JAX functions; the GeoTensor operator is
     options:
       show_root_heading: false
       heading_level: 2
+
+# Band table
+
+A band observable `g(m[, h], ΔΩ)` (one band's `τ₁₂`, or `τ₁₂ − τ₁₁`) tabulated against the enhancement and inverted by interpolation, as *radtrax · 1* and *· 2* do, from any observable or from the layered forward model.
+
+::: radtrax.retrieval.band_table
+    options:
+      show_root_heading: false
+      heading_level: 2
