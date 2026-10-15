@@ -6,7 +6,9 @@
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
   the one matched-filter core (radtrax#29), ported from geotoolz.
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
-  multi-pass signal, geotoolz's former ``plume.SBMP`` (radtrax#30).
+  multi-pass signal, geotoolz's former ``plume.SBMP`` (radtrax#30), with
+  optional per-pass scale factors; :class:`SBMP` and :class:`MBSP` complete
+  *radtrax · 2*'s multi-pass family (radtrax#111).
 
 Importing this subpackage does not need the extra; the operators load on
 first use, and a missing extra raises an ``ImportError`` naming it.
@@ -41,6 +43,8 @@ _OPERATORS = {
     "StreamingBackgroundResult": "matched_filter",
     "ValidateMFInputs": "matched_filter",
     "MBMP": "mbmp",
+    "MBSP": "mbmp",
+    "SBMP": "mbmp",
 }
 
 
@@ -79,11 +83,13 @@ if TYPE_CHECKING:
         StreamingBackgroundResult,
         ValidateMFInputs,
     )
-    from radtrax.geo.mbmp import MBMP
+    from radtrax.geo.mbmp import MBMP, MBSP, SBMP
 
 
 __all__ = [
     "MBMP",
+    "MBSP",
+    "SBMP",
     "AdaptiveBackground",
     "AdaptiveWindowBackground",
     "ApplyAdaptiveMF",
