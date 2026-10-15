@@ -32,11 +32,8 @@ def test_v3_gradients_of_the_v0_model(voigt_table: xr.Dataset) -> None:
     @jax.jit
     def bands(theta: jax.Array) -> jax.Array:  # (8,) → (B,)
         ch4 = atm.vmr["CH4"].at[:3].set(theta[:3] * 1e-6)
-        state = eqx.tree_at(
-            lambda s: (s.vmr["CH4"], s.vmr["H2O"], s.t_k),
-            atm,
-            (ch4, theta[3] * atm.vmr["H2O"], atm.t_k + theta[4]),
-        )
+        gases = atm.with_vmr("CH4", ch4).with_vmr("H2O", theta[3] * atm.vmr["H2O"])
+        state = eqx.tree_at(lambda s: s.t_k, gases, atm.t_k + theta[4])
         fm = eqx.tree_at(lambda m: m.instrument.shift_cm, model, theta[6])
         geometry = ViewingGeometry.from_angles(theta[7], 10.0)
         return fm(state, Lambertian(theta[5]), geometry)
