@@ -11,15 +11,15 @@ hand-derived code.
 
 :::{note} Status
 radtrax moved the code that already existed elsewhere in the stack, then
-rebuilt it as one layered forward model; all three steps are on `main`, and
+rebuilt it as one layered forward model; all three stages are on `main`, and
 the first release is pending:
 
-| Release | What lands | State |
+| Stage | What lands | State |
 |---|---|---|
-| 0.1 | plumax's band-integrated Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, ported with their tests | on `main` |
-| 0.2 | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators (from geotoolz) behind `radtrax[geo]` | on `main` |
-| 0.3 | the layered v0 forward model (atmosphere → opacity → Beer–Lambert → instrument) and matched-filter targets from autodiff | on `main`; gate V2 against HITRAN pending ([#89](https://github.com/jejjohnson/radtrax/issues/89)) |
-| 0.4 | v1: a spherical air mass, kernel BRDFs and spectral albedo, a calibrated instrument and noise model, and optimal estimation, closed against EMIT's operational product | planned: [Wave 4](https://github.com/jejjohnson/radtrax/issues/100) |
+| Port | plumax's band-integrated Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, ported with their tests | on `main` |
+| One of each | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators (from geotoolz) behind `radtrax[geo]` | on `main` |
+| v0 | the layered forward model (atmosphere → opacity → Beer–Lambert → instrument) and matched-filter targets from autodiff | on `main`; gate V2 against HITRAN pending ([#89](https://github.com/jejjohnson/radtrax/issues/89)) |
+| v1 | a spherical air mass, kernel BRDFs and spectral albedo, a calibrated instrument and noise model, and optimal estimation on vardax, gated on EMIT, Sentinel-2 and Landsat 8/9 | planned: [Wave 4](https://github.com/jejjohnson/radtrax/issues/100) |
 
 The plan is tracked in one epic per wave, the next being
 [Wave 4](https://github.com/jejjohnson/radtrax/issues/100); the design is
