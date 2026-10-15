@@ -1,10 +1,17 @@
 # Spectroscopy
 
-Cross-section look-up tables σ(ν; T, p): interpolation and Beer–Lambert transmittance (`tables`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra). Theory: [HITRAN tables](../../hitran-tables/).
+Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered atmosphere (`opacity`: the `OpacityProvider` protocol and `TableOpacity`), single-slab interpolation and Beer–Lambert transmittance (`tables`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra). Theory: [HITRAN tables](../../hitran-tables/).
 
 ::: radtrax.spectroscopy
     options:
       members: false
+
+## `opacity`
+
+::: radtrax.spectroscopy.opacity
+    options:
+      show_root_heading: false
+      heading_level: 3
 
 ## `tables`
 

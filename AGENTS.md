@@ -29,7 +29,7 @@ the layout drifts:
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
 | `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) | now |
-| `spectroscopy/` | `tables`: cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20) |
+| `spectroscopy/` | `opacity`: the `OpacityProvider` protocol and `TableOpacity`, per-layer τ (L, G) bilinear in (ln p, T) (#33); `tables`: single-slab cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `hitran/`: offline table building through HAPI (`[hitran]`) | ported (#20); `opacity` (#33) |
 | `solvers/` | `RTSolver` protocol, `BeerLambert` | Wave 3 |
 | `surface/` | `Lambertian`, later kernel BRDFs | Wave 3 |
 | `instrument/` | `srf`: the one SRF band integration (exact Gaussian FWHM, #28); `psf`: JAX point-spread and ground-sampling operators | ported (#21) |
