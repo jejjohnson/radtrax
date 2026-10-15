@@ -42,6 +42,12 @@ import lineax as lx
 from jaxtyping import Array, ArrayLike, Float
 
 
+__all__ = [
+    "IdentityTransform",
+    "WhiteningTransform",
+]
+
+
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:

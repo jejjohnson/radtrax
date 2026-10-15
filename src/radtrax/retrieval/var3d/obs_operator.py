@@ -52,6 +52,11 @@ from radtrax.instrument.psf import (
 from radtrax.slab.config import number_density_cm3
 
 
+__all__ = [
+    "RadianceObservationModel",
+]
+
+
 if TYPE_CHECKING:
     import xarray as xr
 

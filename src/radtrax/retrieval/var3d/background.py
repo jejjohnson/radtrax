@@ -39,6 +39,13 @@ from jaxtyping import ArrayLike, Float
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 
 
+__all__ = [
+    "build_diagonal_background",
+    "build_kronecker_background",
+    "build_lowrank_background",
+]
+
+
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:

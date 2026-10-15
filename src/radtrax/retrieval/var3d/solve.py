@@ -39,6 +39,14 @@ from jaxtyping import Array, ArrayLike, Float
 from radtrax.retrieval.var3d.cost import ForwardFn
 
 
+__all__ = [
+    "SolveResult",
+    "run_dual_psas",
+    "run_gauss_newton",
+    "run_lbfgs",
+]
+
+
 if TYPE_CHECKING:
     from radtrax.retrieval.var3d.cost import Cost
 
