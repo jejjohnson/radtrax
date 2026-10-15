@@ -34,14 +34,18 @@ from radtrax.exceptions import ParameterError, ShapeError
 
 
 if TYPE_CHECKING:
-    from jaxtyping import ArrayLike
-
     from radtrax.atmosphere.geometry import ViewingGeometry
     from radtrax.atmosphere.state import AtmosphericState
     from radtrax.forward_model import ForwardModel
     from radtrax.retrieval.var3d.obs_operator import RadianceObservationModel
     from radtrax.surface.lambertian import Surface
 
+
+__all__ = [
+    "linear_target_from_obs",
+    "nonlinear_target_from_obs",
+    "unit_absorption_target",
+]
 
 Pattern = Literal["uniform", "impulse"]
 
