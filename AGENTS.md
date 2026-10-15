@@ -167,6 +167,7 @@ docstring before changing what it checks.
 |---|---|
 | `tests/test_public_api.py` | `__all__` sorted, unique and importable; `SUBMODULES` is exactly the set of modules and `SUBPACKAGES` the set of subpackages; each declares a docstring and a sorted `__all__`; the `py.typed` marker ships; `__version__` is dotted |
 | `lint-imports` (`make lint`, `lint.yml`) | radtrax never imports plumax |
+| `scripts/check_base_install.py` (`base-install.yml`) | Gate P5: a fresh `uv pip install .` holds no georeader, geotoolz or plumax, and every radtrax module imports without the extras |
 | `tests/test_capabilities.py` | `docs/api/capabilities.md` is current; no name is bound to two different objects |
 | `tests/conftest.py` | Float64 is on for the whole suite |
 | `--doctest-modules` on `src/radtrax` (`addopts`) | Every docstring `Examples:` block runs and prints what it says |
