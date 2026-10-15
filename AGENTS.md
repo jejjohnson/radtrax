@@ -166,8 +166,9 @@ Everything composes because it keeps these contracts.
   `tests/test_annotations.py` checks it, and jaxtyping's pytest hook
   (`--jaxtyping-packages=radtrax,beartype.beartype` in `addopts`) checks
   the shapes themselves on every test run.
-- Quote every dimension string, with a leading space for a single name
-  (`" B"`). Don't write `...` or `"..."`; use a named variadic such as
+- Quote every dimension string, with a leading space when it would
+  otherwise parse as Python (`" B"`, `" B *shape"`): ruff's UP037 unquotes
+  such a string into an expression (`B * shape`). Don't write `...` or `"..."`; use a named variadic such as
   `"*shape"` (element-wise functions take and return
   `Float[ArrayLike, "*shape"]`) or `"*batch"`.
 - A name with a leading `_` (`"*_batch B"`) is not checked across

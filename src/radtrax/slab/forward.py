@@ -34,9 +34,21 @@ from dataclasses import dataclass
 
 import numpy as np
 import xarray as xr
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import GridError, MissingKeyError, ParameterError
 from radtrax.slab.config import number_density_cm3
+
+
+__all__ = [
+    "ForwardResult",
+    "forward_maclaurin",
+    "forward_maclaurin_normalized",
+    "forward_nonlinear",
+    "forward_nonlinear_normalized",
+    "forward_taylor",
+    "forward_taylor_normalized",
+]
 
 
 @dataclass(frozen=True)
@@ -66,7 +78,7 @@ class ForwardResult:
 
 def _interp_sigma(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     T_K: float,
     p_atm: float,
     var: str,
@@ -106,7 +118,7 @@ def _interp_sigma(
 
 def forward_nonlinear(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,
@@ -142,7 +154,7 @@ def forward_nonlinear(
 
 def forward_nonlinear_normalized(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,
@@ -180,7 +192,7 @@ def forward_nonlinear_normalized(
 
 def forward_maclaurin(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,
@@ -232,7 +244,7 @@ def forward_maclaurin(
 
 def forward_maclaurin_normalized(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,
@@ -270,7 +282,7 @@ def forward_maclaurin_normalized(
 
 def forward_taylor(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,
@@ -303,7 +315,7 @@ def forward_taylor(
 
 def forward_taylor_normalized(
     ds: xr.Dataset,
-    nu_obs: np.ndarray,
+    nu_obs: Float[ArrayLike, " G"],
     *,
     T_K: float,
     p_atm: float,

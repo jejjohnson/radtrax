@@ -43,10 +43,16 @@ import equinox as eqx
 import jax
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float, Real
 
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.instrument.srf import FWHM_PER_SIGMA
+
+
+__all__ = [
+    "GroundSamplingDistance",
+    "PointSpreadFunction",
+]
 
 
 PSFType = Literal["gaussian", "airy"]
@@ -89,7 +95,7 @@ class PointSpreadFunction(eqx.Module):
 
     kernel: Float[Array, "k k"]
 
-    def __init__(self, kernel: Float[Array, "k k"] | np.ndarray) -> None:
+    def __init__(self, kernel: Real[ArrayLike, "k k"]) -> None:
         k = jnp.asarray(kernel, dtype=jnp.float64)
         if k.ndim != 2:
             raise ShapeError(

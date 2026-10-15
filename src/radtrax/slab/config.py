@@ -28,8 +28,16 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import ParameterError, ShapeError
+
+
+__all__ = [
+    "InstrumentSpec",
+    "ObservationGeometry",
+    "number_density_cm3",
+]
 
 
 if TYPE_CHECKING:  # avoid circular import at module load
@@ -178,7 +186,9 @@ class InstrumentSpec:
         """Number of bands."""
         return int(np.asarray(self.band_centers_nm).size)
 
-    def make_srf(self, wavelengths_nm: np.ndarray) -> SpectralResponseFunction:
+    def make_srf(
+        self, wavelengths_nm: Float[ArrayLike, " Ghr"]
+    ) -> SpectralResponseFunction:
         """Construct a :class:`SpectralResponseFunction` over ``wavelengths_nm``.
 
         Imported locally to avoid a circular import at module load.
