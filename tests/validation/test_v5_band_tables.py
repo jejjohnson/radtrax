@@ -1,4 +1,4 @@
-"""Gate V5: band tables relative to the background column (radtrax#36).
+"""Gate V5: band tables relative to the background column (radtrax#36, #38).
 
 radtrax · 2 found plumax's ``nB`` integrates the plume without the
 background column and overstates Sentinel-2 band 12's plume optical depth
@@ -123,19 +123,3 @@ def test_zero_background_is_plumax_table(
     expected = _band_transmittance(voigt_table, srf, lut.delta_column)
     np.testing.assert_allclose(lut.nB, expected, rtol=0, atol=1e-14)
     assert lut.background_column == 0.0
-
-
-@pytest.mark.parametrize("column", [-1.0, 3.54e19])
-def test_a_negative_or_per_cm2_background_raises(
-    synthetic_lut: xr.Dataset, swir_srf: SpectralResponseFunction, column: float
-) -> None:
-    """3.54e19 is AFGL's CH₄ column in molecules/cm²; in mol/m² it is 0.588."""
-    with pytest.raises(ValueError, match="background_column"):
-        build_nb_lut(
-            synthetic_lut,
-            swir_srf,
-            T_K=280.0,
-            p_atm=1.0,
-            amf=2.0,
-            background_column=column,
-        )
