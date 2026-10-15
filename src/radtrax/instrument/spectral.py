@@ -30,6 +30,21 @@ trapezoidal weights) through :meth:`BandInstrument.from_srf`, so both
 integrate a band the same way; this module only moves it onto the gradient
 path. Ported from the radtrax · 3 design notebook's ``Instrument``.
 
+:class:`GaussianInstrument` (radtrax#96) builds the same Gaussian bands in
+JAX from their centres and FWHM in nm, and shifts the response rather than
+the spectrum:
+
+.. math::
+    y_b = \\frac{\\sum_g w_g\\, f_b(ν_g)\\, L(ν_g)}{\\sum_g w_g\\, f_b(ν_g)},\\qquad
+    f_b(ν) = \\exp\\Big(-\\frac{(10^7/(ν - δ) - δ_λ - c_b)^2}{2σ_b^2}\\Big),
+
+with ``w`` the trapezoidal weights on the wavelengths ``10⁷/ν``, ``c_b`` the
+centre, ``σ_b`` the FWHM over ``2√(2 ln 2)``, and a shift ``δ`` in cm⁻¹ or
+``δ_λ`` in nm. At zero shift it is ``BandInstrument.from_srf`` of the same
+bands; ``y`` is smooth in both shifts and in the FWHM, so ``∂²y/∂δ²`` is
+the band's curvature, not zero, and a calibration per nm needs no
+conversion.
+
 Shapes: ``G`` wavenumbers, ``B`` bands.
 """
 
@@ -43,11 +58,11 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Float
 
-from radtrax.exceptions import GridError, ShapeError
-from radtrax.instrument.srf import SpectralResponseFunction
+from radtrax.exceptions import GridError, ParameterError, ShapeError
+from radtrax.instrument.srf import FWHM_PER_SIGMA, SpectralResponseFunction
 
 
-__all__ = ["BandInstrument", "Instrument"]
+__all__ = ["BandInstrument", "GaussianInstrument", "Instrument"]
 
 
 class Instrument(eqx.Module):
@@ -114,7 +129,7 @@ class BandInstrument(Instrument):
             raise ShapeError(
                 f"BandInstrument: nu_cm must be (G,), got {self.nu_cm.shape}."
             )
-        _check_increasing(self.nu_cm)
+        _check_increasing(self.nu_cm, "BandInstrument")
         if self.response.ndim != 2 or self.response.shape[1] != self.nu_cm.shape[0]:
             raise ShapeError(
                 f"BandInstrument: response must be (B, G) with G = "
@@ -174,11 +189,144 @@ class BandInstrument(Instrument):
         return cls(nu, srf.matrix[:, ::-1], shift_cm, srf.band_names)
 
 
-def _check_increasing(nu_cm: Float[Array, " G"]) -> None:
+class GaussianInstrument(Instrument):
+    """Gaussian bands built in JAX, shifted analytically in cm⁻¹ or in nm.
+
+    ``y_b`` is the trapezoidal average of the radiance over band ``b``'s
+    response ``f_b(ν) = exp(−(10⁷/(ν − δ) − δ_λ − c_b)² / 2σ_b²)``; see the
+    module docstring. Keep each band's response inside the grid: a band
+    shifted off it raises ``equinox.EquinoxRuntimeError`` (a ``RuntimeError``).
+
+    Attributes:
+        nu_cm: Wavenumber grid [cm⁻¹], strictly increasing, ``(G,)``.
+        center_nm: Band centres [nm], ``(B,)``.
+        fwhm_nm: Band FWHM [nm], ``(B,)``, a differentiable leaf.
+        shift_cm: Spectral shift ``δ`` [cm⁻¹]; positive moves the bands to
+            higher wavenumber, as in :class:`BandInstrument`.
+        shift_nm: Spectral shift ``δ_λ`` [nm]; positive moves the bands to
+            longer wavelength.
+        band_names: One label per band.
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> nu = jnp.linspace(4250.0, 4350.0, 1001)
+        >>> instrument = GaussianInstrument(
+        ...     nu, jnp.array([2325.0]), jnp.array([8.5])
+        ... )
+        >>> round(float(instrument(jnp.ones(1001))[0]), 12)  # a flat spectrum
+        1.0
+    """
+
+    nu_cm: Float[Array, " G"]
+    center_nm: Float[Array, " B"]
+    fwhm_nm: Float[Array, " B"]
+    shift_cm: Float[Array, ""]
+    shift_nm: Float[Array, ""]
+    band_names: tuple[str, ...] = eqx.field(static=True)
+
+    def __init__(
+        self,
+        nu_cm: Float[ArrayLike, " G"],
+        center_nm: Float[ArrayLike, " B"],
+        fwhm_nm: Float[ArrayLike, " B"],
+        *,
+        shift_cm: Float[ArrayLike, ""] = 0.0,
+        shift_nm: Float[ArrayLike, ""] = 0.0,
+        band_names: tuple[str, ...] | None = None,
+    ) -> None:
+        self.nu_cm = jnp.asarray(nu_cm, dtype=float)
+        self.center_nm = jnp.asarray(center_nm, dtype=float)
+        self.fwhm_nm = jnp.asarray(fwhm_nm, dtype=float)
+        self.shift_cm = jnp.asarray(shift_cm, dtype=float)
+        self.shift_nm = jnp.asarray(shift_nm, dtype=float)
+        n_bands = self.center_nm.shape[0] if self.center_nm.ndim == 1 else 0
+        self.band_names = (
+            tuple(f"B{b}" for b in range(n_bands))
+            if band_names is None
+            else tuple(band_names)
+        )
+
+    def __check_init__(self) -> None:
+        if self.nu_cm.ndim != 1:
+            raise ShapeError(
+                f"GaussianInstrument: nu_cm must be (G,), got {self.nu_cm.shape}."
+            )
+        _check_increasing(self.nu_cm, "GaussianInstrument")
+        if self.center_nm.ndim != 1 or self.fwhm_nm.shape != self.center_nm.shape:
+            raise ShapeError(
+                "GaussianInstrument: center_nm and fwhm_nm must be (B,) alike, got "
+                f"{self.center_nm.shape} and {self.fwhm_nm.shape}."
+            )
+        if len(self.band_names) != self.center_nm.shape[0]:
+            raise ShapeError(
+                f"GaussianInstrument: {len(self.band_names)} band names for "
+                f"{self.center_nm.shape[0]} bands."
+            )
+        if self.shift_cm.ndim != 0 or self.shift_nm.ndim != 0:
+            raise ShapeError(
+                "GaussianInstrument: shift_cm and shift_nm must be scalars."
+            )
+
+    @property
+    def n_bands(self) -> int:
+        """Number of bands ``B``."""
+        return int(self.center_nm.shape[0])
+
+    def response(self) -> Float[Array, "B G"]:
+        """The shifted, trapezoid-weighted response, each row summing to 1, ``(B, G)``."""
+        wavelength_nm = 1e7 / (self.nu_cm - self.shift_cm) - self.shift_nm  # (G,)
+        sigma = self.fwhm_nm[:, None] / FWHM_PER_SIGMA  # (B, 1)
+        f = jnp.exp(-((wavelength_nm - self.center_nm[:, None]) ** 2) / (2 * sigma**2))
+        # Trapezoidal weights on the (unshifted) wavelengths, as the NumPy SRF.
+        half = jnp.abs(jnp.diff(1e7 / self.nu_cm)) / 2  # (G − 1,)
+        weights = jnp.pad(half, (0, 1)) + jnp.pad(half, (1, 0))  # (G,)
+        weighted = f * weights
+        total = jnp.sum(weighted, axis=1, keepdims=True)  # (B, 1)
+        # A band shifted off the grid has no response left: fail loudly (also
+        # under jit), as the NumPy SRF does, rather than return 0/0.
+        total = eqx.error_if(
+            total,
+            jnp.any(total <= 0),
+            "GaussianInstrument: a band has no response on the grid.",
+        )
+        return weighted / total
+
+    def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
+        return self.response() @ jnp.asarray(radiance)
+
+    @classmethod
+    def from_srf(
+        cls,
+        srf: SpectralResponseFunction,
+        nu_cm: Float[ArrayLike, " G"],
+        *,
+        shift_cm: Float[ArrayLike, ""] = 0.0,
+        shift_nm: Float[ArrayLike, ""] = 0.0,
+    ) -> GaussianInstrument:
+        """The bands of a Gaussian :class:`~radtrax.instrument.SpectralResponseFunction`.
+
+        Raises:
+            ParameterError: If the SRF's bands are not Gaussian.
+        """
+        if srf.srf_type != "gaussian":
+            raise ParameterError(
+                f"GaussianInstrument.from_srf: the SRF must be Gaussian, got {srf.srf_type!r}."
+            )
+        return cls(
+            nu_cm,
+            srf.band_centers_nm,
+            srf.band_widths_nm,
+            shift_cm=shift_cm,
+            shift_nm=shift_nm,
+            band_names=srf.band_names,
+        )
+
+
+def _check_increasing(nu_cm: Float[Array, " G"], name: str) -> None:
     """Fail fast on a concrete grid that is not strictly increasing."""
     try:
         ok = bool(jnp.all(jnp.diff(nu_cm) > 0))
     except (jax.errors.TracerBoolConversionError, jax.errors.ConcretizationTypeError):
         return
     if not ok:
-        raise GridError("BandInstrument: nu_cm must be strictly increasing.")
+        raise GridError(f"{name}: nu_cm must be strictly increasing.")
