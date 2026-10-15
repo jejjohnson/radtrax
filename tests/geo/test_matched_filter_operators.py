@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 
+import equinox as eqx
 import jax
 import jax.numpy as jnp
 import lineax as lx
@@ -777,3 +778,44 @@ def test_cube_shaped_background_keeps_its_band_axis() -> None:
         pixel=(1, 2),
     )
     np.testing.assert_allclose(op(np.zeros((3, 4, 5))), [1.0, 2.0, 3.0], rtol=1e-14)
+
+
+def test_numpy_callable_at_a_zero_state_takes_the_given_step() -> None:
+    """A NumPy callable at zero has no state scale: fd_step sets the step.
+    Central-difference error (k·h)²/6 ≈ 1.7e-7 for k = 1e4, h = 1e-7."""
+
+    def obs_model(x: np.ndarray) -> np.ndarray:
+        return np.exp(1e4 * np.asarray(x)).mean(axis=(1, 2))  # not traceable
+
+    cube = np.zeros((3, 2, 2))
+    default = rg.LinearTargetFromObs(obs_model=obs_model)(cube)
+    np.testing.assert_allclose(default, np.full(3, np.sinh(1.0) / 1e-4), rtol=1e-12)
+    scaled = rg.LinearTargetFromObs(obs_model=obs_model, fd_step=1e-7)(cube)
+    np.testing.assert_allclose(scaled, np.full(3, 1e4), rtol=1e-6)
+
+
+def test_column_enhancement_forwards_the_target_state(obs_at_background) -> None:
+    """With a GSD the target's state lives on the high-resolution grid; a
+    varying background there changes the (nonlinear) target at the centre."""
+    from radtrax.instrument.psf import GroundSamplingDistance
+
+    obs = eqx.tree_at(
+        lambda m: m.gsd,
+        obs_at_background,
+        GroundSamplingDistance(downsample_factor=2),
+        is_leaf=lambda x: x is None,
+    )
+    hr = 1.9e-6 * (1.0 + jnp.linspace(0.0, 4.0, 80).reshape(8, 10))
+    rng = np.random.default_rng(13)
+    cube = 1.0 + 0.01 * rng.normal(size=(obs.n_bands, 4, 5))
+    op = rg.ColumnEnhancement(obs_model=obs, vmr_background=np.asarray(hr))
+    expected_target = np.asarray(linear_target_from_obs(obs, hr))
+    default_target = np.asarray(linear_target_from_obs(obs, jnp.full((4, 5), 1.9e-6)))
+    assert not np.allclose(expected_target, default_target)
+    mean = rg.EstimateMean(method="median")(cube)
+    cov = rg.EstimateCovShrunk(mean=mean)(cube)
+    expected = rg.MatchedFilter(mean=mean, cov_op=cov, target=expected_target)(cube)
+    np.testing.assert_allclose(np.asarray(op(cube)), np.asarray(expected), rtol=1e-10)
+    assert len(op.get_config()["vmr_background"]) == 8
+    pixel = rg.ColumnEnhancement(target_pattern="impulse", target_pixel=(1, 2))
+    assert Operator.from_state(pixel.state).get_config() == pixel.get_config()
