@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 from _bands import emit_like_srf
 from _gradcheck import assert_gradients_match
-from _synthetic_table import NU
 
 from radtrax import GridError, ParameterError, ShapeError
 from radtrax.instrument import (
@@ -17,6 +16,7 @@ from radtrax.instrument import (
     GaussianInstrument,
     SpectralResponseFunction,
 )
+from radtrax.spectroscopy.synthetic import NU_CM as NU
 
 
 SRF = emit_like_srf(np.asarray(NU))

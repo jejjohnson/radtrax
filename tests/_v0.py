@@ -14,13 +14,13 @@ import equinox as eqx
 import jax
 import xarray as xr
 from _bands import emit_like_srf
-from _synthetic_table import NU, synthetic_table
 
 from radtrax import ForwardModel
 from radtrax.atmosphere import AtmosphericState, ViewingGeometry, afgl_us_standard
 from radtrax.instrument import BandInstrument
 from radtrax.solvers import BeerLambert
 from radtrax.spectroscopy import TableOpacity
+from radtrax.spectroscopy.synthetic import NU_CM as NU, synthetic_table
 from radtrax.surface import Lambertian
 
 

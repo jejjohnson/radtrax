@@ -5,11 +5,11 @@ from __future__ import annotations
 import jax.numpy as jnp
 import numpy as np
 import pytest
-from _synthetic_table import P_ATM, T_K
 
 from radtrax.atmosphere import ATM_TO_PA, afgl_us_standard
 from radtrax.optics import OpticalProperties
 from radtrax.spectroscopy import CrossSectionTable, TableOpacity
+from radtrax.spectroscopy.synthetic import P_ATM, T_K
 
 
 def test_built_from_an_opacity_provider() -> None:

@@ -14,7 +14,6 @@ import numpy as np
 import pytest
 import xarray as xr
 from _bands import emit_like_srf
-from _synthetic_table import M_CH4_U, NU, P_ATM, T_K
 
 from radtrax.atmosphere import (
     AVOGADRO_PER_MOL,
@@ -24,6 +23,12 @@ from radtrax.atmosphere import (
 )
 from radtrax.instrument import SpectralResponseFunction
 from radtrax.slab.nb_lut import build_nb_lut, lookup_nb
+from radtrax.spectroscopy.synthetic import (
+    CH4_MASS_U as M_CH4_U,
+    NU_CM as NU,
+    P_ATM,
+    T_K,
+)
 
 
 CH4_MOLAR_MASS_KG_PER_MOL = M_CH4_U * 1e-3  # the synthetic table's CH₄

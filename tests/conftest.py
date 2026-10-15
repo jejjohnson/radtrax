@@ -35,6 +35,6 @@ def shapes_unchecked() -> Iterator[None]:
 
 @pytest.fixture(scope="session")
 def voigt_table() -> xr.Dataset:
-    from _synthetic_table import synthetic_table
+    from radtrax.spectroscopy.synthetic import synthetic_table
 
     return synthetic_table()

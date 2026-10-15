@@ -5,7 +5,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import xarray as xr
-from _synthetic_table import P_ATM, T_K
 
 import radtrax.spectroscopy.hitran.build as build_module
 from radtrax import MissingTableError
@@ -19,6 +18,7 @@ from radtrax.spectroscopy import (
 )
 from radtrax.spectroscopy.hitran import build_table
 from radtrax.spectroscopy.hitran.build import main
+from radtrax.spectroscopy.synthetic import P_ATM, T_K
 from radtrax.spectroscopy.table_cache import TABLE_DIR_ENV, table_path
 
 
