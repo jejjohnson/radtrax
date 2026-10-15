@@ -32,7 +32,7 @@ import jax
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Bool, Float, PRNGKeyArray
 
 from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 
@@ -43,6 +43,14 @@ else:
     LinearOperator = object
 
 
+__all__ = [
+    "estimate_cov_empirical",
+    "estimate_cov_lowrank",
+    "estimate_cov_shrunk",
+    "estimate_mean",
+    "shrink_covariance",
+]
+
 _RobustMethod = Literal["mean", "median", "trimmed", "huber"]
 
 
@@ -50,12 +58,12 @@ _RobustMethod = Literal["mean", "median", "trimmed", "huber"]
 
 
 def estimate_mean(
-    cube: Float[Array, "H W B"] | np.ndarray,
+    cube: Float[ArrayLike, "H W B"],
     *,
     method: _RobustMethod = "mean",
     trim_proportion: float = 0.1,
     huber_c: float = 1.345,
-) -> np.ndarray:
+) -> Float[np.ndarray, " B"]:
     """Estimate the per-band background mean ``μ`` from a scene.
 
     Parameters
@@ -127,11 +135,11 @@ def _dense_operator(cov: np.ndarray) -> LinearOperator:
 
 
 def estimate_cov_empirical(
-    cube: Float[Array, "H W B"] | np.ndarray,
-    mean: np.ndarray | None = None,
+    cube: Float[ArrayLike, "H W B"],
+    mean: Float[ArrayLike, " B"] | None = None,
     *,
     ridge: float = 0.0,
-    mask: np.ndarray | None = None,
+    mask: Bool[ArrayLike, "*pixels"] | None = None,
 ) -> LinearOperator:
     """Empirical covariance via :class:`sklearn.covariance.EmpiricalCovariance`.
 
@@ -157,11 +165,11 @@ def estimate_cov_empirical(
 
 
 def estimate_cov_shrunk(
-    cube: Float[Array, "H W B"] | np.ndarray,
-    mean: np.ndarray | None = None,
+    cube: Float[ArrayLike, "H W B"],
+    mean: Float[ArrayLike, " B"] | None = None,
     *,
     method: Literal["ledoit_wolf", "oas"] = "ledoit_wolf",
-    mask: np.ndarray | None = None,
+    mask: Bool[ArrayLike, "*pixels"] | None = None,
 ) -> LinearOperator:
     """Shrinkage covariance estimator.
 
@@ -192,12 +200,12 @@ def estimate_cov_shrunk(
 
 
 def shrink_covariance(
-    empirical: Float[Array, "B B"] | np.ndarray,
+    empirical: Float[ArrayLike, "B B"],
     *,
     method: Literal["ledoit_wolf", "oas"],
     n_samples: int,
     fourth_moment: float | None = None,
-) -> np.ndarray:
+) -> Float[np.ndarray, "B B"]:
     """Shrink a ``1/n`` empirical covariance toward a scaled identity.
 
     Returns ``(1 − s)·Sₙ + s·μ·I`` with ``μ = tr(Sₙ)/p``, where ``Sₙ`` is the
@@ -287,14 +295,14 @@ def shrink_covariance(
 
 
 def estimate_cov_lowrank(
-    cube: Float[Array, "H W B"] | np.ndarray,
-    mean: np.ndarray | None = None,
+    cube: Float[ArrayLike, "H W B"],
+    mean: Float[ArrayLike, " B"] | None = None,
     *,
     rank: int,
     tikhonov: float,
-    random_state: int | jax.Array | None = 0,
+    random_state: int | PRNGKeyArray | None = 0,
     n_oversamples: int = 10,
-    mask: np.ndarray | None = None,
+    mask: Bool[ArrayLike, "*pixels"] | None = None,
     rank_rtol: float = 1e-10,
 ) -> LinearOperator:
     """Low-rank + Tikhonov covariance: ``Σ = λI + V D Vᵀ``.
@@ -402,7 +410,7 @@ lowrank_factors = jax.jit(
 )
 
 
-def _flatten_cube(cube: Float[Array, "H W B"] | np.ndarray) -> np.ndarray:
+def _flatten_cube(cube: Float[ArrayLike, "H W B"]) -> np.ndarray:
     arr = np.asarray(cube)
     if arr.ndim != 3:
         raise ShapeError(
@@ -421,7 +429,7 @@ def _finite_pixels(X: np.ndarray) -> np.ndarray:
 
 
 def _flatten_cube_masked(
-    cube: Float[Array, "H W B"] | np.ndarray,
+    cube: Float[ArrayLike, "H W B"],
     mask: np.ndarray | None,
     *,
     min_samples: int = 2,

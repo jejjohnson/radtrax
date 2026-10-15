@@ -40,20 +40,6 @@ JAXTYPING_DTYPES = {
 # its subpackage's block.
 ALLOWED: frozenset[str] = frozenset(
     {
-        # retrieval/matched_filter
-        "retrieval/matched_filter/background.py::estimate_cov_empirical",
-        "retrieval/matched_filter/background.py::estimate_cov_lowrank",
-        "retrieval/matched_filter/background.py::estimate_cov_shrunk",
-        "retrieval/matched_filter/background.py::estimate_mean",
-        "retrieval/matched_filter/background.py::shrink_covariance",
-        "retrieval/matched_filter/cluster.py::adaptive_window_background",
-        "retrieval/matched_filter/cluster.py::gmm_cluster_background",
-        "retrieval/matched_filter/io.py::apply_image_xarray",
-        "retrieval/matched_filter/io.py::open_multi_scene",
-        "retrieval/matched_filter/streaming.py::WelfordAccumulator.covariance",
-        "retrieval/matched_filter/streaming.py::WelfordAccumulator.mean",
-        "retrieval/matched_filter/streaming.py::WelfordAccumulator.update",
-        "retrieval/matched_filter/streaming.py::streaming_background",
         # slab + instrument
         "instrument/psf.py::PointSpreadFunction.__init__",
         "instrument/srf.py::SpectralResponseFunction.adjoint",

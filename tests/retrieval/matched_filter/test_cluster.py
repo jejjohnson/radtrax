@@ -30,6 +30,7 @@ def test_gmm_separates_two_populations(rng):
     assert accuracy > 0.9, f"GMM cluster recovery only {accuracy:.2f}"
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_gmm_shape_check():
     with pytest.raises(ValueError, match="must be"):
         gmm_cluster_background(np.zeros((3, 4)), n_clusters=2)

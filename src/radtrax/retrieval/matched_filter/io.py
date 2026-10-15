@@ -27,6 +27,7 @@ from collections.abc import Iterable, Iterator
 from typing import TYPE_CHECKING
 
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import MissingFileError, ShapeError
 
@@ -34,16 +35,15 @@ from radtrax.exceptions import MissingFileError, ShapeError
 if TYPE_CHECKING:
     import lineax as lx
     import xarray as xr
-    from jaxtyping import Array, Float
 
     LinearOperator = lx.AbstractLinearOperator
 
 
 def apply_image_xarray(
     cube: xr.DataArray,
-    mean: np.ndarray | Float[Array, " B"],
+    mean: Float[ArrayLike, " B"],
     cov_op: LinearOperator,
-    target: np.ndarray | Float[Array, " B"],
+    target: Float[ArrayLike, " B"],
     *,
     band_dim: str = "band",
     dask: str = "parallelized",
@@ -115,7 +115,7 @@ def open_multi_scene(
     band_dim: str = "band",
     variable: str | None = None,
     **open_kwargs,
-) -> Iterator[np.ndarray]:
+) -> Iterator[Float[np.ndarray, "N B"]]:
     """Yield ``(n_pixels, n_bands)`` batches from a sequence of scene files.
 
     Iterates one file at a time with :func:`xarray.open_dataset`, closes each

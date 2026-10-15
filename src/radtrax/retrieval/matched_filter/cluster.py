@@ -82,7 +82,7 @@ class ClusterBackground(eqx.Module):
 
 
 def gmm_cluster_background(
-    cube: np.ndarray,
+    cube: Float[ArrayLike, "H W B"],
     *,
     n_clusters: int,
     cov_estimator: str = "ledoit_wolf",
@@ -193,11 +193,11 @@ def gmm_cluster_background(
 
 
 def adaptive_window_background(
-    cube: np.ndarray,
+    cube: Float[ArrayLike, "H W B"],
     *,
     window_size: int,
     guard_size: int = 0,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[Float[np.ndarray, "H W B"], Float[np.ndarray, "H W B"]]:
     """Per-pixel local mean and per-band variance over a square window.
 
     For each pixel ``(i, j)``, estimate ``μ_{ij}`` and a *diagonal* local

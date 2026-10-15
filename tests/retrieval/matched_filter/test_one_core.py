@@ -98,7 +98,7 @@ def test_shrink_covariance_ledoit_wolf_properties() -> None:
         shrink_covariance(cov, method="ledoit_wolf", n_samples=10)
     with pytest.raises(ValueError, match="method"), shapes_unchecked():
         shrink_covariance(cov, method="nope", n_samples=10)  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="square"):
+    with pytest.raises(ValueError, match="square"), shapes_unchecked():
         shrink_covariance(np.ones((2, 3)), method="oas", n_samples=10)
     with pytest.raises(ValueError, match="n_samples"):
         shrink_covariance(cov, method="oas", n_samples=0)
