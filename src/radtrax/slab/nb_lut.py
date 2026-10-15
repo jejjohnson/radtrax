@@ -47,10 +47,19 @@ from dataclasses import dataclass
 
 import numpy as np
 import xarray as xr
+from jaxtyping import ArrayLike, Float
 
 from radtrax.atmosphere import gas
 from radtrax.exceptions import MissingKeyError, ParameterError, ShapeError
 from radtrax.instrument.srf import SpectralResponseFunction, check_srf_lut_coverage
+
+
+__all__ = [
+    "NBLookup",
+    "build_nb_lut",
+    "inject_plume",
+    "lookup_nb",
+]
 
 
 #: ΔX rows per block when building the table.
@@ -236,9 +245,9 @@ def build_nb_lut(
 
 
 def lookup_nb(
-    plume_column: np.ndarray,
+    plume_column: Float[ArrayLike, "*shape"],
     nb_lookup: NBLookup,
-) -> np.ndarray:
+) -> Float[np.ndarray, " B *shape"]:
     """Look up per-band nB for every pixel of a 2-D column map.
 
     Values outside the LUT range are clipped. Clipping at the top end is
@@ -276,12 +285,12 @@ def lookup_nb(
 
 
 def inject_plume(
-    scene: np.ndarray,
-    plume_column: np.ndarray,
+    scene: Float[ArrayLike, "*scene"],
+    plume_column: Float[ArrayLike, "H W"],
     nb_lookup: NBLookup,
     *,
     band_axis: int = 0,
-) -> np.ndarray:
+) -> Float[np.ndarray, "*scene"]:
     """Multiplicative plume injection: ``scene_plume = scene · nB(ΔX)``.
 
     Parameters

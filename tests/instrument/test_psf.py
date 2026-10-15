@@ -131,6 +131,7 @@ class TestPointSpreadFunction:
         with pytest.raises(ValueError, match="odd"):
             PointSpreadFunction(kernel=np.ones((4, 4)))
 
+    @pytest.mark.usefixtures("shapes_unchecked")
     def test_rejects_non_square_kernel(self):
         with pytest.raises(ValueError, match="square"):
             PointSpreadFunction(kernel=np.ones((3, 5)))

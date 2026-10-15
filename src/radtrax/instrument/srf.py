@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import (
     DegenerateInputError,
@@ -46,6 +47,13 @@ from radtrax.exceptions import (
     ParameterError,
     ShapeError,
 )
+
+
+__all__ = [
+    "FWHM_PER_SIGMA",
+    "SpectralResponseFunction",
+    "check_srf_lut_coverage",
+]
 
 
 # FWHM of a Gaussian in units of σ, exact: 2√(2 ln 2) ≈ 2.35482. plumax used
@@ -209,7 +217,9 @@ class SpectralResponseFunction:
 
     # ── linear operator ──────────────────────────────────────────────────────
 
-    def apply(self, radiance_hr: np.ndarray) -> np.ndarray:
+    def apply(
+        self, radiance_hr: Float[ArrayLike, "*batch Ghr"]
+    ) -> Float[np.ndarray, "*batch B"]:
         """Forward operator: map HR spectrum/cube to band-integrated values.
 
         Parameters
@@ -234,11 +244,15 @@ class SpectralResponseFunction:
         # of `matrix`, so `...l, bl -> ...b`.
         return np.einsum("bl, ...l -> ...b", self.matrix, x)
 
-    def jacobian(self, tangent_hr: np.ndarray) -> np.ndarray:
+    def jacobian(
+        self, tangent_hr: Float[ArrayLike, "*batch Ghr"]
+    ) -> Float[np.ndarray, "*batch B"]:
         """Jacobian-vector product ``S · v``. Linear operator → same as ``apply``."""
         return self.apply(tangent_hr)
 
-    def adjoint(self, cotangent_bands: np.ndarray) -> np.ndarray:
+    def adjoint(
+        self, cotangent_bands: Float[ArrayLike, "*batch B"]
+    ) -> Float[np.ndarray, "*batch Ghr"]:
         """Adjoint operator ``Sᵀ``: map band-space cotangents back to HR.
 
         Used for reverse-mode / VJP gradient calculations.
@@ -264,11 +278,11 @@ class SpectralResponseFunction:
 
 def check_srf_lut_coverage(
     srf: SpectralResponseFunction,
-    lut_wavelengths_nm: np.ndarray,
+    lut_wavelengths_nm: Float[ArrayLike, " G"],
     *,
     context: str,
     tol: float = 1e-2,
-) -> np.ndarray:
+) -> Float[np.ndarray, " B"]:
     """Warn when SRF bands respond outside the LUT's wavelength coverage.
 
     Resampling a cross-section / target spectrum onto the SRF grid zero-fills

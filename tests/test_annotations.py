@@ -40,21 +40,6 @@ JAXTYPING_DTYPES = {
 # its subpackage's block.
 ALLOWED: frozenset[str] = frozenset(
     {
-        # slab + instrument
-        "instrument/psf.py::PointSpreadFunction.__init__",
-        "instrument/srf.py::SpectralResponseFunction.adjoint",
-        "instrument/srf.py::SpectralResponseFunction.apply",
-        "instrument/srf.py::SpectralResponseFunction.jacobian",
-        "instrument/srf.py::check_srf_lut_coverage",
-        "slab/config.py::InstrumentSpec.make_srf",
-        "slab/forward.py::forward_maclaurin",
-        "slab/forward.py::forward_maclaurin_normalized",
-        "slab/forward.py::forward_nonlinear",
-        "slab/forward.py::forward_nonlinear_normalized",
-        "slab/forward.py::forward_taylor",
-        "slab/forward.py::forward_taylor_normalized",
-        "slab/nb_lut.py::inject_plume",
-        "slab/nb_lut.py::lookup_nb",
         # spectroscopy + atmosphere + geo
         "atmosphere/geometry.py::air_mass_factor",
         "geo/srf.py::sentinel2_srf",
