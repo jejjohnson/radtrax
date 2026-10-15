@@ -20,10 +20,9 @@ primitives**: new code composes what is here, and anything new lands where
 the next person will find and reuse it.
 
 It is one package, `src/radtrax/`. The public API is `radtrax.__all__`,
-re-exported from `src/radtrax/__init__.py`. Today it holds the exception
-base and the layout below; each subpackage is empty until its issue lands
-(issues #1–#4 are the wave epics), and `tests/test_public_api.py` fails if
-the layout drifts:
+re-exported from `src/radtrax/__init__.py`. It holds v0, the layered forward
+model, in the layout below (issues #1–#4 are the wave epics of v0, #100 is
+v1's), and `tests/test_public_api.py` fails if the layout drifts:
 
 | Module | Owns | Lands in |
 |---|---|---|
@@ -48,10 +47,14 @@ GeoStack package graph gets a cycle.
   not know about plumes; plumax's plume-to-radiance coupling imports radtrax.
   An import-linter contract (`[tool.importlinter]` in `pyproject.toml`)
   checks it.
-- **No GeoModels or GeoML package below it.** radtrax builds on Numerics
-  (gaussx, lineax, optimistix) and, through extras, GeoStack (geotoolz,
-  georeader). finitevolx, spectraldiffx and somax are not dependencies: a
-  layer grid is three arrays and a band integration is a matrix product.
+- **Layers point down: GeoModels → GeoML → GeoNumerics.** radtrax is a
+  GeoModels package. It may depend on GeoNumerics (gaussx, lineax,
+  optimistix) and GeoStack (geotoolz, georeader, through extras), and on
+  GeoML: vardax holds the variational machinery radtrax customises (#109,
+  through `radtrax[var]`). Nothing in GeoNumerics or GeoML may import
+  radtrax. No other GeoModels package sits below it either:
+  finitevolx, spectraldiffx and somax are not dependencies, since a layer
+  grid is three arrays and a band integration is a matrix product.
 - **Geo carriers arrive through extras.** `radtrax[geo]` adds georeader
   (with the `openpyxl`, `tqdm` and `typing-extensions` it needs but does not
   declare), geotoolz and pipekit; the base install stays JAX-only. The
@@ -238,7 +241,8 @@ agent can read and follow them), and two read-only review checklists in
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
 Recipes for radtrax's extension points (a new opacity provider, solver,
-surface or instrument) arrive with their protocols in Wave 3.
+surface, instrument or noise model) are tracked in #118; until then, follow
+the existing implementation behind each protocol.
 
 Downstream users get the package's guidance through `docs/llms.txt`
 (copied to the site root by `ROOT_FILES` in `scripts/build_docs.py`); update

@@ -13,7 +13,7 @@ specific to Claude Code.
 - **Skills** in `.claude/skills/` load on their own when a task matches
   their description (or run them as `/<name>`):
   - building: `add-guide-page`, `add-notebook` (recipes for radtrax's
-    extension points arrive with their protocols in Wave 3);
+    extension points are tracked in #118);
   - shipping: `pre-pr-check`, `radtrax-review`, `squash-commit`;
   - GitHub housekeeping: `create-gh-issue`, `link-gh-issues`.
 - **Subagents** (`.claude/agents/`), both read-only, both used by
