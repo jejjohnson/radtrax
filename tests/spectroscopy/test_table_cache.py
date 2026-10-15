@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import jax.numpy as jnp
 import numpy as np
 import pytest
 import xarray as xr
@@ -10,15 +9,6 @@ from _synthetic_table import P_ATM, T_K
 
 import radtrax.spectroscopy.hitran.build as build_module
 from radtrax import MissingTableError
-from radtrax.atmosphere import (
-    ATM_TO_PA,
-    AtmosphericState,
-    ViewingGeometry,
-    air_mass_factor,
-)
-from radtrax.optics import OpticalProperties
-from radtrax.slab.forward import forward_nonlinear
-from radtrax.solvers import BeerLambert
 from radtrax.spectroscopy import (
     V0_GRID,
     TableGrid,
@@ -30,7 +20,6 @@ from radtrax.spectroscopy import (
 from radtrax.spectroscopy.hitran import build_table
 from radtrax.spectroscopy.hitran.build import main
 from radtrax.spectroscopy.table_cache import TABLE_DIR_ENV, table_path
-from radtrax.surface import Lambertian
 
 
 # ── the grid and the cache layout ────────────────────────────────────────────
@@ -92,46 +81,6 @@ def test_a_cached_table_loads_into_table_opacity(
     opacity = load_opacity(["CH4"], cache_dir=tmp_path)
     assert isinstance(opacity, TableOpacity)
     assert opacity.tables["CH4"].sigma_cm2.shape == (P_ATM.size, T_K.size, 14000)
-
-
-# ── the synthetic table: one layer equals the slab model ─────────────────────
-
-
-def test_one_layer_on_a_node_equals_the_slab_model(voigt_table: xr.Dataset) -> None:
-    """At L = 1 on a table node, TableOpacity through BeerLambert equals
-    radtrax.slab's forward model (the radtrax · 3 notebook got 1.3e-15; both
-    evaluate σ n x Δz in float64)."""
-    p_atm, t_k, vmr, dz_cm = float(P_ATM[-2]), float(T_K[4]), 1.9e-6, 8.0e5
-    mu0 = float(np.cos(np.radians(35.0)))  # also the solar irradiance
-    amf = float(air_mass_factor(35.0, 0.0))
-    nu = voigt_table["wavenumber"].values
-    ref = forward_nonlinear(
-        voigt_table,
-        nu,
-        T_K=t_k,
-        p_atm=p_atm,
-        vmr=vmr,
-        path_length_cm=dz_cm,
-        amf=amf,
-        solar_irradiance=mu0,
-    )
-    slab = AtmosphericState(
-        p_pa=jnp.array([p_atm * ATM_TO_PA]),
-        t_k=jnp.array([t_k]),
-        z_m=jnp.array([dz_cm / 200]),
-        dz_m=jnp.array([dz_cm / 100]),
-        vmr={"CH4": jnp.array([vmr])},
-    )
-    opacity = TableOpacity.from_datasets({"CH4": voigt_table})
-    # radtrax.slab's solar_irradiance is E₀ μ₀ in BeerLambert's notation.
-    radiance = BeerLambert()(
-        OpticalProperties(opacity.nu_cm, opacity(slab)),
-        Lambertian(1.0),
-        ViewingGeometry.from_angles(35.0, 0.0),
-    )
-    np.testing.assert_allclose(radiance, ref.radiance, rtol=1e-12)
-    # Line cores are strong but not black.
-    assert 0.3 < 1 - radiance.min() / (mu0 / np.pi) < 0.99
 
 
 # ── building (no network: the HAPI pipeline is stubbed) ─────────────────────

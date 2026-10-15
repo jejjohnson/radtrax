@@ -35,6 +35,7 @@ project:
         - file: notebooks/hitran_ch4_table.ipynb
         - file: notebooks/hitran_multigas_tables.ipynb
         - file: notebooks/mf_covariance_flavours.ipynb
+        - file: notebooks/v0_layers_vs_slab.ipynb
     - title: Project
       children:
         - file: contributing.md

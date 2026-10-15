@@ -149,3 +149,19 @@ def test_build_nb_lut_rejects_invalid_grid(synthetic_lut, swir_srf):
             amf=2.0,
             max_delta_column=0.0,
         )
+
+
+@pytest.mark.parametrize("column", [-1.0, 3.54e19])
+def test_a_negative_or_per_cm2_background_raises(
+    synthetic_lut, swir_srf, column: float
+) -> None:
+    """3.54e19 is AFGL's CH₄ column in molecules/cm²; in mol/m² it is 0.588."""
+    with pytest.raises(ValueError, match="background_column"):
+        build_nb_lut(
+            synthetic_lut,
+            swir_srf,
+            T_K=280.0,
+            p_atm=1.0,
+            amf=2.0,
+            background_column=column,
+        )

@@ -1,8 +1,7 @@
 """ForwardModel and the unit-absorption target from autodiff (radtrax#37).
 
-The model is radtrax · 3's v0 slice on the synthetic Voigt table: AFGL US
-Standard to 20 km (CH₄, and a second synthetic table standing in for H₂O),
-Beer–Lambert, EMIT-like bands.
+The model is radtrax · 3's v0 slice on the synthetic tables (``tests/_v0.py``).
+The v0 gates, V4 among them, are in ``tests/validation``.
 """
 
 from __future__ import annotations
@@ -13,12 +12,12 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 import xarray as xr
-from _bands import emit_like_srf
 from _gradcheck import assert_gradients_match
-from _synthetic_table import NU, synthetic_table
+from _synthetic_table import NU
+from _v0 import GEOMETRY, SURFACE, theta_to_bands, v0_atmosphere, v0_model
 
 from radtrax import ForwardModel, unit_absorption_target
-from radtrax.atmosphere import AtmosphericState, ViewingGeometry, afgl_us_standard
+from radtrax.atmosphere import AtmosphericState, ViewingGeometry
 from radtrax.instrument import BandInstrument
 from radtrax.optics import OpticalProperties
 from radtrax.retrieval.matched_filter import (
@@ -29,12 +28,9 @@ from radtrax.retrieval.matched_filter import (
     matched_filter_snr,
 )
 from radtrax.solvers import BeerLambert
-from radtrax.spectroscopy import TableOpacity
 from radtrax.surface import Lambertian
 
 
-GEOMETRY = ViewingGeometry.from_angles(35.0, 10.0)
-SURFACE = Lambertian(0.25)
 # Compiled once per signature: eagerly, 14,000 wavenumbers × 20 layers
 # dispatch op by op.
 TARGET = eqx.filter_jit(unit_absorption_target)
@@ -42,17 +38,12 @@ TARGET = eqx.filter_jit(unit_absorption_target)
 
 @pytest.fixture(scope="module")
 def model(voigt_table: xr.Dataset) -> ForwardModel:
-    opacity = TableOpacity.from_datasets(
-        {"CH4": voigt_table, "H2O": synthetic_table(seed=1)}
-    )
-    instrument = BandInstrument.from_srf(emit_like_srf(NU), NU)
-    return ForwardModel(opacity, BeerLambert(), instrument)
+    return v0_model(voigt_table)
 
 
 @pytest.fixture(scope="module")
 def atm() -> AtmosphericState:
-    # 20 one-kilometre layers, inside the table's 0.03–1.1 atm.
-    return afgl_us_standard(z_top_km=20.0, gases=["CH4", "H2O"])
+    return v0_atmosphere()
 
 
 def test_the_model_is_its_stages_composed(
@@ -145,17 +136,7 @@ def test_add_column_adds_exactly_delta_x(atm: AtmosphericState) -> None:
         atm.add_column("CH4", 0.3, jnp.ones(3))
 
 
-# ── gradients and swaths (gate V4) ───────────────────────────────────────────
-
-
-def _y_of(model: ForwardModel, atm: AtmosphericState):
-    """θ = (ΔX [mol/m²], albedo, shift [cm⁻¹]) (3,) → y (B,), as radtrax · 3."""
-
-    def y_of(theta: jax.Array) -> jax.Array:
-        fm = eqx.tree_at(lambda m: m.instrument.shift_cm, model, theta[2])
-        return fm(atm.add_column("CH4", theta[0]), Lambertian(theta[1]), GEOMETRY)
-
-    return y_of
+# ── gradients ───────────────────────────────────────────
 
 
 @pytest.mark.slow  # ~2 s, most of it compiling
@@ -163,31 +144,8 @@ def test_gradients_in_column_albedo_and_shift(
     model: ForwardModel, atm: AtmosphericState
 ) -> None:
     # The shift off the 0.01 cm⁻¹ nodes: y is piecewise linear in it.
-    y_of = jax.jit(_y_of(model, atm))
+    y_of = jax.jit(theta_to_bands(model, atm))
     assert_gradients_match(y_of, jnp.array([0.1, 0.25, 0.0037]))
-
-
-@pytest.mark.slow
-def test_v4_vmapped_swath_jacobians_equal_a_loop(
-    model: ForwardModel, atm: AtmosphericState
-) -> None:
-    """K = ∂y/∂θ per pixel over 256 pixels: filter_vmap outside jacrev."""
-    y_of = _y_of(model, atm)
-    thetas = jnp.stack(
-        [
-            jnp.linspace(0.0, 0.5, 256),
-            jnp.linspace(0.1, 0.4, 256),
-            jnp.linspace(-0.02, 0.02, 256),
-        ],
-        axis=1,
-    )  # (256, 3)
-    k_all = eqx.filter_jit(eqx.filter_vmap(jax.jacrev(y_of)))(thetas)  # (256, B, 3)
-    k_one = eqx.filter_jit(jax.jacrev(y_of))
-    assert k_all.shape == (256, model.instrument.n_bands, 3)
-    # Not bit for bit: XLA batches the band and layer sums in another order,
-    # 1.2e-15 relative at worst over the swath; 1e-12 is radtrax · 3's norm.
-    for i in range(256):
-        np.testing.assert_allclose(k_all[i], k_one(thetas[i]), rtol=1e-12, atol=0)
 
 
 # ── into the matched filter ──────────────────────────────────────────────────

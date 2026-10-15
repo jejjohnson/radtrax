@@ -1,0 +1,16 @@
+"""v0's gates (radtrax#38), one module each.
+
+- V1 ``test_v1_slab``: at L = 1, radiance and Jacobian equal radtrax.slab
+  to 1e-12.
+- V2 ``test_v2_hapi``: band transmittance within 0.1 % of HAPI on AFGL US
+  Standard; needs the built tables, ``[hitran]`` and HITRAN (slow,
+  integration; skips otherwise, #89).
+- V3 ``test_v3_gradients``: autodiff equals central differences to 1e-6
+  on a reduced state touching every stage.
+- V4 ``test_v4_swath``: ``filter_vmap`` over 256 pixels equals a loop
+  (to 1e-12; XLA's batched sums are not bit for bit).
+- V5 ``test_v5_band_tables``: the band table's τ_b equals the exact band
+  integral to 0.1 % over ΔΩ ∈ [0, 0.1] kg/m², against the background.
+
+All but V2 run in CI on the synthetic tables (``tests/_v0.py``).
+"""
