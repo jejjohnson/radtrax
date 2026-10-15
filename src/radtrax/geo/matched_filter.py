@@ -48,6 +48,7 @@ import jax
 import jax.numpy as jnp
 import lineax as lx
 import numpy as np
+from jaxtyping import Bool, Float
 
 from radtrax.retrieval.matched_filter.background import (
     _dense_operator,
@@ -98,12 +99,26 @@ except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
     ) from err
 
 
+# Shapes, in radtrax's dimension names: B bands, H W pixels, N samples. A cube
+# has its band axis at ``axis`` (default -3), so a time stack is "*time B H W".
+Spectrum = Float[np.ndarray, " B"]
+CovMatrix = Float[np.ndarray, "B B"]
+Cube = Float[np.ndarray, "*time B H W"]
+VMRField = Float[np.ndarray, "H W"]
+ScoreArray = Float[np.ndarray, "*time H W"]
+ValidMap = Bool[np.ndarray, "*time H W"]
+Samples = Float[np.ndarray, "N 1 B"]
+
 if TYPE_CHECKING:
     from georeader.geotensor import GeoTensor
 
-    Carrier = GeoTensor | np.ndarray
+    #: A spectral cube: a GeoTensor or a plain array.
+    Carrier = GeoTensor | Cube
+    #: A score map on the input's carrier: ``(H, W)``, or ``(T, 1, H, W)``.
+    ScoreMap = GeoTensor | ScoreArray
 else:
     Carrier = Any
+    ScoreMap = Any
 
 
 __all__ = [
@@ -132,7 +147,8 @@ __all__ = [
 MeanMethod = Literal["mean", "median", "trimmed", "huber"]
 CovMethod = Literal["empirical", "ledoit_wolf", "oas", "lowrank"]
 ShrinkMethod = Literal["ledoit_wolf", "oas"]
-CovLike = lx.AbstractLinearOperator | np.ndarray
+#: A covariance: a lineax / gaussx operator or a dense ``(B, B)`` matrix.
+CovLike = lx.AbstractLinearOperator | CovMatrix
 
 #: Step of the central-difference target for a plain callable ``obs_model``,
 #: relative to the largest magnitude in the background state (absolute when the
@@ -154,8 +170,8 @@ class AdaptiveBackground(NamedTuple):
             shape.
     """
 
-    mean: np.ndarray
-    variance: np.ndarray
+    mean: Cube
+    variance: Cube
 
 
 class StreamingBackgroundResult(NamedTuple):
@@ -166,7 +182,7 @@ class StreamingBackgroundResult(NamedTuple):
         cov_op: Covariance operator ``(B, B)``.
     """
 
-    mean: np.ndarray
+    mean: Spectrum
     cov_op: lx.AbstractLinearOperator
 
 
@@ -220,9 +236,9 @@ class MatchedFilter(Operator):
     def __init__(
         self,
         *,
-        mean: np.ndarray | None = None,
+        mean: Spectrum | None = None,
         cov_op: CovLike | None = None,
-        target: np.ndarray | None = None,
+        target: Spectrum | None = None,
         fit_on_call: bool = False,
         mean_method: MeanMethod = "median",
         cov_method: CovMethod = "ledoit_wolf",
@@ -235,12 +251,12 @@ class MatchedFilter(Operator):
         self.mean_method = mean_method
         self.cov_method = cov_method
         self.axis = axis
-        self.mean_: np.ndarray | None = None
+        self.mean_: Spectrum | None = None
         self.cov_op_: CovLike | None = None
 
     def _estimate(
-        self, samples: np.ndarray, *, keep_supplied: bool
-    ) -> tuple[np.ndarray, CovLike]:
+        self, samples: Samples, *, keep_supplied: bool
+    ) -> tuple[Spectrum, CovLike]:
         mean = self.mean if keep_supplied else None
         cov_op = self.cov_op if keep_supplied else None
         if mean is None:
@@ -262,7 +278,7 @@ class MatchedFilter(Operator):
         self.mean_ = mean  # published last: the fit-once check reads mean_
         return self
 
-    def _background(self) -> tuple[np.ndarray, CovLike]:
+    def _background(self) -> tuple[Spectrum, CovLike]:
         if self.mean_ is not None and self.cov_op_ is not None:
             return self.mean_, self.cov_op_
         if self.mean is not None and self.cov_op is not None:
@@ -272,7 +288,7 @@ class MatchedFilter(Operator):
         )
 
     @_float64
-    def transform(self, gt: Carrier) -> Carrier:
+    def transform(self, gt: Carrier) -> ScoreMap:
         """Score ``gt`` against the fitted (or supplied) background.
 
         Raises:
@@ -284,10 +300,10 @@ class MatchedFilter(Operator):
     def _score(
         self,
         gt: Carrier,
-        mean: np.ndarray,
+        mean: Spectrum,
         cov_op: CovLike,
-        prepared: tuple[np.ndarray, tuple[int, ...], np.ndarray | None] | None = None,
-    ) -> Carrier:
+        prepared: tuple[Samples, tuple[int, ...], ValidMap | None] | None = None,
+    ) -> ScoreMap:
         if self.target is None:
             raise ValueError("target must be supplied before applying MatchedFilter")
         samples, shape, valid = (
@@ -304,7 +320,7 @@ class MatchedFilter(Operator):
         return _score_map(gt, np.asarray(scores).reshape(shape), valid)
 
     @_float64
-    def _apply(self, gt: Carrier) -> Carrier:
+    def _apply(self, gt: Carrier) -> ScoreMap:
         if self.fit_on_call:
             # Per-scene background: estimated locally, never stored, so
             # concurrent calls share no mutable state.
@@ -339,15 +355,13 @@ class MatchedFilterPixel(Operator):
 
     _terminal: ClassVar[bool] = True
 
-    def __init__(
-        self, *, mean: np.ndarray, cov_op: CovLike, target: np.ndarray
-    ) -> None:
+    def __init__(self, *, mean: Spectrum, cov_op: CovLike, target: Spectrum) -> None:
         self.mean = np.asarray(mean, dtype=float)
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
 
     @_float64
-    def _apply(self, pixel: np.ndarray) -> float:
+    def _apply(self, pixel: Spectrum) -> float:
         return float(
             apply_pixel(
                 jnp.asarray(pixel, dtype=float),
@@ -380,9 +394,7 @@ class MatchedFilterSNR(Operator):
 
     _terminal: ClassVar[bool] = True
 
-    def __init__(
-        self, *, amplitude: float, cov_op: CovLike, target: np.ndarray
-    ) -> None:
+    def __init__(self, *, amplitude: float, cov_op: CovLike, target: Spectrum) -> None:
         self.amplitude = amplitude
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
@@ -418,7 +430,7 @@ class DetectionThreshold(Operator):
     _terminal: ClassVar[bool] = True
 
     def __init__(
-        self, *, false_alarm_rate: float, cov_op: CovLike, target: np.ndarray
+        self, *, false_alarm_rate: float, cov_op: CovLike, target: Spectrum
     ) -> None:
         self.false_alarm_rate = false_alarm_rate
         self.cov_op = _as_cov(cov_op)
@@ -451,7 +463,7 @@ class ValidateMFInputs(Operator):
         target: Target signature ``(B,)``.
     """
 
-    def __init__(self, *, cov_op: CovLike, target: np.ndarray) -> None:
+    def __init__(self, *, cov_op: CovLike, target: Spectrum) -> None:
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
 
@@ -494,7 +506,7 @@ class EstimateMean(Operator):
         self.huber_c = huber_c
         self.axis = axis
 
-    def _apply(self, gt: Carrier) -> np.ndarray:
+    def _apply(self, gt: Carrier) -> Spectrum:
         samples, _, _ = _samples(gt, self.axis, type(self).__name__)
         return np.asarray(
             estimate_mean(
@@ -517,7 +529,7 @@ class EstimateCovEmpirical(Operator):
     """
 
     def __init__(
-        self, *, mean: np.ndarray | None = None, ridge: float = 0.0, axis: int = -3
+        self, *, mean: Spectrum | None = None, ridge: float = 0.0, axis: int = -3
     ) -> None:
         self.mean = None if mean is None else np.asarray(mean, dtype=float)
         self.ridge = ridge
@@ -549,7 +561,7 @@ class EstimateCovShrunk(Operator):
     def __init__(
         self,
         *,
-        mean: np.ndarray | None = None,
+        mean: Spectrum | None = None,
         method: ShrinkMethod = "ledoit_wolf",
         axis: int = -3,
     ) -> None:
@@ -586,7 +598,7 @@ class EstimateCovLowRank(Operator):
     def __init__(
         self,
         *,
-        mean: np.ndarray | None = None,
+        mean: Spectrum | None = None,
         rank: int = LOWRANK_RANK,
         tikhonov: float = LOWRANK_TIKHONOV,
         seed: int | None = 0,
@@ -681,12 +693,12 @@ class ApplyClusterMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
-    def __init__(self, *, target: np.ndarray, axis: int = -3) -> None:
+    def __init__(self, *, target: Spectrum, axis: int = -3) -> None:
         self.target = np.asarray(target, dtype=float)
         self.axis = axis
 
     @_float64
-    def _apply(self, gt: Carrier, cluster: ClusterBackground) -> Carrier:
+    def _apply(self, gt: Carrier, cluster: ClusterBackground) -> ScoreMap:
         samples, shape, valid = _samples(gt, self.axis, type(self).__name__)
         labels = jnp.asarray(cluster.labels)
         if labels.shape != shape:
@@ -749,15 +761,13 @@ class ApplyAdaptiveMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
-    def __init__(
-        self, *, target: np.ndarray, ridge: float = 0.0, axis: int = -3
-    ) -> None:
+    def __init__(self, *, target: Spectrum, ridge: float = 0.0, axis: int = -3) -> None:
         self.target = np.asarray(target, dtype=float)
         self.ridge = ridge
         self.axis = axis
 
     @_float64
-    def _apply(self, gt: Carrier, background: AdaptiveBackground) -> Carrier:
+    def _apply(self, gt: Carrier, background: AdaptiveBackground) -> ScoreMap:
         name = type(self).__name__
         require_ndim(gt, 3, name)
         masked, valid = _masked(gt, self.axis, name)
@@ -805,7 +815,7 @@ class StreamingBackground(Operator):
     @_float64
     def _apply(self, cubes: Iterable[Carrier]) -> StreamingBackgroundResult:
         name = type(self).__name__
-        batches: Iterator[np.ndarray] = (
+        batches: Iterator[Samples] = (
             _samples(cube, self.axis, name)[0] for cube in cubes
         )
         first = next(batches, None)
@@ -864,8 +874,8 @@ class LinearTargetFromObs(Operator):
         self,
         *,
         obs_model: Any,
-        vmr_background: np.ndarray | None = None,
-        pattern: str | np.ndarray = "uniform",
+        vmr_background: VMRField | Cube | None = None,
+        pattern: str | VMRField | Cube = "uniform",
         pixel: tuple[int, int] | None = None,
         axis: int = -3,
         fd_step: float | None = None,
@@ -878,7 +888,7 @@ class LinearTargetFromObs(Operator):
         self.fd_step = fd_step
 
     @_float64
-    def _apply(self, gt: Carrier) -> np.ndarray:
+    def _apply(self, gt: Carrier) -> Spectrum:
         if isinstance(self.obs_model, RadianceObservationModel):
             return np.asarray(
                 linear_target_from_obs(
@@ -948,9 +958,9 @@ class NonlinearTargetFromObs(Operator):
         self,
         *,
         obs_model: Any,
-        vmr_background: np.ndarray | None = None,
+        vmr_background: VMRField | Cube | None = None,
         amplitude: float = 1.0,
-        pattern: str | np.ndarray = "uniform",
+        pattern: str | VMRField | Cube = "uniform",
         pixel: tuple[int, int] | None = None,
         axis: int = -3,
     ) -> None:
@@ -962,7 +972,7 @@ class NonlinearTargetFromObs(Operator):
         self.axis = axis
 
     @_float64
-    def _apply(self, gt: Carrier) -> np.ndarray:
+    def _apply(self, gt: Carrier) -> Spectrum:
         if isinstance(self.obs_model, RadianceObservationModel):
             return np.asarray(
                 nonlinear_target_from_obs(
@@ -1003,6 +1013,8 @@ class ColumnEnhancement(Operator):
             :class:`LinearTargetFromObs`; pass it on the model's
             high-resolution grid when the observation model has a GSD.
         target_pixel: Impulse location / output pixel of the target.
+        fd_step: Central-difference step of the target for an ``obs_model``
+            JAX cannot trace, forwarded to :class:`LinearTargetFromObs`.
         rank: Rank for ``"lowrank"`` (default 10 when ``None``).
         tikhonov: Floor for ``"lowrank"`` (default ``1e-3`` when ``None``).
         axis: Position of the band axis. Default ``-3``.
@@ -1017,8 +1029,9 @@ class ColumnEnhancement(Operator):
         mean_method: MeanMethod = "median",
         cov_method: ShrinkMethod | Literal["lowrank"] = "ledoit_wolf",
         target_pattern: str = "uniform",
-        vmr_background: np.ndarray | None = None,
+        vmr_background: VMRField | Cube | None = None,
         target_pixel: tuple[int, int] | None = None,
+        fd_step: float | None = None,
         rank: int | None = None,
         tikhonov: float | None = None,
         axis: int = -3,
@@ -1033,12 +1046,13 @@ class ColumnEnhancement(Operator):
             None if vmr_background is None else np.asarray(vmr_background, dtype=float)
         )
         self.target_pixel = None if target_pixel is None else tuple(target_pixel)
+        self.fd_step = fd_step
         self.rank = rank
         self.tikhonov = tikhonov
         self.axis = axis
 
     @_float64
-    def _apply(self, gt: Carrier) -> Carrier:
+    def _apply(self, gt: Carrier) -> ScoreMap:
         mean = EstimateMean(method=self.mean_method, axis=self.axis)(gt)
         samples, _, _ = _samples(gt, self.axis, type(self).__name__)
         cov_op = _estimate_cov(
@@ -1057,6 +1071,7 @@ class ColumnEnhancement(Operator):
                 pattern=self.target_pattern,
                 pixel=self.target_pixel,
                 axis=self.axis,
+                fd_step=self.fd_step,
             )(gt)
         return MatchedFilter(mean=mean, cov_op=cov_op, target=target, axis=self.axis)(
             gt
@@ -1078,6 +1093,7 @@ class ColumnEnhancement(Operator):
             "target_pixel": None
             if self.target_pixel is None
             else list(self.target_pixel),
+            "fd_step": self.fd_step,
             "rank": self.rank,
             "tikhonov": self.tikhonov,
             "axis": self.axis,
@@ -1102,8 +1118,8 @@ def _operator(cov_op: CovLike) -> lx.AbstractLinearOperator:
 
 
 def _estimate_cov(
-    samples: np.ndarray,
-    mean: np.ndarray,
+    samples: Samples,
+    mean: Spectrum,
     method: str,
     *,
     rank: int = LOWRANK_RANK,
@@ -1118,7 +1134,7 @@ def _estimate_cov(
     raise ValueError(f"MatchedFilter: unknown cov_method {method!r}")
 
 
-def _array_config(value: np.ndarray | None) -> Any:
+def _array_config(value: Float[np.ndarray, "*shape"] | None) -> Any:
     return None if value is None else jsonable(np.asarray(value))
 
 
@@ -1154,7 +1170,7 @@ def _check_band_axis(gt: Any, axis: int, name: str) -> None:
         )
 
 
-def _masked(gt: Carrier, axis: int, name: str) -> tuple[np.ndarray, np.ndarray | None]:
+def _masked(gt: Carrier, axis: int, name: str) -> tuple[Cube, ValidMap | None]:
     """Float cube with nodata pixels NaN in every band, and the validity map.
 
     ``valid`` is ``None`` when every pixel is valid; otherwise a boolean map
@@ -1172,7 +1188,7 @@ def _masked(gt: Carrier, axis: int, name: str) -> tuple[np.ndarray, np.ndarray |
 
 def _samples(
     gt: Carrier, axis: int, name: str
-) -> tuple[np.ndarray, tuple[int, ...], np.ndarray | None]:
+) -> tuple[Samples, tuple[int, ...], ValidMap | None]:
     """``(N, 1, B)`` pixel cube for the core, the non-band shape, the validity map.
 
     Every pixel is a row, nodata ones as ``NaN``: the core leaves them out of
@@ -1183,13 +1199,13 @@ def _samples(
     return samples[:, None, :], tuple(layout.sample_shape), valid
 
 
-def _band_last(gt: Carrier, axis: int, name: str) -> np.ndarray:
+def _band_last(gt: Carrier, axis: int, name: str) -> Float[np.ndarray, "H W B"]:
     """``(H, W, B)`` float cube with nodata pixels NaN."""
     cube, _ = _masked(gt, axis, name)
     return np.moveaxis(cube, axis, -1)
 
 
-def _score_map(gt: Carrier, scores: np.ndarray, valid: np.ndarray | None) -> Carrier:
+def _score_map(gt: Carrier, scores: ScoreArray, valid: ValidMap | None) -> ScoreMap:
     """A score map on ``gt``'s carrier, ``NaN`` at nodata pixels."""
     out = scores if valid is None else restore_fill(scores, valid, np.nan)
     return wrap_like(gt, keep_band_axis(out, gt), fill_value_default=np.nan)
@@ -1205,7 +1221,7 @@ def _spatial_shape(gt: Carrier, axis: int) -> tuple[int, ...]:
 def _vmr_background(
     obs: RadianceObservationModel,
     gt: Carrier,
-    vmr_background: np.ndarray | None,
+    vmr_background: VMRField | Cube | None,
     axis: int,
 ) -> jax.Array:
     """The VMR field the target is taken about: given, or the reference on ``gt``'s grid."""
@@ -1214,18 +1230,18 @@ def _vmr_background(
     return jnp.full(_spatial_shape(gt, axis)[-2:], obs.vmr_reference, dtype=float)
 
 
-def _jax_pattern(pattern: str | np.ndarray) -> str | jax.Array:
+def _jax_pattern(pattern: str | VMRField) -> str | Float[jax.Array, "H W"]:
     return pattern if isinstance(pattern, str) else jnp.asarray(pattern, dtype=float)
 
 
 def _callable_state(
     obs_model: Any,
     gt: Carrier,
-    vmr_background: np.ndarray | None,
-    pattern: str | np.ndarray,
+    vmr_background: VMRField | Cube | None,
+    pattern: str | VMRField | Cube,
     pixel: tuple[int, ...] | None,
     axis: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+) -> tuple[VMRField | Cube, VMRField | Cube, ValidMap | None]:
     """``(base, direction, valid)`` for a callable.
 
     The state, its perturbation, and the validity map of ``gt``'s pixels
@@ -1249,7 +1265,7 @@ def _callable_state(
     return base, direction, valid
 
 
-def _along(vector: np.ndarray, axis: int, ndim: int) -> np.ndarray:
+def _along(vector: Spectrum, axis: int, ndim: int) -> Float[np.ndarray, "*shape"]:
     """``vector`` shaped to broadcast along ``axis`` of an ``ndim``-D array."""
     shape = [1] * ndim
     shape[axis % ndim] = vector.shape[0]
@@ -1257,8 +1273,11 @@ def _along(vector: np.ndarray, axis: int, ndim: int) -> np.ndarray:
 
 
 def _response_vector(
-    response: np.ndarray, gt: Carrier, axis: int, valid: np.ndarray | None = None
-) -> np.ndarray:
+    response: Float[np.ndarray, "*shape"],
+    gt: Carrier,
+    axis: int,
+    valid: ValidMap | None = None,
+) -> Spectrum:
     """A callable's response as the ``(B,)`` target, checked against ``gt``'s bands.
 
     A cube response is averaged over its finite pixels that are also valid
@@ -1282,12 +1301,12 @@ def _response_vector(
 
 
 def _target_pattern(
-    base: np.ndarray,
+    base: VMRField | Cube,
     *,
-    pattern: str | np.ndarray,
+    pattern: str | VMRField | Cube,
     pixel: tuple[int, ...] | None,
     axis: int | None,
-) -> np.ndarray:
+) -> VMRField | Cube:
     """The perturbation direction, the shape of ``base``.
 
     ``"impulse"`` perturbs one pixel (every band when ``base`` has a band

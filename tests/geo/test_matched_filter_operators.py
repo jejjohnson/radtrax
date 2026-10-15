@@ -848,3 +848,21 @@ def test_column_enhancement_forwards_the_target_state(obs_at_background) -> None
     assert len(op.get_config()["vmr_background"]) == 8
     pixel = rg.ColumnEnhancement(target_pattern="impulse", target_pixel=(1, 2))
     assert Operator.from_state(pixel.state).get_config() == pixel.get_config()
+
+
+def test_column_enhancement_forwards_fd_step() -> None:
+    """The fd_step escape hatch reaches the target inside ColumnEnhancement."""
+
+    def obs_model(x: np.ndarray) -> np.ndarray:
+        return np.exp(1e4 * np.asarray(x)).mean(axis=(1, 2))  # not traceable
+
+    rng = np.random.default_rng(14)
+    cube = 0.01 * rng.normal(size=(3, 5, 6))
+    state = np.zeros_like(cube)
+    op = rg.ColumnEnhancement(obs_model=obs_model, vmr_background=state, fd_step=1e-7)
+    # The target is 1e4 per band (to (k·h)²/6 ≈ 1.7e-7); the scores scale as 1/t.
+    mean = rg.EstimateMean(method="median")(cube)
+    cov = rg.EstimateCovShrunk(mean=mean)(cube)
+    expected = rg.MatchedFilter(mean=mean, cov_op=cov, target=np.full(3, 1e4))(cube)
+    np.testing.assert_allclose(op(cube), expected, rtol=1e-6)
+    assert op.get_config()["fd_step"] == 1e-7
