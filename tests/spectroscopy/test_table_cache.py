@@ -10,8 +10,15 @@ from _synthetic_table import P_ATM, T_K
 
 import radtrax.spectroscopy.hitran.build as build_module
 from radtrax import MissingTableError
-from radtrax.atmosphere import ATM_TO_PA, AtmosphericState, air_mass_factor
+from radtrax.atmosphere import (
+    ATM_TO_PA,
+    AtmosphericState,
+    ViewingGeometry,
+    air_mass_factor,
+)
+from radtrax.optics import OpticalProperties
 from radtrax.slab.forward import forward_nonlinear
+from radtrax.solvers import BeerLambert
 from radtrax.spectroscopy import (
     V0_GRID,
     TableGrid,
@@ -23,6 +30,7 @@ from radtrax.spectroscopy import (
 from radtrax.spectroscopy.hitran import build_table
 from radtrax.spectroscopy.hitran.build import main
 from radtrax.spectroscopy.table_cache import TABLE_DIR_ENV, table_path
+from radtrax.surface import Lambertian
 
 
 # ── the grid and the cache layout ────────────────────────────────────────────
@@ -90,8 +98,9 @@ def test_a_cached_table_loads_into_table_opacity(
 
 
 def test_one_layer_on_a_node_equals_the_slab_model(voigt_table: xr.Dataset) -> None:
-    """At L = 1 on a table node, exp(−m τ) equals radtrax.slab's forward model
-    (the radtrax · 3 notebook got 1.3e-15; both evaluate σ n x Δz in float64)."""
+    """At L = 1 on a table node, TableOpacity through BeerLambert equals
+    radtrax.slab's forward model (the radtrax · 3 notebook got 1.3e-15; both
+    evaluate σ n x Δz in float64)."""
     p_atm, t_k, vmr, dz_cm = float(P_ATM[-2]), float(T_K[4]), 1.9e-6, 8.0e5
     mu0 = float(np.cos(np.radians(35.0)))  # also the solar irradiance
     amf = float(air_mass_factor(35.0, 0.0))
@@ -113,8 +122,13 @@ def test_one_layer_on_a_node_equals_the_slab_model(voigt_table: xr.Dataset) -> N
         dz_m=jnp.array([dz_cm / 100]),
         vmr={"CH4": jnp.array([vmr])},
     )
-    tau = TableOpacity.from_datasets({"CH4": voigt_table})(slab)
-    radiance = mu0 / np.pi * np.exp(-amf * np.asarray(tau.sum(0)))
+    opacity = TableOpacity.from_datasets({"CH4": voigt_table})
+    # radtrax.slab's solar_irradiance is E₀ μ₀ in BeerLambert's notation.
+    radiance = BeerLambert()(
+        OpticalProperties(opacity.nu_cm, opacity(slab)),
+        Lambertian(1.0),
+        ViewingGeometry.from_angles(35.0, 0.0),
+    )
     np.testing.assert_allclose(radiance, ref.radiance, rtol=1e-12)
     # Line cores are strong but not black.
     assert 0.3 < 1 - radiance.min() / (mu0 / np.pi) < 0.99

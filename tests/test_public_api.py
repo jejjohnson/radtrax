@@ -26,6 +26,7 @@ SUBPACKAGES = [
     "atmosphere",
     "geo",
     "instrument",
+    "optics",
     "retrieval",
     "retrieval.matched_filter",
     "retrieval.var3d",

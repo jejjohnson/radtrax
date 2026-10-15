@@ -3,7 +3,8 @@
 The layered atmosphere every forward model starts from: `AtmosphericState`
 (`state`), layers from levels by hydrostatic balance (`hydrostatics`) and the
 AFGL (1986) US Standard profile (`afgl`); and the ideal-gas constants and
-number density (`gas`) and the air-mass factor (`geometry`), the one
+number density (`gas`) and the air-mass factor and `ViewingGeometry`
+(`geometry`), the one
 implementation of each in radtrax (`radtrax.spectroscopy.tables` and
 `radtrax.slab.config` re-export them).
 
