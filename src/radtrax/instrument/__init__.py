@@ -4,7 +4,9 @@
 (``SpectralResponseFunction``); ``psf`` holds the JAX point-spread and
 ground-sampling operators with their hand-written adjoints. ``spectral``
 holds the ``Instrument`` protocol and ``BandInstrument``, the JAX band
-integration with a differentiable spectral shift (radtrax#36). ``noise``
+integration with a differentiable spectral shift (radtrax#36), and
+``GaussianInstrument``, Gaussian bands shifted analytically in cm⁻¹ or nm
+(radtrax#96). ``noise``
 holds the ``NoiseModel`` protocol, the measurement-noise covariance
 (radtrax#108).
 
@@ -17,13 +19,14 @@ from __future__ import annotations
 from radtrax.instrument import noise, psf, spectral, srf
 from radtrax.instrument.noise import DiagonalNoise, NoiseModel, SNRNoise
 from radtrax.instrument.psf import GroundSamplingDistance, PointSpreadFunction
-from radtrax.instrument.spectral import BandInstrument, Instrument
+from radtrax.instrument.spectral import BandInstrument, GaussianInstrument, Instrument
 from radtrax.instrument.srf import SpectralResponseFunction
 
 
 __all__ = [
     "BandInstrument",
     "DiagonalNoise",
+    "GaussianInstrument",
     "GroundSamplingDistance",
     "Instrument",
     "NoiseModel",
