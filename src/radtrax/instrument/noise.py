@@ -3,8 +3,10 @@
 Optimal estimation needs ``S_ε`` as a structured operator, and synthetic
 scenes need draws from it. A noise model returns ``S_ε(y)`` for the band
 values ``y`` it is evaluated at (signal-dependent noise needs ``y``), as a
-lineax operator that ``gx.solve`` dispatches on, and draws
-``ε ~ 𝒩(0, S_ε(y))`` from a ``jax.random`` key the caller passes.
+lineax operator tagged positive semidefinite (so ``gx.solve``, ``gx.logdet``
+and ``lx.CG`` all take it), draws ``ε ~ 𝒩(0, S_ε(y))`` from a
+``jax.random`` key the caller passes, and scores an observation with
+``log 𝒩(y_obs | y, S_ε(y))``.
 
 Two diagonal models:
 
@@ -64,6 +66,27 @@ class NoiseModel(eqx.Module):
         y = jnp.asarray(y, dtype=float)
         return gx.sample_mvn(jnp.zeros_like(y), self.covariance(y), key=key)[0]
 
+    def log_prob(
+        self, y_obs: Float[ArrayLike, " B"], y_model: Float[ArrayLike, " B"]
+    ) -> Float[Array, ""]:
+        """``log 𝒩(y_obs | y_model, S_ε(y_model))``, through ``gx.gaussian_log_prob``.
+
+        The noise is evaluated at the modelled values, so for signal-dependent
+        noise the ``log |S_ε|`` term depends on them too and is kept: dropping
+        it would favour brighter solutions.
+
+        Args:
+            y_obs: Observed band values, ``(B,)``.
+            y_model: Modelled band values, ``(B,)``.
+
+        Returns:
+            The log-density, a scalar.
+        """
+        y_model = jnp.asarray(y_model, dtype=float)
+        return gx.gaussian_log_prob(
+            y_model, self.covariance(y_model), jnp.asarray(y_obs, dtype=float)
+        )
+
 
 class DiagonalNoise(NoiseModel):
     """Independent noise with a fixed standard deviation per band, ``S_ε = diag(σ²)``.
@@ -75,7 +98,8 @@ class DiagonalNoise(NoiseModel):
     Examples:
         >>> import jax.numpy as jnp
         >>> noise = DiagonalNoise(jnp.array([0.1, 0.2]))
-        >>> [round(v, 6) for v in noise.covariance(jnp.ones(2)).diagonal.tolist()]
+        >>> import gaussx as gx
+        >>> [round(v, 6) for v in gx.diag(noise.covariance(jnp.ones(2))).tolist()]
         [0.01, 0.04]
     """
 
@@ -86,10 +110,10 @@ class DiagonalNoise(NoiseModel):
         _check_bands("DiagonalNoise", sigma=self.sigma)
         _check_positive("DiagonalNoise", sigma=self.sigma)
 
-    def covariance(self, y: Float[ArrayLike, " B"]) -> lx.DiagonalLinearOperator:
+    def covariance(self, y: Float[ArrayLike, " B"]) -> lx.AbstractLinearOperator:
         """``diag(σ²)``, whatever ``y``; ``y`` sets only the band count."""
         _check_y("DiagonalNoise", y, self.sigma)
-        return lx.DiagonalLinearOperator(self.sigma**2)
+        return _diagonal_covariance(self.sigma**2)
 
 
 class SNRNoise(NoiseModel):
@@ -107,7 +131,8 @@ class SNRNoise(NoiseModel):
     Examples:
         >>> import jax.numpy as jnp
         >>> noise = SNRNoise(snr=jnp.array([100.0]), floor=jnp.array([0.03]))
-        >>> round(float(noise.covariance(jnp.array([4.0])).diagonal[0]), 6)
+        >>> import gaussx as gx
+        >>> round(float(gx.diag(noise.covariance(jnp.array([4.0])))[0]), 6)
         0.0025
     """
 
@@ -122,10 +147,23 @@ class SNRNoise(NoiseModel):
         _check_bands("SNRNoise", snr=self.snr, floor=self.floor)
         _check_positive("SNRNoise", snr=self.snr, floor=self.floor)
 
-    def covariance(self, y: Float[ArrayLike, " B"]) -> lx.DiagonalLinearOperator:
+    def covariance(self, y: Float[ArrayLike, " B"]) -> lx.AbstractLinearOperator:
         """``diag((y / SNR)² + σ_floor²)``, differentiable in ``y``."""
         y = _check_y("SNRNoise", y, self.snr)
-        return lx.DiagonalLinearOperator((y / self.snr) ** 2 + self.floor**2)
+        return _diagonal_covariance((y / self.snr) ** 2 + self.floor**2)
+
+
+def _diagonal_covariance(variance: Float[Array, " B"]) -> lx.AbstractLinearOperator:
+    """``diag(variance)``, tagged so lineax and gaussx know it is positive definite.
+
+    A bare ``lx.DiagonalLinearOperator`` is not known to be positive (its
+    entries could be negative), so ``lx.CG`` refuses it; gaussx still takes
+    its diagonal fast paths through the tag.
+    """
+    return lx.TaggedLinearOperator(
+        lx.DiagonalLinearOperator(variance),
+        (lx.positive_semidefinite_tag, lx.symmetric_tag, lx.diagonal_tag),
+    )
 
 
 def _check_bands(name: str, **fields: Float[Array, "*_shape"]) -> None:
