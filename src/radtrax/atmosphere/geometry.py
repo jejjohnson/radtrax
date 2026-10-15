@@ -12,6 +12,22 @@ differentiates through them, and :meth:`ViewingGeometry.air_mass` is the
 air-mass factor on the gradient path. Surfaces and solvers take one
 ``ViewingGeometry``, so the azimuth the v1 kernel BRDFs need is already
 there.
+
+:meth:`ViewingGeometry.layer_air_mass` is the spherical-shell (Chapman)
+air mass of each layer (radtrax#104): the straight slant path through the
+shell between the layer's bottom and top, ``z_b`` and ``z_t``, over its
+thickness, one way at zenith angle θ (``μ = cos θ``):
+
+$$
+m(\\theta) = \\frac{\\sqrt{(R + z_t)^2 - R^2\\sin^2\\theta}
+    - \\sqrt{(R + z_b)^2 - R^2\\sin^2\\theta}}{z_t - z_b}
+  = \\frac{2R + z_t + z_b}{\\sqrt{R^2\\mu^2 + 2Rz_t + z_t^2}
+    + \\sqrt{R^2\\mu^2 + 2Rz_b + z_b^2}},
+$$
+
+written in the second form, which does not cancel. It tends to ``1/μ`` as
+``z/R → 0`` and stays finite at θ = 90° for a layer above the surface. It
+ignores refraction.
 """
 
 from __future__ import annotations
@@ -19,6 +35,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
+from geonnax.geo import EARTH_MEAN_RADIUS_M
 from jaxtyping import Array, ArrayLike, Float, Real
 
 
@@ -112,6 +129,54 @@ class ViewingGeometry(eqx.Module):
     def air_mass(self) -> Float[Array, ""]:
         """Plane-parallel two-way air-mass factor ``m = 1/μ₀ + 1/μ``."""
         return 1.0 / self.mu0 + 1.0 / self.mu
+
+    def layer_air_mass(
+        self,
+        z_m: Float[ArrayLike, " L"],
+        dz_m: Float[ArrayLike, " L"],
+        *,
+        earth_radius_m: float = EARTH_MEAN_RADIUS_M,
+    ) -> Float[Array, " L"]:
+        """Spherical-shell two-way air mass of each layer, ``m(θ₀) + m(θ)``.
+
+        Args:
+            z_m: Height of each layer's middle above the surface [m], ``(L,)``.
+            dz_m: Thickness of each layer [m], ``(L,)``.
+            earth_radius_m: Radius of the sphere through the surface [m]; the
+                default is the IUGG mean Earth radius
+                (``geonnax.geo.EARTH_MEAN_RADIUS_M``).
+
+        Returns:
+            The layer air masses, ``(L,)``; each tends to :meth:`air_mass`
+            as ``z/R → 0``.
+
+        Examples:
+            >>> import jax.numpy as jnp
+            >>> geometry = ViewingGeometry.from_angles(60.0, 0.0)
+            >>> m = geometry.layer_air_mass(jnp.array([500.0]), jnp.array([1000.0]))
+            >>> round(float(m[0]), 4)  # just under the plane-parallel 3
+            2.9995
+        """
+        z, dz = jnp.asarray(z_m, dtype=float), jnp.asarray(dz_m, dtype=float)
+        z_b, z_t = z - dz / 2, z + dz / 2
+        return _shell_air_mass(self.mu0, z_b, z_t, earth_radius_m) + _shell_air_mass(
+            self.mu, z_b, z_t, earth_radius_m
+        )
+
+
+def _shell_air_mass(
+    mu: Float[Array, ""],
+    z_b: Float[Array, " L"],
+    z_t: Float[Array, " L"],
+    radius: float,
+) -> Float[Array, " L"]:
+    """One-way slant path through each shell over its thickness (module docstring)."""
+
+    def root(z: Float[Array, " L"]) -> Float[Array, " L"]:
+        # √(R²μ² + 2Rz + z²), positive: ViewingGeometry keeps μ > 0.
+        return jnp.sqrt((radius * mu) ** 2 + z * (2 * radius + z))
+
+    return (2 * radius + z_t + z_b) / (root(z_t) + root(z_b))
 
 
 def _cosine(name: str, value: Real[ArrayLike, ""]) -> Float[Array, ""]:
