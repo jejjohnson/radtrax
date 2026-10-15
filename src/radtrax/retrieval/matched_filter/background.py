@@ -73,17 +73,15 @@ def estimate_mean(
         Huber influence threshold in units of the per-band MAD. Ignored
         unless ``method='huber'``.
 
+    Pixels with a non-finite band (NaN fill, saturated or missing data) are
+    left out, as in every estimator of this module.
+
     Returns
     -------
     np.ndarray
         Mean spectrum of length ``n_bands``.
     """
-    cube_np = np.asarray(cube)
-    if cube_np.ndim != 3:
-        raise ValueError(
-            f"estimate_mean: cube must be (H, W, n_bands), got shape {cube_np.shape}."
-        )
-    X = cube_np.reshape(-1, cube_np.shape[-1])
+    X = _flatten_cube_masked(cube, None, min_samples=1)
     if method == "mean":
         return X.mean(axis=0)
     if method == "median":
@@ -189,6 +187,96 @@ def estimate_cov_shrunk(
             f"estimate_cov_shrunk: method must be 'ledoit_wolf' or 'oas'; got {method!r}."
         )
     return _dense_operator(est.covariance_)
+
+
+def shrink_covariance(
+    empirical: Float[Array, "B B"] | np.ndarray,
+    *,
+    method: Literal["ledoit_wolf", "oas"],
+    n_samples: int,
+    fourth_moment: float | None = None,
+) -> np.ndarray:
+    """Shrink a ``1/n`` empirical covariance toward a scaled identity.
+
+    Returns ``(1 − s)·Sₙ + s·μ·I`` with ``μ = tr(Sₙ)/p``, where ``Sₙ`` is the
+    maximum-likelihood (``1/n``) scatter of ``n`` samples in ``p`` bands — the
+    normalisation every estimator in this module uses — and the intensity
+    ``s ∈ [0, 1]`` is estimated from the data. Both methods reproduce
+    scikit-learn's :class:`~sklearn.covariance.LedoitWolf` and
+    :class:`~sklearn.covariance.OAS` exactly. This is the form a streaming
+    pass needs (:func:`~radtrax.retrieval.matched_filter.streaming.streaming_background`),
+    where only the moments, not the samples, are kept.
+
+    - ``"ledoit_wolf"`` (Ledoit & Wolf 2004), with ``dₖ = xₖ − x̄`` and
+      ``m₄ = (1/n) Σₖ ‖dₖ‖⁴``::
+
+          δ² = ‖Sₙ − μ I‖²_F
+          β̄² = (1/n²) Σₖ ‖dₖdₖᵀ − Sₙ‖²_F = (m₄ − ‖Sₙ‖²_F) / n
+          s  = min(β̄², δ²) / δ²                    (0 when δ² = 0)
+
+      β̄² needs the fourth moment ``m₄``, which ``Sₙ`` alone does not carry.
+
+    - ``"oas"`` (Chen et al. 2010, as scikit-learn implements it, without
+      the ``2/p`` terms of their Eq. 23)::
+
+          s = min(1, (tr(Sₙ²) + tr(Sₙ)²) / ((n + 1)·(tr(Sₙ²) − tr(Sₙ)²/p)))
+
+    Parameters
+    ----------
+    empirical
+        ``1/n`` empirical covariance ``Σₖ dₖdₖᵀ / n``, shape ``(B, B)``.
+    method
+        Shrinkage-intensity estimator.
+    n_samples
+        Number of samples behind ``empirical``.
+    fourth_moment
+        ``m₄`` over the same centred samples; required for
+        ``"ledoit_wolf"``, ignored by ``"oas"``.
+        :meth:`~radtrax.retrieval.matched_filter.streaming.WelfordAccumulator.fourth_moment`
+        tracks it.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> x = np.random.default_rng(0).normal(size=(30, 4))
+    >>> d = x - x.mean(axis=0)
+    >>> s_n = d.T @ d / 30
+    >>> m4 = float(np.mean(np.sum(d * d, axis=1) ** 2))
+    >>> shrink_covariance(
+    ...     s_n, method="ledoit_wolf", n_samples=30, fourth_moment=m4
+    ... ).shape
+    (4, 4)
+    """
+    cov = np.asarray(empirical, dtype=float)
+    if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
+        raise ValueError(
+            f"shrink_covariance: empirical must be square, got shape {cov.shape}."
+        )
+    if n_samples < 1:
+        raise ValueError(f"shrink_covariance: n_samples must be ≥ 1, got {n_samples}.")
+    p = cov.shape[0]
+    mu = float(np.trace(cov)) / p
+    fro_sq = float(np.sum(cov * cov))
+    if method == "oas":
+        trace_sq = float(np.trace(cov)) ** 2
+        denom = (n_samples + 1) * (fro_sq - trace_sq / p)
+        shrinkage = 1.0 if denom <= 0 else min(1.0, (fro_sq + trace_sq) / denom)
+    elif method == "ledoit_wolf":
+        if fourth_moment is None:
+            raise ValueError(
+                "shrink_covariance: 'ledoit_wolf' needs fourth_moment = "
+                "mean(‖xₖ − x̄‖⁴) over the samples (WelfordAccumulator.fourth_moment())."
+            )
+        diff = cov - mu * np.eye(p)
+        d_sq = float(np.sum(diff * diff))
+        b_bar_sq = max((float(fourth_moment) - fro_sq) / n_samples, 0.0)
+        b_sq = min(b_bar_sq, d_sq)
+        shrinkage = 0.0 if b_sq == 0 else b_sq / d_sq
+    else:
+        raise ValueError(
+            f"shrink_covariance: method must be 'ledoit_wolf' or 'oas'; got {method!r}."
+        )
+    return (1.0 - shrinkage) * cov + shrinkage * mu * np.eye(p)
 
 
 # ── low-rank covariance (Woodbury-friendly) ──────────────────────────────────
@@ -319,30 +407,44 @@ def _flatten_cube(cube: Float[Array, "H W B"] | np.ndarray) -> np.ndarray:
     return arr.reshape(-1, arr.shape[-1])
 
 
+def _finite_pixels(X: np.ndarray) -> np.ndarray:
+    """Boolean ``(...)`` mask of pixels whose bands (last axis) are all finite.
+
+    The one validity rule of the matched filter: a pixel with any non-finite
+    band (NaN fill, missing or saturated data) is left out of every statistic.
+    """
+    return np.asarray(np.isfinite(X).all(axis=-1), dtype=bool)
+
+
 def _flatten_cube_masked(
     cube: Float[Array, "H W B"] | np.ndarray,
     mask: np.ndarray | None,
+    *,
+    min_samples: int = 2,
 ) -> np.ndarray:
-    """Flatten a cube to ``(n_kept, n_bands)``, dropping masked-out pixels.
+    """Flatten a cube to ``(n_kept, n_bands)``, dropping excluded pixels.
 
-    ``mask`` is a boolean **exclude** mask — ``True`` marks pixels (e.g.
-    detected plume / target) to leave out of the background statistics so the
-    filter is not attenuated by its own signal. Any shape with one entry per
-    pixel is accepted (``(H, W)`` or flat).
+    A pixel is excluded when any of its bands is non-finite (a NaN fill,
+    missing data) or when ``mask`` flags it. ``mask`` is a boolean **exclude**
+    mask — ``True`` marks pixels (e.g. detected plume / target) to leave out of
+    the background statistics so the filter is not attenuated by its own
+    signal. Any shape with one entry per pixel is accepted (``(H, W)`` or
+    flat).
     """
     X = _flatten_cube(cube)
-    if mask is None:
-        return X
-    m = np.asarray(mask, dtype=bool).reshape(-1)
-    if m.shape[0] != X.shape[0]:
+    keep = _finite_pixels(X)
+    if mask is not None:
+        m = np.asarray(mask, dtype=bool).reshape(-1)
+        if m.shape[0] != X.shape[0]:
+            raise ValueError(
+                f"background estimator: `mask` must have one entry per pixel "
+                f"({X.shape[0]}), got {m.size}."
+            )
+        keep &= ~m
+    kept = X if keep.all() else X[keep]
+    if kept.shape[0] < min_samples:
         raise ValueError(
-            f"background estimator: `mask` must have one entry per pixel "
-            f"({X.shape[0]}), got {m.size}."
-        )
-    kept = X[~m]
-    if kept.shape[0] < 2:
-        raise ValueError(
-            "background estimator: `mask` excludes all but "
-            f"{kept.shape[0]} pixel(s); need ≥ 2 for a covariance estimate."
+            f"background estimator: {kept.shape[0]} of {X.shape[0]} pixel(s) are "
+            f"finite and not masked; need ≥ {min_samples}."
         )
     return kept
