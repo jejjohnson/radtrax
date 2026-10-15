@@ -38,6 +38,8 @@ dependencies = [
     "lineax>=0.1",
     "optimistix>=0.1",
     "gaussx>=0.6.5",
+    # Legendre polynomials for the spectral albedo (geonnax.basis).
+    "geonnax>=0.0.9",
     "numpy>=2.0",
     "xarray",
     # backs the compressed-NetCDF round-trip of the cross-section tables.
@@ -75,6 +77,7 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 # requirements above, so radtrax installs with uv until both are on PyPI (#25).
 [tool.uv.sources]
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
 geotoolz = { git = "https://github.com/jejjohnson/geotoolz", tag = "geotoolz-v0.10.3", subdirectory = "packages/geotoolz" }
 
 [dependency-groups]
