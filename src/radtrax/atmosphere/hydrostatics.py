@@ -26,7 +26,8 @@ US Standard profile, and surface gravity varies with latitude by ±0.27 %.
 
 Inputs are cast to floating point (integer pressures would truncate the
 means). Pressures must be positive and strictly decreasing: checked eagerly
-with a ``ValueError``, and under ``jit`` / ``vmap`` with ``eqx.error_if``.
+with a [`GridError`][radtrax.GridError], and under ``jit`` / ``vmap`` with
+``eqx.error_if``, which raises a ``RuntimeError`` at run time.
 """
 
 from __future__ import annotations
@@ -43,6 +44,7 @@ from radtrax.atmosphere.gas import (
     STANDARD_GRAVITY_M_PER_S2,
 )
 from radtrax.atmosphere.state import AtmosphericState
+from radtrax.exceptions import GridError, ShapeError
 
 
 __all__ = ["layers_from_levels"]
@@ -91,12 +93,12 @@ def layers_from_levels(
     p = p.astype(jnp.result_type(p, float))
     t = jnp.asarray(t_levels_k, dtype=p.dtype)
     if p.ndim != 1 or p.shape[0] < 2:
-        raise ValueError(
+        raise ShapeError(
             f"layers_from_levels: need (L + 1,) levels with L ≥ 1, got {p.shape}."
         )
     for name, value in {"t_levels_k": t, **vmr_levels}.items():
         if jnp.shape(value) != p.shape:
-            raise ValueError(
+            raise ShapeError(
                 f"layers_from_levels: {name} has shape {jnp.shape(value)}, "
                 f"p_levels_pa has {p.shape}."
             )
@@ -144,7 +146,7 @@ def _check_decreasing(p: Float[Array, " L1"]) -> None:
     except (jax.errors.TracerBoolConversionError, jax.errors.ConcretizationTypeError):
         return
     if not ok:
-        raise ValueError(
+        raise GridError(
             "layers_from_levels: level pressures must be positive and strictly "
             "decreasing upwards (surface first)."
         )

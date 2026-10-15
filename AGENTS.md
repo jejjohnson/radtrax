@@ -27,7 +27,7 @@ the layout drifts:
 
 | Module | Owns | Lands in |
 |---|---|---|
-| `exceptions.py` | `RadtraxError`, the base of every error | now |
+| `exceptions.py` | `RadtraxError`, the base of every error, and one subclass per kind of failure (`ShapeError`, `GridError`, `ParameterError`, …) | now |
 | `forward_model.py` | `ForwardModel`: state → opacity → solver → instrument, per pixel (#37); its matched-filter target, `unit_absorption_target`, lives in `retrieval/matched_filter/target.py` | now |
 | `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) and `ViewingGeometry`, the JAX geometry surfaces and solvers take (#35) | now |
 | `spectroscopy/` | `opacity`: the `OpacityProvider` protocol and `TableOpacity`, per-layer τ (L, G) bilinear in (ln p, T) (#33); `tables`: single-slab cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `table_cache`: v0's tables in the user cache, `load_opacity`; `hitran/`: offline table building through HAPI (`[hitran]`, `python -m radtrax.spectroscopy.hitran GAS ...`) | ported (#20); `opacity`, `table_cache` (#33, #34) |
@@ -148,6 +148,12 @@ Everything composes because it keeps these contracts.
   standard-library exception, so `except ValueError` keeps working. A new
   error goes into `exceptions.py`, is exported, and is tested in
   `tests/test_exceptions.py`.
+- Raise an existing class from `exceptions.py` rather than a built-in;
+  `tests/test_exceptions.py` scans `src/radtrax` and fails on any
+  `raise ValueError` (or other built-in) outside its allow-list. Checks
+  under `jit` (`eqx.error_if`) raise a `RuntimeError` at run time
+  (`equinox.EquinoxRuntimeError` under `eqx.filter_jit`,
+  `jax.errors.JaxRuntimeError` under `jax.jit`); say so in the docstring.
 
 ### The public API
 

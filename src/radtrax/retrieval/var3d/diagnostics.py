@@ -32,6 +32,8 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 
+from radtrax.exceptions import ParameterError
+
 
 if TYPE_CHECKING:
     from radtrax.retrieval.var3d.control import WhiteningTransform
@@ -102,7 +104,7 @@ def degrees_of_freedom_for_signal(
     """
     if whitened:
         if background_op is not None:
-            raise ValueError(
+            raise ParameterError(
                 "degrees_of_freedom_for_signal: `whitened=True` uses the "
                 "whitened prior B_ξ = I; do not pass `background_op` (the ξ-space "
                 "Hessian already absorbs B via δx = U ξ)."
@@ -112,7 +114,7 @@ def degrees_of_freedom_for_signal(
             return z
     else:
         if background_op is None:
-            raise ValueError(
+            raise ParameterError(
                 "degrees_of_freedom_for_signal: model-space mode "
                 "(`whitened=False`) requires `background_op = B`; pass the "
                 "Hessian from build_cost_x, or set `whitened=True` for a "

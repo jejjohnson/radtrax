@@ -45,6 +45,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, Float
 
+from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.instrument.srf import FWHM_PER_SIGMA
 
 
@@ -75,6 +76,11 @@ class PointSpreadFunction(eqx.Module):
     array), so it cannot be a static ``jit`` argument or a dict key; pass it
     to ``eqx.filter_jit`` instead.
 
+    A kernel that sums to zero raises
+    [`DegenerateInputError`][radtrax.DegenerateInputError]; a traced kernel is
+    checked with ``eqx.error_if`` instead, which raises a ``RuntimeError`` at
+    run time.
+
     Attributes
     ----------
     kernel : Array
@@ -86,15 +92,15 @@ class PointSpreadFunction(eqx.Module):
     def __init__(self, kernel: Float[Array, "k k"] | np.ndarray) -> None:
         k = jnp.asarray(kernel, dtype=jnp.float64)
         if k.ndim != 2:
-            raise ValueError(
+            raise ShapeError(
                 f"PointSpreadFunction: kernel must be 2-D, got shape {k.shape}."
             )
         if k.shape[0] != k.shape[1]:
-            raise ValueError(
+            raise ShapeError(
                 f"PointSpreadFunction: kernel must be square, got {k.shape}."
             )
         if k.shape[0] % 2 != 1 or k.shape[0] < 3:
-            raise ValueError(
+            raise ShapeError(
                 f"PointSpreadFunction: kernel side length must be odd ≥ 3 (got {k.shape[0]})."
             )
         s = k.sum()
@@ -105,7 +111,7 @@ class PointSpreadFunction(eqx.Module):
             k = eqx.error_if(k, s == 0.0, "PointSpreadFunction: kernel sums to zero.")
         else:
             if sums_to_zero:
-                raise ValueError(
+                raise DegenerateInputError(
                     "PointSpreadFunction: kernel sums to zero; cannot normalise."
                 )
         self.kernel = k / s
@@ -129,7 +135,9 @@ class PointSpreadFunction(eqx.Module):
         and L1-normalised in ``__init__``.
         """
         if fwhm_pixels <= 0.0:
-            raise ValueError("PointSpreadFunction.gaussian: `fwhm_pixels` must be > 0.")
+            raise ParameterError(
+                "PointSpreadFunction.gaussian: `fwhm_pixels` must be > 0."
+            )
         c = kernel_size // 2
         y, x = np.ogrid[-c : c + 1, -c : c + 1]
         r2 = x * x + y * y
@@ -150,7 +158,7 @@ class PointSpreadFunction(eqx.Module):
         from scipy.special import j1
 
         if fwhm_pixels <= 0.0:
-            raise ValueError("PointSpreadFunction.airy: `fwhm_pixels` must be > 0.")
+            raise ParameterError("PointSpreadFunction.airy: `fwhm_pixels` must be > 0.")
         c = kernel_size // 2
         y, x = np.ogrid[-c : c + 1, -c : c + 1]
         r = np.sqrt(x * x + y * y)
@@ -164,7 +172,7 @@ class PointSpreadFunction(eqx.Module):
         """Forward blur: ``y = K * x`` per channel."""
         x = jnp.asarray(radiance)
         if x.ndim != 3:
-            raise ValueError(
+            raise ShapeError(
                 f"PointSpreadFunction.apply: input must be 3-D (ny, nx, n_lambda), "
                 f"got shape {x.shape}."
             )
@@ -183,7 +191,7 @@ class PointSpreadFunction(eqx.Module):
         """
         u = jnp.asarray(cotangent)
         if u.ndim != 3:
-            raise ValueError(
+            raise ShapeError(
                 f"PointSpreadFunction.adjoint: input must be 3-D, got shape {u.shape}."
             )
         return _convolve_channels(u, self.normalised_kernel[::-1, ::-1])
@@ -246,7 +254,7 @@ class GroundSamplingDistance(eqx.Module):
 
     def __check_init__(self) -> None:
         if self.downsample_factor < 1:
-            raise ValueError(
+            raise ParameterError(
                 f"GroundSamplingDistance: `downsample_factor` must be ≥ 1 "
                 f"(got {self.downsample_factor})."
             )
@@ -291,14 +299,14 @@ class GroundSamplingDistance(eqx.Module):
         """Forward down-sample by block mean."""
         x = jnp.asarray(radiance)
         if x.ndim != 3:
-            raise ValueError(
+            raise ShapeError(
                 f"GroundSamplingDistance.apply: input must be 3-D, got shape {x.shape}."
             )
         ny_hr, nx_hr, n_lambda = x.shape
         f = self.downsample_factor
         ny_lr, nx_lr = ny_hr // f, nx_hr // f
         if ny_lr == 0 or nx_lr == 0:
-            raise ValueError(
+            raise ShapeError(
                 f"GroundSamplingDistance.apply: input shape {x.shape[:2]} too small "
                 f"for factor {f}."
             )
@@ -324,14 +332,14 @@ class GroundSamplingDistance(eqx.Module):
         """
         u = jnp.asarray(cotangent)
         if u.ndim != 3:
-            raise ValueError(
+            raise ShapeError(
                 f"GroundSamplingDistance.adjoint: input must be 3-D, got shape {u.shape}."
             )
         ny_hr, nx_hr, n_lambda = hr_shape
         f = self.downsample_factor
         ny_lr, nx_lr = ny_hr // f, nx_hr // f
         if u.shape != (ny_lr, nx_lr, n_lambda):
-            raise ValueError(
+            raise ShapeError(
                 f"GroundSamplingDistance.adjoint: cotangent shape {u.shape} does not "
                 f"match expected {(ny_lr, nx_lr, n_lambda)} for hr_shape={hr_shape}."
             )

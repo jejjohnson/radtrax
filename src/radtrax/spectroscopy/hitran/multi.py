@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+from radtrax.exceptions import GridError, MissingKeyError
 from radtrax.spectroscopy.hitran.config import (
     ATMOSPHERIC_GASES,
     GasConfig,
@@ -113,12 +114,12 @@ def create_combined_lut(
 
     missing = [g for g in gases if g not in ATMOSPHERIC_GASES]
     if missing:
-        raise KeyError(f"Unknown gases: {missing}")
+        raise MissingKeyError(f"Unknown gases: {missing}")
 
     nu_min = max(ATMOSPHERIC_GASES[g].nu_min for g in gases)
     nu_max = min(ATMOSPHERIC_GASES[g].nu_max for g in gases)
     if nu_min >= nu_max:
-        raise ValueError(
+        raise GridError(
             f"Gases {gases} have no common spectral range ({nu_min:.1f} >= {nu_max:.1f})."
         )
     nu_grid = np.arange(nu_min, nu_max, grid_config.nu_step)

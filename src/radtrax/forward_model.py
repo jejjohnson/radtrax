@@ -29,6 +29,7 @@ from jaxtyping import Array, Float
 
 from radtrax.atmosphere.geometry import ViewingGeometry
 from radtrax.atmosphere.state import AtmosphericState
+from radtrax.exceptions import GridError
 from radtrax.instrument.spectral import Instrument
 from radtrax.optics.properties import OpticalProperties
 from radtrax.solvers.beer_lambert import RTSolver
@@ -91,7 +92,7 @@ class ForwardModel(eqx.Module):
     def __check_init__(self) -> None:
         nu_o, nu_i = self.opacity.nu_cm, self.instrument.nu_cm
         if jnp.shape(nu_o) != jnp.shape(nu_i):
-            raise ValueError(
+            raise GridError(
                 f"ForwardModel: the opacity has {jnp.shape(nu_o)} wavenumbers, "
                 f"the instrument {jnp.shape(nu_i)}."
             )
@@ -103,7 +104,7 @@ class ForwardModel(eqx.Module):
         ):
             return
         if not same:
-            raise ValueError(
+            raise GridError(
                 "ForwardModel: the opacity and the instrument are on different "
                 "wavenumber grids."
             )

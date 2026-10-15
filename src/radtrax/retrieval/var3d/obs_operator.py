@@ -44,6 +44,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
+from radtrax.exceptions import MissingKeyError, ShapeError
 from radtrax.instrument.psf import (
     GroundSamplingDistance,
     PointSpreadFunction,
@@ -97,12 +98,12 @@ class RadianceObservationModel(eqx.Module):
         a = jnp.asarray(absorption_coeff_hr)
         s = jnp.asarray(srf_matrix)
         if a.ndim != 1:
-            raise ValueError(
+            raise ShapeError(
                 f"RadianceObservationModel: absorption_coeff_hr must be 1-D, "
                 f"got shape {a.shape}."
             )
         if s.ndim != 2 or s.shape[1] != a.size:
-            raise ValueError(
+            raise ShapeError(
                 f"RadianceObservationModel: srf_matrix shape {s.shape} does not "
                 f"align with absorption_coeff_hr (n_lambda={a.size})."
             )
@@ -157,7 +158,7 @@ class RadianceObservationModel(eqx.Module):
         twin retrievals but physically wrong for anything cross-validated.
         """
         if var not in lut:
-            raise KeyError(
+            raise MissingKeyError(
                 f"RadianceObservationModel.from_lut: variable {var!r} not in "
                 f"dataset (have {list(lut.data_vars)})."
             )
@@ -206,7 +207,7 @@ class RadianceObservationModel(eqx.Module):
             (``ny_lr = ny_hr // f``, ``nx_lr = nx_hr // f`` if a GSD is set).
         """
         if vmr_field.ndim != 2:
-            raise ValueError(
+            raise ShapeError(
                 f"RadianceObservationModel.forward: vmr_field must be 2-D, got shape {vmr_field.shape}."
             )
         delta_vmr = vmr_field - self.vmr_reference

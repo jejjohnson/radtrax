@@ -19,6 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
+from radtrax.exceptions import MissingExtraError, MissingKeyError
 from radtrax.spectroscopy.hitran.config import (
     ATMOSPHERIC_GASES,
     GasConfig,
@@ -58,7 +59,7 @@ def gas_config_for(gas: str, grid: TableGrid = V0_GRID) -> GasConfig:
         KeyError: If ``gas`` has no HITRAN configuration.
     """
     if gas not in ATMOSPHERIC_GASES:
-        raise KeyError(
+        raise MissingKeyError(
             f"no HITRAN configuration for {gas!r} (have {sorted(ATMOSPHERIC_GASES)})."
         )
     return dataclasses.replace(
@@ -138,7 +139,7 @@ def _with_extra[**P, R](fn: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -
     except ModuleNotFoundError as err:
         if err.name != "hapi":
             raise
-        raise ImportError(
+        raise MissingExtraError(
             "building cross-section tables needs the [hitran] extra: "
             "pip install 'radtrax[hitran]'"
         ) from err

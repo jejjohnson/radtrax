@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Literal
 import lineax as lx
 import numpy as np
 
+from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.retrieval.matched_filter.background import (
     _dense_operator,
     _finite_pixels,
@@ -88,7 +89,7 @@ class WelfordAccumulator:
 
     def __post_init__(self) -> None:
         if self.n_bands <= 0:
-            raise ValueError("WelfordAccumulator: n_bands must be > 0.")
+            raise ParameterError("WelfordAccumulator: n_bands must be > 0.")
         self._mean = np.zeros(self.n_bands, dtype=float)
         self._M2 = np.zeros((self.n_bands, self.n_bands), dtype=float)
         self._M3 = np.zeros(self.n_bands, dtype=float)
@@ -100,7 +101,7 @@ class WelfordAccumulator:
         if arr.ndim == 3:
             arr = arr.reshape(-1, arr.shape[-1])
         if arr.ndim != 2 or arr.shape[1] != self.n_bands:
-            raise ValueError(
+            raise ShapeError(
                 f"WelfordAccumulator.update: expected shape (*, {self.n_bands}); "
                 f"got {arr.shape}."
             )
@@ -122,7 +123,7 @@ class WelfordAccumulator:
     def merge(self, other: WelfordAccumulator) -> WelfordAccumulator:
         """Combine with another accumulator on disjoint data (exact)."""
         if other.n_bands != self.n_bands:
-            raise ValueError(
+            raise ShapeError(
                 f"WelfordAccumulator.merge: n_bands mismatch "
                 f"({self.n_bands} vs {other.n_bands})."
             )
@@ -166,13 +167,13 @@ class WelfordAccumulator:
     def mean(self) -> np.ndarray:
         """Mean spectrum of the samples seen so far."""
         if self.count == 0:
-            raise ValueError("WelfordAccumulator.mean: no data yet.")
+            raise DegenerateInputError("WelfordAccumulator.mean: no data yet.")
         return self._mean.copy()
 
     def covariance(self, ddof: int = 1) -> np.ndarray:
         """Covariance ``M₂ / (count − ddof)``."""
         if self.count <= ddof:
-            raise ValueError(
+            raise DegenerateInputError(
                 f"WelfordAccumulator.covariance: need count > ddof; got count={self.count}."
             )
         return self._M2 / (self.count - ddof)
@@ -180,7 +181,7 @@ class WelfordAccumulator:
     def fourth_moment(self) -> float:
         """``m₄ = M₄ / count = (1/n) Σ ‖xₖ − x̄‖⁴``, the Ledoit–Wolf input."""
         if self.count == 0:
-            raise ValueError("WelfordAccumulator.fourth_moment: no data yet.")
+            raise DegenerateInputError("WelfordAccumulator.fourth_moment: no data yet.")
         return self._M4 / self.count
 
 
@@ -241,7 +242,7 @@ def streaming_background(
         )
         cov = shrunk * (acc.count / (acc.count - ddof))
     elif cov_kind != "empirical":
-        raise ValueError(
+        raise ParameterError(
             "streaming_background: cov_kind must be 'empirical', 'ledoit_wolf' "
             f"or 'oas'; got {cov_kind!r}."
         )

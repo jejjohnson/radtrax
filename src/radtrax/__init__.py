@@ -12,7 +12,19 @@ The design and roadmap live in the GeoStack docs (*radtrax · 3*).
 
 from __future__ import annotations
 
-from radtrax.exceptions import MissingTableError, RadtraxError
+from radtrax.exceptions import (
+    ArgumentTypeError,
+    DegenerateInputError,
+    GridError,
+    MissingExtraError,
+    MissingFileError,
+    MissingKeyError,
+    MissingTableError,
+    ParameterError,
+    RadtraxError,
+    ShapeError,
+    TableBuildError,
+)
 from radtrax.forward_model import ForwardModel
 from radtrax.retrieval.matched_filter.target import unit_absorption_target
 
@@ -20,9 +32,18 @@ from radtrax.retrieval.matched_filter.target import unit_absorption_target
 __version__ = "0.0.0"
 
 __all__ = [
+    "ArgumentTypeError",
+    "DegenerateInputError",
     "ForwardModel",
+    "GridError",
+    "MissingExtraError",
+    "MissingFileError",
+    "MissingKeyError",
     "MissingTableError",
+    "ParameterError",
     "RadtraxError",
+    "ShapeError",
+    "TableBuildError",
     "__version__",
     "unit_absorption_target",
 ]

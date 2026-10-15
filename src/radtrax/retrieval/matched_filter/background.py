@@ -34,6 +34,8 @@ import lineax as lx
 import numpy as np
 from jaxtyping import Array, Float
 
+from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
+
 
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
@@ -92,7 +94,7 @@ def estimate_mean(
         return trim_mean(X, proportiontocut=trim_proportion, axis=0)
     if method == "huber":
         return _huber_mean(X, c=huber_c)
-    raise ValueError(f"estimate_mean: unknown method {method!r}.")
+    raise ParameterError(f"estimate_mean: unknown method {method!r}.")
 
 
 def _huber_mean(
@@ -183,7 +185,7 @@ def estimate_cov_shrunk(
 
         est = OAS(assume_centered=assume_centered).fit(X)
     else:
-        raise ValueError(
+        raise ParameterError(
             f"estimate_cov_shrunk: method must be 'ledoit_wolf' or 'oas'; got {method!r}."
         )
     return _dense_operator(est.covariance_)
@@ -249,11 +251,13 @@ def shrink_covariance(
     """
     cov = np.asarray(empirical, dtype=float)
     if cov.ndim != 2 or cov.shape[0] != cov.shape[1]:
-        raise ValueError(
+        raise ShapeError(
             f"shrink_covariance: empirical must be square, got shape {cov.shape}."
         )
     if n_samples < 1:
-        raise ValueError(f"shrink_covariance: n_samples must be ≥ 1, got {n_samples}.")
+        raise ParameterError(
+            f"shrink_covariance: n_samples must be ≥ 1, got {n_samples}."
+        )
     p = cov.shape[0]
     mu = float(np.trace(cov)) / p
     fro_sq = float(np.sum(cov * cov))
@@ -263,7 +267,7 @@ def shrink_covariance(
         shrinkage = 1.0 if denom <= 0 else min(1.0, (fro_sq + trace_sq) / denom)
     elif method == "ledoit_wolf":
         if fourth_moment is None:
-            raise ValueError(
+            raise ParameterError(
                 "shrink_covariance: 'ledoit_wolf' needs fourth_moment = "
                 "mean(‖xₖ − x̄‖⁴) over the samples (WelfordAccumulator.fourth_moment())."
             )
@@ -273,7 +277,7 @@ def shrink_covariance(
         b_sq = min(b_bar_sq, d_sq)
         shrinkage = 0.0 if b_sq == 0 else b_sq / d_sq
     else:
-        raise ValueError(
+        raise ParameterError(
             f"shrink_covariance: method must be 'ledoit_wolf' or 'oas'; got {method!r}."
         )
     return (1.0 - shrinkage) * cov + shrinkage * mu * np.eye(p)
@@ -330,7 +334,7 @@ def estimate_cov_lowrank(
         VᵀL⁻¹U`` blow up to inf/NaN; dropping them keeps every score finite.
     """
     if tikhonov <= 0.0:
-        raise ValueError("estimate_cov_lowrank: tikhonov must be > 0.")
+        raise ParameterError("estimate_cov_lowrank: tikhonov must be > 0.")
     X = _flatten_cube_masked(cube, mask)
     mu = X.mean(axis=0) if mean is None else np.asarray(mean)
     Xc = X - mu
@@ -401,7 +405,7 @@ lowrank_factors = jax.jit(
 def _flatten_cube(cube: Float[Array, "H W B"] | np.ndarray) -> np.ndarray:
     arr = np.asarray(cube)
     if arr.ndim != 3:
-        raise ValueError(
+        raise ShapeError(
             f"background estimator: cube must be (H, W, n_bands), got shape {arr.shape}."
         )
     return arr.reshape(-1, arr.shape[-1])
@@ -436,14 +440,14 @@ def _flatten_cube_masked(
     if mask is not None:
         m = np.asarray(mask, dtype=bool).reshape(-1)
         if m.shape[0] != X.shape[0]:
-            raise ValueError(
+            raise ShapeError(
                 f"background estimator: `mask` must have one entry per pixel "
                 f"({X.shape[0]}), got {m.size}."
             )
         keep &= ~m
     kept = X if keep.all() else X[keep]
     if kept.shape[0] < min_samples:
-        raise ValueError(
+        raise DegenerateInputError(
             f"background estimator: {kept.shape[0]} of {X.shape[0]} pixel(s) are "
             f"finite and not masked; need ≥ {min_samples}."
         )
