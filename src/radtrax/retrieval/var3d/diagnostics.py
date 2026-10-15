@@ -63,7 +63,7 @@ def reduced_chi_squared(
     """
     y = jnp.asarray(observation)
     R_inv = jnp.asarray(obs_inv_variance)
-    residual = y - forward_fn(estimated_state)
+    residual = y - forward_fn(jnp.asarray(estimated_state))
     chi2 = float(jnp.sum(R_inv * residual * residual))
     return chi2 / int(y.size)
 
