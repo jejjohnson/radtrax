@@ -8,7 +8,7 @@ is not quoted (``Float[Array, B]``). Module aliases such as
 ``Spectrum = Float[np.ndarray, " B"]`` pass. The dimension names are listed in
 the "Shapes" section of AGENTS.md.
 
-``ALLOWED`` holds the signatures not yet annotated (#81); it only shrinks.
+``ALLOWED`` is empty since #81: annotate a new signature rather than list it.
 """
 
 from __future__ import annotations
@@ -36,19 +36,8 @@ JAXTYPING_DTYPES = {
     "UInt",
 }
 
-# Public signatures without shapes, as "path::qualname"; each #81 PR deletes
-# its subpackage's block.
-ALLOWED: frozenset[str] = frozenset(
-    {
-        # spectroscopy + atmosphere + geo
-        "atmosphere/geometry.py::air_mass_factor",
-        "geo/srf.py::sentinel2_srf",
-        "spectroscopy/hitran/generator.py::build_lut_dataset",
-        "spectroscopy/hitran/generator.py::compute_absorption_lut",
-        "spectroscopy/tables.py::absorption_coefficient",
-        "spectroscopy/tables.py::transmittance",
-    }
-)
+# Public signatures without shapes, as "path::qualname".
+ALLOWED: frozenset[str] = frozenset()
 
 
 def _is_public(path: Path) -> bool:

@@ -12,6 +12,7 @@ import warnings
 from collections.abc import Sequence
 
 import numpy as np
+from jaxtyping import ArrayLike, Float
 
 from radtrax.exceptions import GridError, MissingExtraError, MissingKeyError
 from radtrax.instrument.srf import SpectralResponseFunction, _bin_widths
@@ -51,7 +52,7 @@ def _hat_weights(fine: np.ndarray, grid: np.ndarray) -> np.ndarray:
 def sentinel2_srf(
     satellite: str = "S2A",
     *,
-    wavelengths_hr_nm: Sequence[float] | np.ndarray | None = None,
+    wavelengths_hr_nm: Sequence[float] | Float[ArrayLike, " Ghr"] | None = None,
     bands: Sequence[str] | None = None,
 ) -> SpectralResponseFunction:
     """Build a Sentinel-2 SRF from the agency table georeader bundles.

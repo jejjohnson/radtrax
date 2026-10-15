@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import numpy as np
 import xarray as xr
+from jaxtyping import Float
 
 # The one home of the constants, number density and air-mass factor
 # (radtrax#27); re-exported here, where plumax defined them.
@@ -77,24 +78,24 @@ def interpolate_cross_section(
 
 
 def absorption_coefficient(
-    sigma: xr.DataArray | np.ndarray,
+    sigma: xr.DataArray | Float[np.ndarray, "*shape"],
     *,
     vmr: float,
     p_atm: float,
     T_K: float,
-) -> xr.DataArray | np.ndarray:
+) -> xr.DataArray | Float[np.ndarray, "*shape"]:
     """α(ν) = σ(ν) · N_gas [1/cm]."""
     n_total = number_density(p_atm, T_K)
     return sigma * (n_total * vmr)
 
 
 def transmittance(
-    alpha: xr.DataArray | np.ndarray,
+    alpha: xr.DataArray | Float[np.ndarray, "*shape"],
     *,
     l_vert_cm: float,
     sza_deg: float,
     vza_deg: float,
-) -> xr.DataArray | np.ndarray:
+) -> xr.DataArray | Float[np.ndarray, "*shape"]:
     """τ(ν) = exp(-α · L_vert · AMF)."""
     amf = air_mass_factor(sza_deg, vza_deg)
     return np.exp(-alpha * l_vert_cm * amf)

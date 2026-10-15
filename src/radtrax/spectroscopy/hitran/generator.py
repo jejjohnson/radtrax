@@ -22,6 +22,7 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
+from jaxtyping import Float
 
 from radtrax.exceptions import ParameterError, TableBuildError
 from radtrax.spectroscopy.hitran.config import (
@@ -30,6 +31,16 @@ from radtrax.spectroscopy.hitran.config import (
     LUTGridConfig,
 )
 
+
+__all__ = [
+    "HAPI_CACHE_ENV",
+    "build_lut_dataset",
+    "compute_absorption_lut",
+    "default_cache_dir",
+    "fetch_hitran_data",
+    "generate_single_gas_lut",
+    "save_lut",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -207,7 +218,9 @@ def compute_absorption_lut(
     *,
     cache_dir: Path | str | None = None,
     progress: bool = True,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[
+    Float[np.ndarray, " G"], Float[np.ndarray, "G T P"], Float[np.ndarray, " G"]
+]:
     """Evaluate σ(ν, T, P) on the full LUT grid.
 
     Assumes ``fetch_hitran_data`` has already populated the cache. Fails
@@ -287,9 +300,9 @@ def compute_absorption_lut(
 def build_lut_dataset(
     gas_config: GasConfig,
     grid_config: LUTGridConfig,
-    nu_grid: np.ndarray,
-    sigma_lut: np.ndarray,
-    wavelength_nm: np.ndarray,
+    nu_grid: Float[np.ndarray, " G"],
+    sigma_lut: Float[np.ndarray, "G T P"],
+    wavelength_nm: Float[np.ndarray, " G"],
 ) -> xr.Dataset:
     """Wrap the raw LUT arrays in a CF-conformant ``xarray.Dataset``."""
     now = datetime.now(UTC).isoformat()

@@ -30,8 +30,8 @@ _COSINE_SLACK = 1e-9
 
 
 def air_mass_factor(
-    sza_deg: float | np.ndarray, vza_deg: float | np.ndarray
-) -> float | np.ndarray:
+    sza_deg: Real[ArrayLike, "*#shape"], vza_deg: Real[ArrayLike, "*#shape"]
+) -> Float[ArrayLike, "*#shape"]:
     """Plane-parallel two-way air-mass factor, sun → surface → sensor.
 
     $$
