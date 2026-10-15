@@ -40,9 +40,9 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import equinox as eqx
-import jax
 import jax.numpy as jnp
 import numpy as np
+from jaxtyping import Array, ArrayLike, Float
 
 from radtrax.exceptions import MissingKeyError, ShapeError
 from radtrax.instrument.psf import (
@@ -81,17 +81,17 @@ class RadianceObservationModel(eqx.Module):
         the spectral cube is already at sensor resolution.
     """
 
-    absorption_coeff_hr: jax.Array
-    srf_matrix: jax.Array
-    vmr_reference: jax.Array
+    absorption_coeff_hr: Float[Array, " Ghr"]
+    srf_matrix: Float[Array, "B Ghr"]
+    vmr_reference: Float[Array, ""]
     psf: PointSpreadFunction | None = None
     gsd: GroundSamplingDistance | None = None
 
     def __init__(
         self,
-        absorption_coeff_hr: jax.Array,
-        srf_matrix: jax.Array,
-        vmr_reference: float | jax.Array = 0.0,
+        absorption_coeff_hr: Float[ArrayLike, " Ghr"],
+        srf_matrix: Float[ArrayLike, "B Ghr"],
+        vmr_reference: Float[ArrayLike, ""] = 0.0,
         psf: PointSpreadFunction | None = None,
         gsd: GroundSamplingDistance | None = None,
     ) -> None:
@@ -187,7 +187,9 @@ class RadianceObservationModel(eqx.Module):
 
     # ── forward operator ────────────────────────────────────────────────────
 
-    def forward(self, vmr_field: jax.Array, *, linear: bool = False) -> jax.Array:
+    def forward(
+        self, vmr_field: Float[Array, "H W"], *, linear: bool = False
+    ) -> Float[Array, "h w B"]:
         """Map a 2-D VMR field to a band-integrated obs cube.
 
         Parameters
@@ -224,7 +226,9 @@ class RadianceObservationModel(eqx.Module):
         # Band integration: contract last (HR-λ) axis with SRF.
         return jnp.einsum("bl, ijl -> ijb", self.srf_matrix, L_hr)
 
-    def make_forward(self, *, linear: bool = False) -> Callable[[jax.Array], jax.Array]:
+    def make_forward(
+        self, *, linear: bool = False
+    ) -> Callable[[Float[Array, "H W"]], Float[Array, "h w B"]]:
         """Return a closure ``vmr_field → obs`` with the model captured.
 
         The closure composes directly with ``jax.value_and_grad`` and the
@@ -239,7 +243,7 @@ class RadianceObservationModel(eqx.Module):
         """
         linear_flag = bool(linear)
 
-        def _fwd(vmr_field: jax.Array) -> jax.Array:
+        def _fwd(vmr_field: Float[Array, "H W"]) -> Float[Array, "h w B"]:
             return self.forward(vmr_field, linear=linear_flag)
 
         return _fwd

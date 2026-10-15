@@ -35,6 +35,7 @@ import gaussx as gx
 import jax
 import jax.numpy as jnp
 import numpy as np
+from jaxtyping import Array, ArrayLike, Float
 
 
 if TYPE_CHECKING:
@@ -44,6 +45,18 @@ if TYPE_CHECKING:
         IdentityTransform,
         WhiteningTransform,
     )
+
+
+__all__ = ["Cost", "build_cost_x", "build_cost_xi", "finite_difference_grad"]
+
+# Shapes: the state is a VMR field (H, W), flattened to (N,) for the optimiser;
+# H maps it to a band cube (h, w, B), coarser than (H, W) under a GSD.
+State = Float[Array, "H W"]
+StateVector = Float[Array, " N"]
+ObsCube = Float[Array, "h w B"]
+ForwardFn = Callable[[State], ObsCube]
+#: ``R⁻¹``: a scalar, or an array broadcastable against the obs cube.
+ObsInvVariance = float | Float[ArrayLike, "*#obs"]
 
 
 class Cost(eqx.Module):
@@ -75,11 +88,11 @@ def _flatten(arr):
 
 def build_cost_x(
     *,
-    forward_fn: Callable[[jax.Array], jax.Array],
+    forward_fn: ForwardFn,
     background_op: lx.AbstractLinearOperator,
-    obs_inv_variance: float | jax.Array,
-    background_state: jax.Array,
-    observation: jax.Array,
+    obs_inv_variance: ObsInvVariance,
+    background_state: Float[ArrayLike, "H W"],
+    observation: Float[ArrayLike, "h w B"],
     state_shape: tuple[int, ...],
 ) -> Cost:
     """Build ``J(δx) = ½ δxᵀ B⁻¹ δx + ½ (y − H(x_b + δx))ᵀ R⁻¹ (y − H(x_b + δx))``.
@@ -126,11 +139,11 @@ def build_cost_x(
 
 def build_cost_xi(
     *,
-    forward_fn: Callable[[jax.Array], jax.Array],
+    forward_fn: ForwardFn,
     whitening: WhiteningTransform | IdentityTransform,
-    obs_inv_variance: float | jax.Array,
-    background_state: jax.Array,
-    observation: jax.Array,
+    obs_inv_variance: ObsInvVariance,
+    background_state: Float[ArrayLike, "H W"],
+    observation: Float[ArrayLike, "h w B"],
     state_shape: tuple[int, ...],
 ) -> Cost:
     """Build ``J(ξ) = ½ ξᵀ ξ + ½ (y − H(x_b + U ξ))ᵀ R⁻¹ (…)``.
@@ -170,8 +183,11 @@ def build_cost_xi(
 
 
 def finite_difference_grad(
-    fn: Callable[[jax.Array], jax.Array], x: jax.Array, *, eps: float = 1e-6
-) -> np.ndarray:
+    fn: Callable[[Float[Array, "*shape"]], Float[Array, ""]],
+    x: Float[ArrayLike, "*shape"],
+    *,
+    eps: float = 1e-6,
+) -> Float[np.ndarray, "*shape"]:
     """Central finite differences — used only by tests to validate ``jax.grad``.
 
     O(N) function evaluations, so keep ``x.size`` small.

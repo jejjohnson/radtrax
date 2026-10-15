@@ -34,6 +34,9 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 import optimistix as optx
+from jaxtyping import Array, ArrayLike, Float
+
+from radtrax.retrieval.var3d.cost import ForwardFn
 
 
 if TYPE_CHECKING:
@@ -64,7 +67,7 @@ class SolveResult(eqx.Module):
 
 def run_lbfgs(
     cost: Cost,
-    initial_state: jax.Array,
+    initial_state: Float[ArrayLike, " N"],
     *,
     rtol: float = 1e-6,
     atol: float = 1e-9,
@@ -91,8 +94,8 @@ def run_lbfgs(
 
 def run_gauss_newton(
     *,
-    residual_fn: Callable[[jax.Array], jax.Array],
-    initial_state: jax.Array,
+    residual_fn: Callable[[Float[Array, " N"]], Float[Array, " M"]],
+    initial_state: Float[ArrayLike, " N"],
     linear_solver: lx.AbstractLinearSolver | None = None,
     rtol: float = 1e-6,
     atol: float = 1e-9,
@@ -127,11 +130,11 @@ def run_gauss_newton(
 
 def run_dual_psas(
     *,
-    forward_fn: Callable[[jax.Array], jax.Array],
+    forward_fn: ForwardFn,
     background_op: lx.AbstractLinearOperator,
     obs_inv_variance: float,
-    background_state: jax.Array,
-    observation: jax.Array,
+    background_state: Float[ArrayLike, "H W"],
+    observation: Float[ArrayLike, "h w B"],
     state_shape: tuple[int, ...],
     cg_rtol: float = 1e-6,
     cg_atol: float = 1e-9,

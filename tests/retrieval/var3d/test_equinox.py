@@ -155,6 +155,7 @@ def test_vmap_over_a_stack_of_models_equals_a_loop(obs_model_with_psf) -> None:
     np.testing.assert_allclose(batched, looped, rtol=1e-14, atol=0)
 
 
+@pytest.mark.usefixtures("shapes_unchecked")
 def test_constructor_still_validates_shapes() -> None:
     with pytest.raises(ValueError, match="1-D"):
         RadianceObservationModel(jnp.ones((2, 2)), jnp.ones((3, 2)))

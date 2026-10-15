@@ -37,9 +37,9 @@ from typing import TYPE_CHECKING
 
 import equinox as eqx
 import gaussx as gx
-import jax
 import jax.numpy as jnp
 import lineax as lx
+from jaxtyping import Array, ArrayLike, Float
 
 
 if TYPE_CHECKING:
@@ -56,13 +56,13 @@ class IdentityTransform(eqx.Module):
     *or* when you want the textbook ``½ δxᵀ B⁻¹ δx`` form for didactic clarity.
     """
 
-    def apply(self, xi: jax.Array) -> jax.Array:
+    def apply(self, xi: Float[Array, " N"]) -> Float[Array, " N"]:
         return xi
 
-    def apply_inverse(self, delta_x: jax.Array) -> jax.Array:
+    def apply_inverse(self, delta_x: Float[Array, " N"]) -> Float[Array, " N"]:
         return delta_x
 
-    def project_gradient(self, g_x: jax.Array) -> jax.Array:
+    def project_gradient(self, g_x: Float[Array, " N"]) -> Float[Array, " N"]:
         return g_x
 
 
@@ -95,11 +95,11 @@ class WhiteningTransform(eqx.Module):
         U = gx.cholesky(background)
         return cls(cholesky_op=U)
 
-    def apply(self, xi: jax.Array) -> jax.Array:
+    def apply(self, xi: Float[ArrayLike, " N"]) -> Float[Array, " N"]:
         """``ξ → U ξ``."""
         return self.cholesky_op.mv(jnp.asarray(xi))
 
-    def apply_inverse(self, delta_x: jax.Array) -> jax.Array:
+    def apply_inverse(self, delta_x: Float[ArrayLike, " N"]) -> Float[Array, " N"]:
         """``δx → U⁻¹ δx`` via :func:`gaussx.solve` for structured dispatch.
 
         ``gaussx.cholesky`` returns operators that preserve their underlying
@@ -110,7 +110,7 @@ class WhiteningTransform(eqx.Module):
         """
         return gx.solve(self.cholesky_op, jnp.asarray(delta_x))
 
-    def project_gradient(self, g_x: jax.Array) -> jax.Array:
+    def project_gradient(self, g_x: Float[ArrayLike, " N"]) -> Float[Array, " N"]:
         """``∂J/∂ξ = Uᵀ ∂J/∂δx`` — the chain rule for the explicit-cost form.
 
         Not needed when you build the cost in ξ-space and let ``jax.grad``
