@@ -18,7 +18,7 @@ by 1.1 % (*radtrax · 2*, the GeoStack design note); pass the scene's
 background column as ``background_column`` (radtrax#36). For methane at
 1.9 ppm over a 1013 hPa column it is 0.678 mol/m² (0.0109 kg/m²). From a
 profile, ``AtmosphericState.column(gas)`` is in molecules/cm²: divide by
-``AVOGADRO_PER_MOL`` and multiply by 1e4 for mol/m².
+``AVOGADRO_PER_MOL`` and multiply by ``CM2_PER_M2`` for mol/m².
 
 Evaluating the integral per pixel is expensive, so we follow the Eucalyptus
 ``radtran()`` trick: pre-tabulate ``nB`` over a 1-D grid of ΔX values, then
@@ -52,7 +52,6 @@ from radtrax.atmosphere import gas
 from radtrax.instrument.srf import SpectralResponseFunction, check_srf_lut_coverage
 
 
-_M2_PER_CM2 = 1e-4
 #: ΔX rows per block when building the table.
 _CHUNK = 256
 #: Above any gas column of the atmosphere (all of the air is 3.6e5 mol/m²);
@@ -208,7 +207,7 @@ def build_nb_lut(
     # Convert ΔX [mol/m²] to the per-wavelength optical depth prefactor.
     #   τ_λ(ΔX) = σ_λ [cm²/molec] · ΔX [mol/m²] · N_A [molec/mol] · 1e-4 [m²/cm²] · AMF
     # No path_length_cm appears here — ΔX already integrates the column.
-    optical_coef = sigma_hr * gas.AVOGADRO_PER_MOL * _M2_PER_CM2 * amf  # (n_lambda,)
+    optical_coef = sigma_hr * gas.AVOGADRO_PER_MOL / gas.CM2_PER_M2 * amf  # (n_lambda,)
 
     # ΔX_k = ΔX_max (k / (n − 1))²: dense near 0, where τ_b(ΔX) curves most.
     delta_column = float(max_delta_column) * np.linspace(0.0, 1.0, int(n_grid)) ** 2

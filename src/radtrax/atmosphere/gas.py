@@ -14,6 +14,7 @@ __all__ = [
     "ATM_TO_PA",
     "AVOGADRO_PER_MOL",
     "BOLTZMANN_J_PER_K",
+    "CM2_PER_M2",
     "CM3_PER_M3",
     "DRY_AIR_MOLAR_MASS_KG_PER_MOL",
     "STANDARD_GRAVITY_M_PER_S2",
@@ -22,6 +23,7 @@ __all__ = [
 
 BOLTZMANN_J_PER_K: float = 1.380649e-23  # [J/K], exact (SI 2019)
 ATM_TO_PA: float = 101325.0  # [Pa/atm], exact
+CM2_PER_M2: float = 1e4
 CM3_PER_M3: float = 1e6
 AVOGADRO_PER_MOL: float = 6.02214076e23  # [1/mol], exact (SI 2019)
 STANDARD_GRAVITY_M_PER_S2: float = 9.80665  # [m/s²], exact (CGPM 1901)

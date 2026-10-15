@@ -15,9 +15,14 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-from jaxtyping import Array, Float
+from jaxtyping import Array, ArrayLike, Float
 
-from radtrax.atmosphere.gas import ATM_TO_PA, number_density
+from radtrax.atmosphere.gas import (
+    ATM_TO_PA,
+    AVOGADRO_PER_MOL,
+    CM2_PER_M2,
+    number_density,
+)
 
 
 __all__ = ["AtmosphericState"]
@@ -92,6 +97,58 @@ class AtmosphericState(eqx.Module):
             KeyError: If the state carries no ``gas``.
         """
         return jnp.sum(self.air_column() * self.vmr[gas])
+
+    def add_column(
+        self,
+        gas: str,
+        delta_column_mol_m2: Float[ArrayLike, ""],
+        profile: Float[ArrayLike, " L"] | None = None,
+    ) -> AtmosphericState:
+        """A copy with ``ΔX`` [mol/m²] more ``gas``, spread over the layers.
+
+        Layer ``l`` gains ``w_l ΔX`` with ``w = profile / Σ profile``, so the
+        column grows by exactly ``ΔX``:
+        ``Δx_l = w_l ΔX N_A / (n_l Δz_l)`` with the air column ``n_l Δz_l``
+        in molecules/m². Differentiable in ``ΔX`` and ``profile``; a plume's
+        unit-absorption target is ``∂ ln y / ∂ΔX`` through this.
+
+        Args:
+            gas: The gas, which the state must carry.
+            delta_column_mol_m2: Column enhancement ``ΔX`` [mol/m²].
+            profile: Relative weight per layer, ``(L,)``; the default puts
+                all of ``ΔX`` in the bottom layer.
+
+        Raises:
+            KeyError: If the state carries no ``gas``.
+            ValueError: If ``profile`` is not ``(L,)``.
+
+        Examples:
+            >>> import jax.numpy as jnp
+            >>> from radtrax.atmosphere import (
+            ...     AVOGADRO_PER_MOL,
+            ...     CM2_PER_M2,
+            ...     afgl_us_standard,
+            ... )
+            >>> atm = afgl_us_standard(z_top_km=3.0, gases=["CH4"])
+            >>> plume = atm.add_column("CH4", 0.1)
+            >>> added = (plume.column("CH4") - atm.column("CH4")) * CM2_PER_M2
+            >>> round(float(added / AVOGADRO_PER_MOL), 4)  # mol/m²
+            0.1
+        """
+        x = self.vmr[gas]
+        if profile is None:
+            weights = jnp.zeros_like(x).at[0].set(1.0)
+        else:
+            weights = jnp.asarray(profile, dtype=x.dtype)
+            if weights.shape != x.shape:
+                raise ValueError(
+                    f"AtmosphericState.add_column: profile must be (L,) = "
+                    f"{x.shape}, got {weights.shape}."
+                )
+            weights = weights / jnp.sum(weights)
+        # Air column per layer [mol/m²]: n Δz [molecules/cm²] × 1e4 / N_A.
+        air_mol_m2 = self.air_column() * CM2_PER_M2 / AVOGADRO_PER_MOL
+        return self.with_vmr(gas, x + weights * delta_column_mol_m2 / air_mol_m2)
 
     def with_vmr(self, gas: str, vmr: float | Float[Array, " L"]) -> AtmosphericState:
         """A copy with ``gas`` set to ``vmr`` [mol/mol] (a scalar fills every layer)."""

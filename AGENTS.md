@@ -28,6 +28,7 @@ the layout drifts:
 | Module | Owns | Lands in |
 |---|---|---|
 | `exceptions.py` | `RadtraxError`, the base of every error | now |
+| `forward_model.py` | `ForwardModel`: state → opacity → solver → instrument, per pixel (#37); its matched-filter target, `unit_absorption_target`, lives in `retrieval/matched_filter/target.py` | now |
 | `atmosphere/` | `state`: `AtmosphericState`; `hydrostatics`: `layers_from_levels`; `afgl`: the AFGL US Standard profile (#32); `gas`: ideal-gas constants, `number_density`; `geometry`: `air_mass_factor` (the one home of each, #27) and `ViewingGeometry`, the JAX geometry surfaces and solvers take (#35) | now |
 | `spectroscopy/` | `opacity`: the `OpacityProvider` protocol and `TableOpacity`, per-layer τ (L, G) bilinear in (ln p, T) (#33); `tables`: single-slab cross-section interpolation, Beer–Lambert transmittance, the plume ratio spectrum; `table_cache`: v0's tables in the user cache, `load_opacity`; `hitran/`: offline table building through HAPI (`[hitran]`, `python -m radtrax.spectroscopy.hitran GAS ...`) | ported (#20); `opacity`, `table_cache` (#33, #34) |
 | `optics/` | `properties`: `OpticalProperties`, τ (L, G) on its grid between opacity and solver (#35); Rayleigh, aerosols, delta-M from v3 | now |
@@ -35,7 +36,7 @@ the layout drifts:
 | `surface/` | `lambertian`: the `Surface` protocol and `Lambertian` (#35); kernel BRDFs from v1 | now |
 | `instrument/` | `spectral`: the `Instrument` protocol and `BandInstrument`, JAX band integration with a spectral shift (#36); `srf`: the one SRF band integration (exact Gaussian FWHM, #28), whose matrix `BandInstrument.from_srf` takes; `psf`: JAX point-spread and ground-sampling operators | ported (#21); `spectral` (#36) |
 | `slab/` | plumax's single-slab Beer–Lambert models (exact, Maclaurin, Taylor), the nB table (relative to a background column, #36), observation config; v0's regression oracle | ported (#21) |
-| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator, xarray I/O); `mbmp`: the Sentinel-2 MBMP signal (#30) | ported (#22, #23) |
+| `retrieval/` | `var3d/`: 3D-Var (observation operator, B, control transforms, three solvers, diagnostics); `matched_filter/`: the one core (backgrounds, clusters, streaming, targets from the observation operator and from `ForwardModel`, xarray I/O); `mbmp`: the Sentinel-2 MBMP signal (#30) | ported (#22, #23) |
 | `geo/` | `sentinel2_srf`: Sentinel-2 SRFs from georeader's bundled table (#28); `matched_filter`: pipekit operators on GeoTensors around the one core (#29); `mbmp`: the MBMP operator, geotoolz's former SBMP (#30) (`[geo]`) | ported (#28–#30) |
 
 ### Boundaries

@@ -13,12 +13,16 @@ The design and roadmap live in the GeoStack docs (*radtrax · 3*).
 from __future__ import annotations
 
 from radtrax.exceptions import MissingTableError, RadtraxError
+from radtrax.forward_model import ForwardModel
+from radtrax.retrieval.matched_filter.target import unit_absorption_target
 
 
 __version__ = "0.0.0"
 
 __all__ = [
+    "ForwardModel",
     "MissingTableError",
     "RadtraxError",
     "__version__",
+    "unit_absorption_target",
 ]
