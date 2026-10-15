@@ -5,13 +5,20 @@ Beer–Lambert transmittance, including the differential-ratio form used for
 plume-enhancement retrievals. ``hitran`` builds those tables offline from
 HITRAN through HAPI (the ``[hitran]`` extra).
 
-Line-by-line opacity arrives in v2 of the roadmap; the ``OpacityProvider``
-protocol and ``TableOpacity`` in Wave 3 (issue #33).
+``opacity`` turns them into per-layer optical depth for a layered
+atmosphere: the ``OpacityProvider`` protocol and ``TableOpacity``, bilinear
+in ``(ln p, T)`` (radtrax#33). Line-by-line opacity arrives in v2 of the
+roadmap.
 """
 
 from __future__ import annotations
 
-from radtrax.spectroscopy import hitran, tables
+from radtrax.spectroscopy import hitran, opacity, tables
+from radtrax.spectroscopy.opacity import (
+    CrossSectionTable,
+    OpacityProvider,
+    TableOpacity,
+)
 from radtrax.spectroscopy.tables import (
     absorption_coefficient,
     air_mass_factor,
@@ -24,12 +31,16 @@ from radtrax.spectroscopy.tables import (
 
 
 __all__ = [
+    "CrossSectionTable",
+    "OpacityProvider",
+    "TableOpacity",
     "absorption_coefficient",
     "air_mass_factor",
     "beers_law_from_lut",
     "hitran",
     "interpolate_cross_section",
     "number_density",
+    "opacity",
     "plume_ratio_spectrum",
     "tables",
     "transmittance",
