@@ -120,8 +120,9 @@ Everything composes because it keeps these contracts.
   Chapman factor or a delta-M scaling is a function.
 - **Protocols at the seams.** `OpacityProvider`, `RTSolver`, `Surface`,
   `Instrument` and `NoiseModel` are abstract Equinox modules
-  (`eqx.AbstractVar` and `eqx.abstractmethod` on the base, concrete fields
-  on the subclass), so `filter_jit` compiles each combination.
+  (`eqx.AbstractVar` fields and `abc.abstractmethod` methods on the base,
+  concrete fields on the subclass), so `filter_jit` compiles each
+  combination.
 - **`vmap` outside `jacrev`.** A swath is a `filter_vmap` over pixels of a
   per-pixel Jacobian, never a Jacobian of a batch.
 - **Gradients are tested.** Every public differentiable function has a test

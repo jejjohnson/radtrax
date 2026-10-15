@@ -32,7 +32,11 @@ from dataclasses import dataclass
 import numpy as np
 import xarray as xr
 
+from radtrax.atmosphere import gas
 from radtrax.instrument.srf import SpectralResponseFunction, check_srf_lut_coverage
+
+
+_M2_PER_CM2 = 1e-4
 
 
 @dataclass(frozen=True)
@@ -165,8 +169,7 @@ def build_nb_lut(
     # Convert ΔX [mol/m²] to the per-wavelength optical depth prefactor.
     #   τ_λ(ΔX) = σ_λ [cm²/molec] · ΔX [mol/m²] · N_A [molec/mol] · 1e-4 [m²/cm²] · AMF
     # No path_length_cm appears here — ΔX already integrates the column.
-    N_A = 6.02214076e23
-    optical_coef = sigma_hr * N_A * 1e-4 * amf  # (n_lambda,)
+    optical_coef = sigma_hr * gas.AVOGADRO_PER_MOL * _M2_PER_CM2 * amf  # (n_lambda,)
 
     delta_column = np.linspace(0.0, float(max_delta_column), int(n_grid))
     # Per-(band, ΔX) brightness: integrate exp(-optical_coef · ΔX) over the SRF.
