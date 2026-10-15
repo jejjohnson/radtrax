@@ -48,6 +48,7 @@ __all__ = [
     "estimate_cov_lowrank",
     "estimate_cov_shrunk",
     "estimate_mean",
+    "lowrank_factors",
     "shrink_covariance",
 ]
 
