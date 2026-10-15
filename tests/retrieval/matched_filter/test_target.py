@@ -142,3 +142,78 @@ def test_custom_pattern_extracts_pixel_at_argmax(obs_model_no_optics):
     t_auto = linear_target_from_obs(obs, x_b, pattern=pattern)
     t_explicit = linear_target_from_obs(obs, x_b, pattern=pattern, pixel=(1, 3))
     np.testing.assert_allclose(np.asarray(t_auto), np.asarray(t_explicit), atol=1e-12)
+
+
+# ── a GSD (radtrax#80) ───────────────────────────────────────────────────────
+
+
+def _jvp_at_output(obs, x_b, dx, out_pixel):
+    _, dL = jax.jvp(obs.make_forward(), (x_b,), (dx,))
+    return np.asarray(dL[out_pixel])
+
+
+@pytest.mark.parametrize("pixel", [(2, 2), (3, 3), (4, 5), (6, 8), (7, 9)])
+def test_impulse_with_a_gsd_reads_the_block_that_holds_it(obs_model_with_gsd, pixel):
+    """``pixel`` indexes the VMR grid; the target is read at ``pixel // 2``.
+
+    Before radtrax#80 it was read at ``pixel`` on the 2× smaller output grid:
+    zero for (2, 2) and (3, 3), out of bounds for (4, 5), (6, 8), (7, 9).
+    """
+    obs = obs_model_with_gsd
+    x_b = jnp.full((8, 10), 1.9e-6)
+    target = linear_target_from_obs(obs, x_b, pattern="impulse", pixel=pixel)
+    dx = jnp.zeros((8, 10)).at[pixel].set(1.0)
+    expected = _jvp_at_output(obs, x_b, dx, (pixel[0] // 2, pixel[1] // 2))
+    assert np.max(np.abs(expected)) > 0.0
+    np.testing.assert_array_equal(np.asarray(target), expected)
+    nonlinear = nonlinear_target_from_obs(
+        obs, x_b, amplitude=1e-9, pattern="impulse", pixel=pixel
+    )
+    # α·t to first order: the curvature term is ~(a·α)/2 ≈ 6e-5 of the
+    # target's scale here (entries run down to ~1e-200, so bound by the scale).
+    scale = 1e-9 * np.max(np.abs(expected))
+    np.testing.assert_allclose(
+        np.asarray(nonlinear), 1e-9 * expected, rtol=0, atol=1e-4 * scale
+    )
+
+
+def test_custom_pattern_with_a_gsd_reads_the_block_of_its_peak(obs_model_with_gsd):
+    obs = obs_model_with_gsd
+    x_b = jnp.full((8, 10), 1.9e-6)
+    pattern = np.zeros((8, 10))
+    pattern[5, 7] = 1.0
+    target = linear_target_from_obs(obs, x_b, pattern=pattern)
+    expected = _jvp_at_output(obs, x_b, jnp.asarray(pattern), (2, 3))
+    np.testing.assert_array_equal(np.asarray(target), expected)
+
+
+def test_out_of_bounds_pixel_with_a_gsd_names_the_vmr_grid(obs_model_with_gsd):
+    x_b = jnp.full((8, 10), 1.9e-6)
+    with pytest.raises(ValueError, match=r"vmr_field shape \(8, 10\)"):
+        linear_target_from_obs(obs_model_with_gsd, x_b, pattern="uniform", pixel=(8, 0))
+
+
+def test_gsd_crop_strip_is_out_of_bounds(obs_model_with_gsd):
+    """9 × 11 with f = 2: the GSD keeps 8 × 10; pixels past it raise."""
+    obs = obs_model_with_gsd
+    x_b = jnp.full((9, 11), 1.9e-6)
+    target = linear_target_from_obs(obs, x_b, pattern="impulse", pixel=(7, 9))
+    dx = jnp.zeros((9, 11)).at[7, 9].set(1.0)
+    np.testing.assert_array_equal(
+        np.asarray(target), _jvp_at_output(obs, x_b, dx, (3, 4))
+    )
+    with pytest.raises(ValueError, match=r"output pixel \(4, 0\)"):
+        linear_target_from_obs(obs, x_b, pattern="impulse", pixel=(8, 0))
+    # The default centre never falls in the crop.
+    linear_target_from_obs(obs, x_b, pattern="impulse")
+
+
+@pytest.mark.parametrize("pixel", [(2, 2), (2, 3), (3, 3), (5, 6)])
+def test_impulse_with_a_psf_and_a_gsd(obs_model_with_psf_and_gsd, pixel):
+    """A PSF before the GSD: still read at pixel // 2, block edges included."""
+    obs = obs_model_with_psf_and_gsd
+    x_b = jnp.full((8, 10), 1.9e-6)
+    target = linear_target_from_obs(obs, x_b, pattern="impulse", pixel=pixel)
+    dx = jnp.zeros((8, 10)).at[pixel].set(1.0)
+    expected = _jvp_at_output(obs, x_b, dx, (pixel[0] // 2, pixel[1] // 2))
+    np.testing.assert_array_equal(np.asarray(target), expected)
