@@ -66,7 +66,7 @@ they cannot see.
   the function and a missing extra names itself in the `ImportError`.
 - **Forward-model components** are `eqx.Module`s; arrays are leaves, never
   `eqx.field(static=True)`; abstract bases use `eqx.AbstractVar` and
-  `eqx.abstractmethod`, concrete classes plain fields.
+  `abc.abstractmethod`, concrete classes plain fields.
 - **Derivatives** come from `jax.jacrev` / `jax.jacfwd`; a hand Jacobian is
   only a test oracle; every public differentiable function has a
   finite-difference gradient test.
