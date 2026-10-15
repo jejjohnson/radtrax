@@ -70,6 +70,7 @@ plugins:
 nav:
   - Overview: index.md
   - Capability index: capabilities.md
+  - Forward model: forward_model.md
   - Atmosphere: atmosphere.md
   - Spectroscopy: spectroscopy.md
   - Optics: optics.md

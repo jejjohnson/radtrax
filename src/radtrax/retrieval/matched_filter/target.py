@@ -14,6 +14,10 @@ in the original snippet). Instead:
   strong plumes. For small ``α`` this reduces to ``α · t_linear`` and the MF
   score becomes scale-invariant to that choice.
 
+- **Unit-absorption target** :func:`unit_absorption_target` is
+  ``∂ ln y / ∂ΔX`` per pixel on the layered :class:`radtrax.ForwardModel`
+  (radtrax#37): the scene's own target, replacing a MODTRAN table.
+
 Ported from plumax 0.1.2 at 28f257e (``src/plumax/matched_filter/target.py``); the read-out
 pixel follows a GSD since radtrax#80.
 """
@@ -28,7 +32,13 @@ from jaxtyping import Array, Float
 
 
 if TYPE_CHECKING:
+    from jaxtyping import ArrayLike
+
+    from radtrax.atmosphere.geometry import ViewingGeometry
+    from radtrax.atmosphere.state import AtmosphericState
+    from radtrax.forward_model import ForwardModel
     from radtrax.retrieval.var3d.obs_operator import RadianceObservationModel
+    from radtrax.surface.lambertian import Surface
 
 
 Pattern = Literal["uniform", "impulse"]
@@ -195,3 +205,51 @@ def nonlinear_target_from_obs(
     return _read_out(
         L_perturbed - L_base, _vmr_pixel(vmr_background, pattern, pixel), obs
     )
+
+
+def unit_absorption_target(
+    model: ForwardModel,
+    state: AtmosphericState,
+    surface: Surface,
+    geometry: ViewingGeometry,
+    *,
+    gas: str = "CH4",
+    profile: Float[ArrayLike, " L"] | None = None,
+) -> Float[Array, " B"]:
+    """Matched-filter target ``t = ∂ ln y / ∂ΔX`` at ``ΔX = 0`` [per mol/m²].
+
+    One forward-mode derivative of the band log-radiance with respect to a
+    column enhancement ``ΔX`` of ``gas`` spread over the layers by
+    ``profile`` (default: the bottom layer, a plume at the surface; see
+    :meth:`~radtrax.atmosphere.AtmosphericState.add_column`). The scene
+    enters through ``state`` (water vapour, surface pressure, temperature),
+    ``geometry`` and ``surface``, so ``t`` is the scene's own unit
+    absorption spectrum. It is differentiable in all of them.
+
+    Feed it to :func:`apply_image` with a cube of ``ln y``, or as ``μ ⊙ t``
+    with a cube of ``y`` and background mean ``μ`` (``∂y/∂ΔX = y t``).
+    :func:`linear_target_from_obs` and :func:`nonlinear_target_from_obs`
+    are the targets of the single-slab
+    :class:`~radtrax.retrieval.var3d.RadianceObservationModel` (2-D fields,
+    PSF and GSD); this one is per pixel on the layered
+    :class:`~radtrax.ForwardModel`.
+
+    Args:
+        model: The forward model.
+        state: The background atmosphere.
+        surface: The surface.
+        geometry: Sun and sensor directions.
+        gas: The plume's gas.
+        profile: Relative weight of the plume per layer, ``(L,)``.
+
+    Returns:
+        ``t``, one value per band [1/(mol/m²)]; negative where the gas
+        absorbs.
+    """
+
+    def log_bands(delta: Float[Array, ""]) -> Float[Array, " B"]:
+        plume = state.add_column(gas, delta, profile)
+        return jnp.log(model(plume, surface, geometry))
+
+    # ΔX = 0 in the state's precision (float32 when x64 is off).
+    return jax.jacfwd(log_bands)(jnp.zeros((), dtype=state.vmr[gas].dtype))

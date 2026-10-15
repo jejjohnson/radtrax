@@ -18,6 +18,7 @@ import radtrax
 
 SUBMODULES = [
     "exceptions",
+    "forward_model",
 ]
 
 # The layout of radtrax · 3. Each subpackage owns one stage of the forward

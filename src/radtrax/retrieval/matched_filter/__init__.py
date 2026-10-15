@@ -25,7 +25,9 @@ Architecture
   :class:`gaussx.LowRankUpdate`, etc.) so the kernel is single-implementation.
 - **Target signatures** (``target``) — derived from an existing
   :class:`radtrax.retrieval.var3d.RadianceObservationModel` via
-  :func:`jax.jvp` (directional derivatives) or a finite-amplitude secant.
+  :func:`jax.jvp` (directional derivatives) or a finite-amplitude secant,
+  or per pixel from the layered :class:`radtrax.ForwardModel`
+  (``unit_absorption_target``, radtrax#37).
   No duplicate Beer–Lambert code.
 - **I/O** (``io``) — xarray wrappers for multi-scene workflows.
 
@@ -51,6 +53,7 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     # target
     "linear_target_from_obs": ("target", "linear_target_from_obs"),
     "nonlinear_target_from_obs": ("target", "nonlinear_target_from_obs"),
+    "unit_absorption_target": ("target", "unit_absorption_target"),
     # background
     "estimate_mean": ("background", "estimate_mean"),
     "estimate_cov_empirical": ("background", "estimate_cov_empirical"),
@@ -122,6 +125,7 @@ if TYPE_CHECKING:  # static type checkers see eagerly-imported symbols
     from radtrax.retrieval.matched_filter.target import (
         linear_target_from_obs,
         nonlinear_target_from_obs,
+        unit_absorption_target,
     )
 
 
