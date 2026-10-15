@@ -40,6 +40,13 @@ from typing import Literal
 
 import numpy as np
 
+from radtrax.exceptions import (
+    DegenerateInputError,
+    GridError,
+    ParameterError,
+    ShapeError,
+)
+
 
 # FWHM of a Gaussian in units of σ, exact: 2√(2 ln 2) ≈ 2.35482. plumax used
 # the rounded 2.355, which made σ 7.6e-5 too small relative to georeader's
@@ -117,35 +124,35 @@ class SpectralResponseFunction:
         self.band_names = tuple(self.band_names)
 
         if self.wavelengths_hr_nm.ndim != 1:
-            raise ValueError(
+            raise ShapeError(
                 "SpectralResponseFunction: `wavelengths_hr_nm` must be 1-D."
             )
         if self.band_centers_nm.shape != self.band_widths_nm.shape:
-            raise ValueError(
+            raise ShapeError(
                 "SpectralResponseFunction: band_centers and band_widths shapes must match."
             )
         if len(self.band_names) != self.band_centers_nm.size:
-            raise ValueError(
+            raise ShapeError(
                 "SpectralResponseFunction: `band_names` length must match number of bands."
             )
         if np.any(np.diff(self.wavelengths_hr_nm) <= 0.0):
-            raise ValueError(
+            raise GridError(
                 "SpectralResponseFunction: `wavelengths_hr_nm` must be strictly increasing."
             )
 
         if self.srf_type == "custom":
             if self.custom_srfs is None:
-                raise ValueError("srf_type='custom' requires `custom_srfs`.")
+                raise ParameterError("srf_type='custom' requires `custom_srfs`.")
             mat = np.asarray(self.custom_srfs, dtype=float)
             expected = (self.n_bands, self.n_lambda)
             if mat.shape != expected:
-                raise ValueError(
+                raise ShapeError(
                     f"`custom_srfs` shape {mat.shape} must equal {expected}"
                 )
         elif self.srf_type in {"gaussian", "rectangular", "triangular"}:
             mat = self._build_parametric_matrix()
         else:
-            raise ValueError(
+            raise ParameterError(
                 f"SpectralResponseFunction: unknown srf_type {self.srf_type!r}. "
                 "Use 'gaussian', 'rectangular', 'triangular', or 'custom'."
             )
@@ -163,7 +170,7 @@ class SpectralResponseFunction:
         # L1-normalise each band so a flat input gives a flat output.
         row_sums = mat.sum(axis=1, keepdims=True)
         if np.any(row_sums <= 0.0):
-            raise ValueError(
+            raise DegenerateInputError(
                 "SpectralResponseFunction: at least one band has zero total response "
                 "over the supplied wavelength grid — extend the grid or check band "
                 "centres/widths."
@@ -219,7 +226,7 @@ class SpectralResponseFunction:
         """
         x = np.asarray(radiance_hr, dtype=float)
         if x.shape[-1] != self.n_lambda:
-            raise ValueError(
+            raise ShapeError(
                 f"SpectralResponseFunction.apply: last axis size {x.shape[-1]} "
                 f"must equal n_lambda={self.n_lambda}"
             )
@@ -248,7 +255,7 @@ class SpectralResponseFunction:
         """
         u = np.asarray(cotangent_bands, dtype=float)
         if u.shape[-1] != self.n_bands:
-            raise ValueError(
+            raise ShapeError(
                 f"SpectralResponseFunction.adjoint: last axis size {u.shape[-1]} "
                 f"must equal n_bands={self.n_bands}"
             )

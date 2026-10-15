@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
 
+from radtrax import DegenerateInputError
 from radtrax.instrument import GroundSamplingDistance, PointSpreadFunction
 
 
@@ -107,13 +108,13 @@ def test_vmap_over_a_stack_of_psfs_equals_a_loop() -> None:
 
 
 def test_zero_sum_kernel_is_rejected() -> None:
-    with pytest.raises(ValueError, match="sums to zero"):
+    with pytest.raises(DegenerateInputError, match="sums to zero"):
         PointSpreadFunction(kernel=np.zeros((3, 3)))
 
 
 def test_a_traced_zero_sum_kernel_fails_at_run_time() -> None:
     build = eqx.filter_jit(lambda kk: PointSpreadFunction(kernel=kk).kernel)
-    with pytest.raises(Exception, match="sums to zero"):
+    with pytest.raises(eqx.EquinoxRuntimeError, match="sums to zero"):
         build(np.zeros((3, 3)))
 
 

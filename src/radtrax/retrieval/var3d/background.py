@@ -35,6 +35,8 @@ import jax.numpy as jnp
 import lineax as lx
 import numpy as np
 
+from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
+
 
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
@@ -66,12 +68,12 @@ def build_diagonal_background(
     var = np.asarray(variance, dtype=float).ravel()
     if var.size == 1:
         if n_pixels is None:
-            raise ValueError(
+            raise ParameterError(
                 "build_diagonal_background: scalar variance requires `n_pixels`."
             )
         var = np.full(int(n_pixels), float(var.item()))
     if np.any(var <= 0.0):
-        raise ValueError("build_diagonal_background: variances must be > 0.")
+        raise ParameterError("build_diagonal_background: variances must be > 0.")
     return lx.DiagonalLinearOperator(jnp.asarray(var))
 
 
@@ -81,7 +83,7 @@ def build_diagonal_background(
 def _ar1_correlation_matrix(n: int, length_scale_pixels: float) -> np.ndarray:
     """``[exp(-|i-j| / L)]`` correlation matrix — symmetric, PD for L > 0."""
     if length_scale_pixels <= 0.0:
-        raise ValueError("AR(1) correlation: length_scale_pixels must be > 0.")
+        raise ParameterError("AR(1) correlation: length_scale_pixels must be > 0.")
     idx = np.arange(n)
     diff = np.abs(idx[:, None] - idx[None, :])
     return np.exp(-diff / length_scale_pixels)
@@ -106,7 +108,7 @@ def build_kronecker_background(
     ``δx[i·nx + j] = δx(i, j)`` — matches ``vmr_field.reshape(-1)`` order.
     """
     if variance <= 0.0:
-        raise ValueError("build_kronecker_background: `variance` must be > 0.")
+        raise ParameterError("build_kronecker_background: `variance` must be > 0.")
     Ky = _ar1_correlation_matrix(ny, length_scale_y)
     Kx = _ar1_correlation_matrix(nx, length_scale_x)
     # Spread the σ² factor evenly between the two Kronecker factors so each is
@@ -157,16 +159,16 @@ def build_lowrank_background(
         uses Woodbury internally.
     """
     if samples.ndim != 2:
-        raise ValueError(
+        raise ShapeError(
             f"build_lowrank_background: samples must be 2-D (n_samples, n_state); "
             f"got {samples.shape}."
         )
     n_samples, n_state = samples.shape
     if n_samples < 2:
-        raise ValueError("build_lowrank_background: need ≥ 2 samples.")
+        raise DegenerateInputError("build_lowrank_background: need ≥ 2 samples.")
     rank = max(1, min(int(rank), n_state, n_samples))
     if regularization <= 0.0:
-        raise ValueError("build_lowrank_background: `regularization` must be > 0.")
+        raise ParameterError("build_lowrank_background: `regularization` must be > 0.")
     centred = samples - samples.mean(axis=0, keepdims=True)
     if rank < 0.5 * min(n_samples, n_state):
         # Few components wanted: randomized range finder, O(rank) passes over

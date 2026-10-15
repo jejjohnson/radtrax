@@ -39,6 +39,7 @@ from radtrax.atmosphere.gas import (
     number_density,
 )
 from radtrax.atmosphere.geometry import air_mass_factor
+from radtrax.exceptions import MissingKeyError
 
 
 __all__ = [
@@ -69,7 +70,9 @@ def interpolate_cross_section(
     clip to the LUT range before interpolating.
     """
     if var not in ds:
-        raise KeyError(f"variable {var!r} not in dataset (have {list(ds.data_vars)})")
+        raise MissingKeyError(
+            f"variable {var!r} not in dataset (have {list(ds.data_vars)})"
+        )
     return ds[var].interp(temperature=T_K, pressure=p_atm)
 
 

@@ -36,6 +36,7 @@ from jaxtyping import Array, Float
 
 from radtrax.atmosphere.gas import ATM_TO_PA
 from radtrax.atmosphere.state import AtmosphericState
+from radtrax.exceptions import GridError, MissingKeyError, ParameterError, ShapeError
 
 
 if TYPE_CHECKING:
@@ -81,12 +82,12 @@ class CrossSectionTable(eqx.Module):
         n_p, n_t = jnp.shape(self.log_p_pa)[0], jnp.shape(self.t_k)[0]
         shape = jnp.shape(self.sigma_cm2)
         if len(shape) != 3 or shape[:2] != (n_p, n_t):
-            raise ValueError(
+            raise ShapeError(
                 f"CrossSectionTable: sigma_cm2 must be (P, T, G) = ({n_p}, {n_t}, G), "
                 f"got {shape}."
             )
         if n_p < 2 or n_t < 2:
-            raise ValueError(
+            raise GridError(
                 "CrossSectionTable: need at least two pressures and temperatures."
             )
         _check_increasing("log_p_pa", self.log_p_pa)
@@ -152,7 +153,7 @@ class TableOpacity(OpacityProvider):
     ) -> None:
         self.nu_cm = jnp.asarray(nu_cm)
         if self.nu_cm.ndim != 1:
-            raise ValueError(
+            raise ShapeError(
                 f"TableOpacity: nu_cm must be (G,), got {self.nu_cm.shape}."
             )
         if self.nu_cm.dtype != jnp.float64:
@@ -163,11 +164,11 @@ class TableOpacity(OpacityProvider):
                 stacklevel=2,
             )
         if not tables:
-            raise ValueError("TableOpacity: need at least one gas table.")
+            raise ParameterError("TableOpacity: need at least one gas table.")
         for gas, table in tables.items():
             n_nu = jnp.shape(table.sigma_cm2)[-1]
             if n_nu != self.nu_cm.shape[0]:
-                raise ValueError(
+                raise GridError(
                     f"TableOpacity: the {gas!r} table has {n_nu} wavenumbers, "
                     f"nu_cm has {self.nu_cm.shape[0]}."
                 )
@@ -176,7 +177,7 @@ class TableOpacity(OpacityProvider):
     def __call__(self, state: AtmosphericState) -> Float[Array, "L G"]:
         missing = sorted(set(self.tables) - set(state.vmr))
         if missing:
-            raise KeyError(
+            raise MissingKeyError(
                 f"TableOpacity: the state has no mixing ratio for {missing}."
             )
         air = state.air_column()  # n Δz, molecules/cm²                      (L,)
@@ -215,7 +216,7 @@ class TableOpacity(OpacityProvider):
         for gas, ds in datasets.items():
             name = var[gas] if isinstance(var, dict) else var
             if name not in ds:
-                raise KeyError(
+                raise MissingKeyError(
                     f"TableOpacity: {gas!r} has no {name!r} (have {list(ds.data_vars)})."
                 )
             da = (
@@ -227,7 +228,7 @@ class TableOpacity(OpacityProvider):
             if nu is None:
                 nu = grid
             elif grid.shape != nu.shape or not np.array_equal(grid, nu):
-                raise ValueError(
+                raise GridError(
                     f"TableOpacity: {gas!r} is on a different wavenumber grid."
                 )
             tables[gas] = CrossSectionTable(
@@ -238,7 +239,7 @@ class TableOpacity(OpacityProvider):
                 sigma_cm2=jnp.asarray(da.values, dtype=float),
             )
         if nu is None:
-            raise ValueError("TableOpacity: need at least one gas table.")
+            raise ParameterError("TableOpacity: need at least one gas table.")
         return cls(jnp.asarray(nu), tables)
 
 
@@ -258,4 +259,4 @@ def _check_increasing(name: str, grid: Float[Array, " N"]) -> None:
     except (jax.errors.TracerBoolConversionError, jax.errors.ConcretizationTypeError):
         return
     if not ok:
-        raise ValueError(f"CrossSectionTable: {name} must be strictly increasing.")
+        raise GridError(f"CrossSectionTable: {name} must be strictly increasing.")

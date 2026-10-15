@@ -13,6 +13,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
+from radtrax.exceptions import GridError, MissingExtraError, MissingKeyError
 from radtrax.instrument.srf import SpectralResponseFunction, _bin_widths
 
 
@@ -23,7 +24,7 @@ def _read_srf_table(satellite: str):  # -> pandas.DataFrame
     try:
         from georeader.readers.S2_SAFE_reader import read_srf
     except ImportError as err:
-        raise ImportError(
+        raise MissingExtraError(
             "radtrax.geo.sentinel2_srf needs the [geo] extra: "
             "pip install 'radtrax[geo]'"
         ) from err
@@ -96,7 +97,7 @@ def sentinel2_srf(
     if bands is not None:
         missing = [b for b in bands if b not in table.columns]
         if missing:
-            raise KeyError(f"sentinel2_srf: no band(s) {missing} in {satellite}")
+            raise MissingKeyError(f"sentinel2_srf: no band(s) {missing} in {satellite}")
         table = table[list(bands)]
     wl_table = table.index.to_numpy(dtype=float)
     grid = np.arange(wl_table[0], wl_table[-1] + 1.0)  # the full 1 nm grid
@@ -104,7 +105,7 @@ def sentinel2_srf(
 
     wl = grid if wavelengths_hr_nm is None else np.asarray(wavelengths_hr_nm, float)
     if wl.ndim != 1 or wl.size < 2 or np.any(np.diff(wl) <= 0.0):
-        raise ValueError(
+        raise GridError(
             "sentinel2_srf: `wavelengths_hr_nm` must be 1-D, strictly increasing, "
             "with at least two points."
         )

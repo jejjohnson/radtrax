@@ -30,6 +30,8 @@ import jax.numpy as jnp
 import lineax as lx
 from jaxtyping import Array, Float
 
+from radtrax.exceptions import DegenerateInputError, ParameterError
+
 
 if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
@@ -70,12 +72,12 @@ def _check_target_energy(
     ):
         return  # traced call: no concrete values to inspect.
     if t_max == 0.0:
-        raise ValueError(
+        raise DegenerateInputError(
             "matched_filter: target signature is all zero — the score "
             "(x−μ)ᵀΣ⁻¹t / (tᵀΣ⁻¹t) is undefined."
         )
     if not tnorm_sq_val > 0.0:
-        raise ValueError(
+        raise DegenerateInputError(
             f"matched_filter: target energy tᵀΣ⁻¹t = {tnorm_sq_val!r} is not "
             "strictly positive. The covariance operator is singular or "
             "indefinite along the target direction. Add a Tikhonov ridge or "
@@ -227,7 +229,7 @@ def detection_threshold(
         :func:`matched_filter_snr`).
     """
     if not 0.0 < false_alarm_rate < 1.0:
-        raise ValueError(
+        raise ParameterError(
             f"detection_threshold: false_alarm_rate must be in (0, 1); "
             f"got {false_alarm_rate}."
         )

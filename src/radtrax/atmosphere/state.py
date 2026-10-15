@@ -23,6 +23,7 @@ from radtrax.atmosphere.gas import (
     CM2_PER_M2,
     number_density,
 )
+from radtrax.exceptions import ShapeError
 
 
 __all__ = ["AtmosphericState"]
@@ -67,12 +68,12 @@ class AtmosphericState(eqx.Module):
     def __check_init__(self) -> None:
         shape = jnp.shape(self.p_pa)
         if len(shape) != 1:
-            raise ValueError(f"AtmosphericState: p_pa must be (L,), got {shape}.")
+            raise ShapeError(f"AtmosphericState: p_pa must be (L,), got {shape}.")
         fields = {"t_k": self.t_k, "z_m": self.z_m, "dz_m": self.dz_m}
         fields |= {f"vmr[{gas!r}]": x for gas, x in self.vmr.items()}
         for name, value in fields.items():
             if jnp.shape(value) != shape:
-                raise ValueError(
+                raise ShapeError(
                     f"AtmosphericState: {name} has shape {jnp.shape(value)}, "
                     f"p_pa has {shape}."
                 )
@@ -141,7 +142,7 @@ class AtmosphericState(eqx.Module):
         else:
             weights = jnp.asarray(profile, dtype=x.dtype)
             if weights.shape != x.shape:
-                raise ValueError(
+                raise ShapeError(
                     f"AtmosphericState.add_column: profile must be (L,) = "
                     f"{x.shape}, got {weights.shape}."
                 )

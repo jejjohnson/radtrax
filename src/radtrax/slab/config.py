@@ -29,6 +29,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from radtrax.exceptions import ParameterError, ShapeError
+
 
 if TYPE_CHECKING:  # avoid circular import at module load
     from radtrax.instrument.srf import SpectralResponseFunction
@@ -78,22 +80,22 @@ class ObservationGeometry:
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.sza_deg < 90.0):
-            raise ValueError(
+            raise ParameterError(
                 f"ObservationGeometry: `sza_deg` must be in [0, 90) "
                 f"(got {self.sza_deg!r})"
             )
         if not (0.0 <= self.vza_deg < 90.0):
-            raise ValueError(
+            raise ParameterError(
                 f"ObservationGeometry: `vza_deg` must be in [0, 90) "
                 f"(got {self.vza_deg!r})"
             )
         if not (self.path_length_cm > 0.0):
-            raise ValueError(
+            raise ParameterError(
                 f"ObservationGeometry: `path_length_cm` must be > 0 "
                 f"(got {self.path_length_cm!r})"
             )
         if self.amf is not None and not (self.amf > 0.0):
-            raise ValueError(
+            raise ParameterError(
                 f"ObservationGeometry: `amf` must be > 0 (got {self.amf!r})"
             )
 
@@ -151,21 +153,21 @@ class InstrumentSpec:
         centers = np.asarray(self.band_centers_nm, dtype=float)
         widths = np.asarray(self.band_widths_nm, dtype=float)
         if centers.ndim != 1 or widths.ndim != 1:
-            raise ValueError("InstrumentSpec: band arrays must be 1-D.")
+            raise ShapeError("InstrumentSpec: band arrays must be 1-D.")
         if centers.shape != widths.shape:
-            raise ValueError(
+            raise ShapeError(
                 f"InstrumentSpec: `band_centers_nm` shape {centers.shape} "
                 f"must match `band_widths_nm` shape {widths.shape}"
             )
         if len(self.band_names) != centers.size:
-            raise ValueError(
+            raise ShapeError(
                 f"InstrumentSpec: `band_names` length {len(self.band_names)} "
                 f"must match number of bands {centers.size}"
             )
         if np.any(widths <= 0.0):
-            raise ValueError("InstrumentSpec: `band_widths_nm` entries must be > 0")
+            raise ParameterError("InstrumentSpec: `band_widths_nm` entries must be > 0")
         if self.srf_type not in {"gaussian", "rectangular", "triangular"}:
-            raise ValueError(
+            raise ParameterError(
                 f"InstrumentSpec: `srf_type` must be one of "
                 f"'gaussian', 'rectangular', 'triangular' "
                 f"(got {self.srf_type!r})"
@@ -195,7 +197,7 @@ class InstrumentSpec:
 def number_density_cm3(p_atm: float, T_K: float) -> float:
     """Ideal-gas total number density [molecules / cm³]."""
     if not (T_K > 0.0 and p_atm > 0.0):
-        raise ValueError(
+        raise ParameterError(
             "number_density_cm3: `T_K` and `p_atm` must be > 0 "
             f"(got T_K={T_K!r}, p_atm={p_atm!r})"
         )

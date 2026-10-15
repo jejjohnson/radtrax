@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
 
+from radtrax import GridError
 from radtrax.atmosphere import (
     AFGL_GASES,
     AVOGADRO_PER_MOL,
@@ -274,10 +275,10 @@ def test_log_mean_pressure_near_equal_levels(gap: float) -> None:
 
 def test_equal_levels_are_rejected_and_finite_under_jit() -> None:
     levels = jnp.array([5e4, 5e4])
-    with pytest.raises(ValueError, match="strictly"):
+    with pytest.raises(GridError, match="strictly"):
         _layer_pressure(levels)
     # Under jit the check is eqx.error_if: still an error, never a NaN.
-    with pytest.raises(Exception, match="strictly"):
+    with pytest.raises(jax.errors.JaxRuntimeError, match="strictly"):
         jax.block_until_ready(jax.jit(_layer_pressure)(levels))
 
 
@@ -287,5 +288,5 @@ def test_pressures_are_checked_under_jit() -> None:
     def air(p: jax.Array) -> jax.Array:
         return layers_from_levels(p, jnp.array([288.0, 250.0, 220.0]), {}).air_column()
 
-    with pytest.raises(Exception, match="strictly"):
+    with pytest.raises(jax.errors.JaxRuntimeError, match="strictly"):
         jax.block_until_ready(jax.jit(air)(jnp.array([1e5, 5e4, 0.0])))

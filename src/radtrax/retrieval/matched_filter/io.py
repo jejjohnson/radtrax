@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from radtrax.exceptions import MissingFileError, ShapeError
+
 
 if TYPE_CHECKING:
     import lineax as lx
@@ -77,7 +79,7 @@ def apply_image_xarray(
     from radtrax.retrieval.matched_filter.core import apply_image
 
     if band_dim not in cube.dims:
-        raise ValueError(
+        raise ShapeError(
             f"apply_image_xarray: DataArray has no dim named {band_dim!r}; "
             f"dims are {cube.dims}."
         )
@@ -152,7 +154,7 @@ def open_multi_scene(
     if isinstance(paths, str):
         expanded = sorted(_glob.glob(paths))
         if not expanded:
-            raise FileNotFoundError(
+            raise MissingFileError(
                 f"open_multi_scene: glob {paths!r} matched zero files."
             )
     else:
@@ -167,7 +169,7 @@ def open_multi_scene(
             else:
                 da = ds[variable]
             if band_dim not in da.dims:
-                raise ValueError(
+                raise ShapeError(
                     f"open_multi_scene: variable in {path!r} has no dim "
                     f"{band_dim!r}; dims are {da.dims}."
                 )
@@ -178,7 +180,7 @@ def open_multi_scene(
             da = da.transpose(*other_dims, band_dim)
             scene = da.values
             if scene.ndim < 2:
-                raise ValueError(
+                raise ShapeError(
                     f"open_multi_scene: scene in {path!r} has unexpected "
                     f"shape {scene.shape}; need ≥ 2 dims."
                 )

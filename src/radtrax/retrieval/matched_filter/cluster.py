@@ -31,6 +31,7 @@ import lineax as lx
 import numpy as np
 from jaxtyping import Array, Float, Int
 
+from radtrax.exceptions import DegenerateInputError, ParameterError, ShapeError
 from radtrax.retrieval.matched_filter.background import (
     _finite_pixels,
     estimate_cov_empirical,
@@ -117,7 +118,7 @@ def gmm_cluster_background(
     """
     arr = np.asarray(cube)
     if arr.ndim != 3:
-        raise ValueError(
+        raise ShapeError(
             f"gmm_cluster_background: cube must be (H, W, n_bands); got {arr.shape}."
         )
     h, w, _ = arr.shape
@@ -125,7 +126,7 @@ def gmm_cluster_background(
     valid = _finite_pixels(X_all)
     X = X_all[valid]
     if X.shape[0] < max(2, n_clusters):
-        raise ValueError(
+        raise DegenerateInputError(
             f"gmm_cluster_background: {X.shape[0]} finite pixel(s) cannot fit "
             f"{n_clusters} cluster(s)."
         )
@@ -155,7 +156,7 @@ def gmm_cluster_background(
     elif cov_estimator in {"ledoit_wolf", "oas"}:
         global_cov_op = estimate_cov_shrunk(arr, mean=global_mean, method=cov_estimator)  # type: ignore[arg-type]
     else:
-        raise ValueError(
+        raise ParameterError(
             f"gmm_cluster_background: unknown cov_estimator {cov_estimator!r}."
         )
     means: list[np.ndarray] = []
@@ -231,21 +232,21 @@ def adaptive_window_background(
         ``NaN``.
     """
     if window_size < 3 or window_size % 2 == 0:
-        raise ValueError(
+        raise ParameterError(
             f"adaptive_window_background: window_size must be an odd int ≥ 3; got {window_size}."
         )
     if guard_size < 0 or (guard_size > 0 and guard_size % 2 == 0):
-        raise ValueError(
+        raise ParameterError(
             f"adaptive_window_background: guard_size must be 0 or an odd int; got {guard_size}."
         )
     if guard_size >= window_size:
-        raise ValueError(
+        raise ParameterError(
             f"adaptive_window_background: guard_size ({guard_size}) must be < "
             f"window_size ({window_size})."
         )
     arr = np.asarray(cube, dtype=float)
     if arr.ndim != 3:
-        raise ValueError(
+        raise ShapeError(
             f"adaptive_window_background: cube must be (H, W, n_bands); got {arr.shape}."
         )
     from scipy.ndimage import uniform_filter
@@ -328,7 +329,7 @@ def apply_cluster_mf(
     """
     cube = jnp.asarray(cube)
     if cube.shape[:2] != tuple(cluster.labels.shape):
-        raise ValueError(
+        raise ShapeError(
             f"apply_cluster_mf: labels shape {tuple(cluster.labels.shape)} does not "
             f"match the cube's spatial shape {cube.shape[:2]}."
         )
@@ -397,17 +398,17 @@ def apply_adaptive_mf(
     # ridge is a configuration value: checked when concrete; a traced ridge
     # (jax.jit with ridge as an argument) skips the check.
     if isinstance(ridge, (int, float)) and ridge < 0:
-        raise ValueError(f"apply_adaptive_mf: ridge must be ≥ 0, got {ridge}.")
+        raise ParameterError(f"apply_adaptive_mf: ridge must be ≥ 0, got {ridge}.")
     cube, mean, variance = (jnp.asarray(a) for a in (cube, mean, variance))
     target = jnp.asarray(target)
     for name, stat in (("mean", mean), ("variance", variance)):
         if stat.shape != cube.shape:
-            raise ValueError(
+            raise ShapeError(
                 f"apply_adaptive_mf: background {name} shape {stat.shape} does not "
                 f"match the cube shape {cube.shape}."
             )
     if target.shape != cube.shape[-1:]:
-        raise ValueError(
+        raise ShapeError(
             f"apply_adaptive_mf: target shape {target.shape} does not match "
             f"{cube.shape[-1]} bands."
         )

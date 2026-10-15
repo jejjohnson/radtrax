@@ -23,6 +23,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
+from radtrax.exceptions import ParameterError, TableBuildError
 from radtrax.spectroscopy.hitran.config import (
     DEFAULT_VMR_NOMINAL,
     GasConfig,
@@ -172,7 +173,7 @@ def fetch_hitran_data(
                     f"{cached_range[0]:.1f}-{cached_range[1]:.1f} cm^-1"
                 )
             )
-            raise RuntimeError(
+            raise TableBuildError(
                 f"HITRAN fetch failed for {gas_config.name} "
                 f"(M{gas_config.molecule_id} I{gas_config.isotopologue_id}, "
                 f"{gas_config.nu_min:.1f}-{gas_config.nu_max:.1f} cm^-1) and "
@@ -189,7 +190,7 @@ def fetch_hitran_data(
         )
 
     if not (data_path.exists() and header_path.exists()):
-        raise RuntimeError(
+        raise TableBuildError(
             f"HITRAN fetch for {gas_config.name} returned without error but "
             f"no {gas_config.name}.data/.header pair was produced under {cache}."
         )
@@ -267,7 +268,7 @@ def compute_absorption_lut(
                     HITRAN_units=True,  # cm²/molecule
                 )
             except Exception as exc:
-                raise RuntimeError(
+                raise TableBuildError(
                     f"absorptionCoefficient_Voigt failed for {gas_config.name} "
                     f"at T={T:.1f} K, p={P:.3f} atm."
                 ) from exc
@@ -275,7 +276,7 @@ def compute_absorption_lut(
 
     if not np.all(np.isfinite(sigma_lut)):
         n_bad = int(np.sum(~np.isfinite(sigma_lut)))
-        raise RuntimeError(
+        raise TableBuildError(
             f"compute_absorption_lut produced {n_bad} non-finite entries for "
             f"{gas_config.name}; refusing to return a partial LUT."
         )
@@ -427,6 +428,6 @@ def generate_single_gas_lut(
     ds = build_lut_dataset(gas_config, grid_config, nu_grid, sigma_lut, wavelength_nm)
     if save:
         if output_dir is None:
-            raise ValueError("save=True requires output_dir.")
+            raise ParameterError("save=True requires output_dir.")
         save_lut(ds, output_dir, gas_config.name)
     return ds

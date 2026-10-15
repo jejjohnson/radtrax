@@ -16,6 +16,7 @@ import jax
 import numpy as np
 from jaxtyping import Float
 
+from radtrax.exceptions import MissingExtraError
 from radtrax.retrieval.mbmp import mbmp_log_signal, swir_contrast
 
 
@@ -31,7 +32,7 @@ try:
     )
     from pipekit import Operator
 except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
-    raise ImportError(
+    raise MissingExtraError(
         "radtrax.geo.mbmp needs the [geo] extra: pip install 'radtrax[geo]'"
     ) from err
 

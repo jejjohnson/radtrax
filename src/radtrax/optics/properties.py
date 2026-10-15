@@ -15,6 +15,8 @@ import equinox as eqx
 import jax.numpy as jnp
 from jaxtyping import Array, ArrayLike, Float
 
+from radtrax.exceptions import ShapeError
+
 
 __all__ = ["OpticalProperties"]
 
@@ -50,11 +52,11 @@ class OpticalProperties(eqx.Module):
 
     def __check_init__(self) -> None:
         if self.nu_cm.ndim != 1:
-            raise ValueError(
+            raise ShapeError(
                 f"OpticalProperties: nu_cm must be (G,), got {self.nu_cm.shape}."
             )
         if self.tau.ndim != 2 or self.tau.shape[1] != self.nu_cm.shape[0]:
-            raise ValueError(
+            raise ShapeError(
                 f"OpticalProperties: tau must be (L, G) with G = "
                 f"{self.nu_cm.shape[0]}, got {self.tau.shape}."
             )

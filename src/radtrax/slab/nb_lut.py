@@ -49,6 +49,7 @@ import numpy as np
 import xarray as xr
 
 from radtrax.atmosphere import gas
+from radtrax.exceptions import MissingKeyError, ParameterError, ShapeError
 from radtrax.instrument.srf import SpectralResponseFunction, check_srf_lut_coverage
 
 
@@ -167,17 +168,17 @@ def build_nb_lut(
         ``delta_column[k]`` for band ``b``.
     """
     if var not in ds:
-        raise KeyError(f"build_nb_lut: {var!r} not in dataset.")
+        raise MissingKeyError(f"build_nb_lut: {var!r} not in dataset.")
     if n_grid < 2:
-        raise ValueError(f"build_nb_lut: `n_grid` must be ≥ 2 (got {n_grid!r})")
+        raise ParameterError(f"build_nb_lut: `n_grid` must be ≥ 2 (got {n_grid!r})")
     if not (0.0 <= background_column <= _MAX_COLUMN_MOL_PER_M2):
-        raise ValueError(
+        raise ParameterError(
             f"build_nb_lut: `background_column` must be in [0, "
             f"{_MAX_COLUMN_MOL_PER_M2:g}] mol/m² (got {background_column!r}); a "
             "column in molecules/cm² is 6.02e19 times larger than in mol/m²."
         )
     if not (max_delta_column > 0.0):
-        raise ValueError(
+        raise ParameterError(
             f"build_nb_lut: `max_delta_column` must be > 0 (got {max_delta_column!r})"
         )
 
@@ -302,7 +303,7 @@ def inject_plume(
     """
     scene_arr = np.asarray(scene)
     if scene_arr.shape[band_axis] != nb_lookup.n_bands:
-        raise ValueError(
+        raise ShapeError(
             f"inject_plume: scene has {scene_arr.shape[band_axis]} bands along "
             f"axis {band_axis}, but LUT has {nb_lookup.n_bands}."
         )
@@ -310,7 +311,7 @@ def inject_plume(
     # Move `scene`'s band axis to the front for broadcasting, then move back.
     scene_bf = np.moveaxis(scene_arr, band_axis, 0)
     if scene_bf.shape[1:] != nb_map.shape[1:]:
-        raise ValueError(
+        raise ShapeError(
             f"inject_plume: spatial shape mismatch — scene {scene_bf.shape[1:]} "
             f"vs. plume {nb_map.shape[1:]}"
         )

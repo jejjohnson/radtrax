@@ -50,6 +50,13 @@ import lineax as lx
 import numpy as np
 from jaxtyping import Bool, Float
 
+from radtrax.exceptions import (
+    ArgumentTypeError,
+    DegenerateInputError,
+    MissingExtraError,
+    ParameterError,
+    ShapeError,
+)
 from radtrax.retrieval.matched_filter.background import (
     _dense_operator,
     estimate_cov_empirical,
@@ -94,7 +101,7 @@ try:
     )
     from pipekit import Operator
 except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
-    raise ImportError(
+    raise MissingExtraError(
         "radtrax.geo.matched_filter needs the [geo] extra: pip install 'radtrax[geo]'"
     ) from err
 
@@ -283,7 +290,7 @@ class MatchedFilter(Operator):
             return self.mean_, self.cov_op_
         if self.mean is not None and self.cov_op is not None:
             return self.mean, self.cov_op
-        raise ValueError(
+        raise ParameterError(
             "MatchedFilter requires mean and cov_op, fit(), or a call on data"
         )
 
@@ -305,7 +312,9 @@ class MatchedFilter(Operator):
         prepared: tuple[Samples, tuple[int, ...], ValidMap | None] | None = None,
     ) -> ScoreMap:
         if self.target is None:
-            raise ValueError("target must be supplied before applying MatchedFilter")
+            raise ParameterError(
+                "target must be supplied before applying MatchedFilter"
+            )
         samples, shape, valid = (
             _samples(gt, self.axis, type(self).__name__)
             if prepared is None
@@ -702,7 +711,7 @@ class ApplyClusterMF(Operator):
         samples, shape, valid = _samples(gt, self.axis, type(self).__name__)
         labels = jnp.asarray(cluster.labels)
         if labels.shape != shape:
-            raise ValueError(
+            raise ShapeError(
                 f"ApplyClusterMF: labels shape {labels.shape} does not match the "
                 f"cube's spatial shape {shape}"
             )
@@ -820,7 +829,7 @@ class StreamingBackground(Operator):
         )
         first = next(batches, None)
         if first is None:
-            raise ValueError(
+            raise DegenerateInputError(
                 "StreamingBackground: cubes must contain at least one cube"
             )
         mean, cov_op = streaming_background(
@@ -1133,7 +1142,7 @@ def _estimate_cov(
         return estimate_cov_lowrank(samples, mean=mean, rank=rank, tikhonov=tikhonov)
     if method in ("ledoit_wolf", "oas"):
         return estimate_cov_shrunk(samples, mean=mean, method=method)  # type: ignore[arg-type]
-    raise ValueError(f"MatchedFilter: unknown cov_method {method!r}")
+    raise ParameterError(f"MatchedFilter: unknown cov_method {method!r}")
 
 
 def _array_config(value: Float[np.ndarray, "*shape"] | None) -> Any:
@@ -1165,7 +1174,7 @@ def _check_band_axis(gt: Any, axis: int, name: str) -> None:
     """A clear error when ``axis`` is not an axis of ``gt`` (e.g. a 2-D map)."""
     ndim = np.ndim(gt)
     if not -ndim <= axis < ndim:
-        raise ValueError(
+        raise ShapeError(
             f"{name}: spectral axis {axis} does not exist on a {ndim}-D input "
             f"of shape {np.shape(gt)}; pass a (C, H, W) cube or a (T, C, H, W) "
             "stack (or set `axis` for a sample matrix)"
@@ -1252,7 +1261,7 @@ def _callable_state(
     valid ones, so a callable that aggregates over pixels sees no ``NaN``.
     """
     if not callable(obs_model):
-        raise TypeError("obs_model must be an observation model or a callable")
+        raise ArgumentTypeError("obs_model must be an observation model or a callable")
     if vmr_background is None:
         base, valid = _masked(gt, axis, "target")
         if valid is not None:
@@ -1294,7 +1303,7 @@ def _response_vector(
     vector = response.reshape(-1)
     n_bands = np.shape(gt)[axis]
     if vector.shape[0] != n_bands:
-        raise ValueError(
+        raise ShapeError(
             f"obs_model gave {vector.shape[0]} values per pixel, the cube has "
             f"{n_bands} bands; a callable's response must keep the band axis at "
             f"axis={axis} (or be a ({n_bands},) vector)"
@@ -1325,12 +1334,12 @@ def _target_pattern(
         spatial = [n for k, n in enumerate(out.shape) if k != band]
         index: list[Any] = list((n // 2 for n in spatial) if pixel is None else pixel)
         if len(index) != len(spatial):
-            raise ValueError(
+            raise ShapeError(
                 f"pixel {pixel} must index the {len(spatial)} non-band axes"
             )
         if band is not None:
             index.insert(band, slice(None))
         out[tuple(index)] = 1.0
     else:
-        raise ValueError(f"unknown target pattern {pattern!r}")
+        raise ParameterError(f"unknown target pattern {pattern!r}")
     return out

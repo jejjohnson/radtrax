@@ -30,6 +30,8 @@ import jax
 import jax.numpy as jnp
 from jaxtyping import Array, Float
 
+from radtrax.exceptions import ParameterError, ShapeError
+
 
 if TYPE_CHECKING:
     from jaxtyping import ArrayLike
@@ -56,17 +58,17 @@ def _build_pattern(
             h, w = vmr_field.shape
             i, j = pixel if pixel is not None else (h // 2, w // 2)
             if not (0 <= i < h and 0 <= j < w):
-                raise ValueError(
+                raise ParameterError(
                     f"target: pixel {(i, j)} is out of bounds for vmr_field "
                     f"shape {vmr_field.shape}."
                 )
             return jnp.zeros_like(vmr_field).at[i, j].set(1.0)
-        raise ValueError(
+        raise ParameterError(
             f"target: pattern must be 'uniform', 'impulse', or an array; got {pattern!r}."
         )
     arr = jnp.asarray(pattern)
     if arr.shape != vmr_field.shape:
-        raise ValueError(
+        raise ShapeError(
             f"target: pattern array shape {arr.shape} must match vmr_field shape "
             f"{vmr_field.shape}."
         )
@@ -97,7 +99,7 @@ def _vmr_pixel(
         idx = int(jnp.argmax(jnp.abs(jnp.asarray(pattern))))
         i, j = idx // w, idx % w
     if not (0 <= i < h and 0 <= j < w):
-        raise ValueError(
+        raise ParameterError(
             f"target: pixel {(i, j)} is out of bounds for vmr_field shape ({h}, {w})."
         )
     return i, j
@@ -118,7 +120,7 @@ def _read_out(
     i, j = vmr_pixel[0] // factor, vmr_pixel[1] // factor
     h, w, _ = cube.shape
     if not (0 <= i < h and 0 <= j < w):
-        raise ValueError(
+        raise ParameterError(
             f"target: VMR pixel {vmr_pixel} maps to output pixel {(i, j)}, out of "
             f"bounds for the output shape ({h}, {w}): the GSD crops the VMR rows "
             "and columns past the last whole block."

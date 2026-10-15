@@ -19,6 +19,7 @@ import numpy as np
 
 from radtrax.atmosphere.hydrostatics import layers_from_levels
 from radtrax.atmosphere.state import AtmosphericState
+from radtrax.exceptions import GridError, ParameterError
 
 
 __all__ = ["AFGL_GASES", "afgl_us_standard"]
@@ -59,11 +60,13 @@ def afgl_us_standard(
     """
     unknown = sorted(set(gases) - set(AFGL_GASES))
     if unknown:
-        raise ValueError(f"afgl_us_standard: no {unknown} in the table {AFGL_GASES}.")
+        raise ParameterError(
+            f"afgl_us_standard: no {unknown} in the table {AFGL_GASES}."
+        )
     table = _read_table()
     keep = table["z_km"] <= z_top_km
     if keep.sum() < 2:
-        raise ValueError(
+        raise GridError(
             f"afgl_us_standard: z_top_km={z_top_km} keeps fewer than two levels."
         )
     return layers_from_levels(

@@ -35,6 +35,7 @@ from dataclasses import dataclass
 import numpy as np
 import xarray as xr
 
+from radtrax.exceptions import GridError, MissingKeyError, ParameterError
 from radtrax.slab.config import number_density_cm3
 
 
@@ -76,7 +77,7 @@ def _interp_sigma(
     have passed the correct dataset.
     """
     if var not in ds:
-        raise KeyError(
+        raise MissingKeyError(
             f"forward model: variable {var!r} not in dataset "
             f"(have {list(ds.data_vars)})"
         )
@@ -88,7 +89,7 @@ def _interp_sigma(
         if coord in ds.coords:
             lo, hi = float(ds[coord].min()), float(ds[coord].max())
             if not (lo <= float(value) <= hi):
-                raise ValueError(
+                raise GridError(
                     f"forward model: `{name}` ({value!r}) is outside the LUT "
                     f"`{coord}` grid range [{lo}, {hi}]; extend the LUT or clamp "
                     "the query."
@@ -203,7 +204,7 @@ def forward_maclaurin(
     classical linear retrievals for thin absorbers.
     """
     if order not in (1, 2, 3):
-        raise ValueError(
+        raise ParameterError(
             f"forward_maclaurin: `order` must be 1, 2 or 3 (got {order!r})"
         )
     sigma = _interp_sigma(ds, nu_obs, T_K, p_atm, var)
@@ -247,7 +248,7 @@ def forward_maclaurin_normalized(
     canonical linearised retrieval signal.
     """
     if order not in (1, 2, 3):
-        raise ValueError("forward_maclaurin_normalized: `order` must be 1, 2 or 3.")
+        raise ParameterError("forward_maclaurin_normalized: `order` must be 1, 2 or 3.")
     sigma = _interp_sigma(ds, nu_obs, T_K, p_atm, var)
     N_total = number_density_cm3(p_atm, T_K)
     a = sigma * N_total * path_length_cm * amf

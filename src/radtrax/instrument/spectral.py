@@ -43,6 +43,7 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Float
 
+from radtrax.exceptions import GridError, ShapeError
 from radtrax.instrument.srf import SpectralResponseFunction
 
 
@@ -110,22 +111,22 @@ class BandInstrument(Instrument):
 
     def __check_init__(self) -> None:
         if self.nu_cm.ndim != 1:
-            raise ValueError(
+            raise ShapeError(
                 f"BandInstrument: nu_cm must be (G,), got {self.nu_cm.shape}."
             )
         _check_increasing(self.nu_cm)
         if self.response.ndim != 2 or self.response.shape[1] != self.nu_cm.shape[0]:
-            raise ValueError(
+            raise ShapeError(
                 f"BandInstrument: response must be (B, G) with G = "
                 f"{self.nu_cm.shape[0]}, got {self.response.shape}."
             )
         if len(self.band_names) != self.response.shape[0]:
-            raise ValueError(
+            raise ShapeError(
                 f"BandInstrument: {len(self.band_names)} band names for "
                 f"{self.response.shape[0]} bands."
             )
         if self.shift_cm.ndim != 0:
-            raise ValueError(
+            raise ShapeError(
                 f"BandInstrument: shift_cm must be a scalar, got {self.shift_cm.shape}."
             )
 
@@ -166,7 +167,7 @@ class BandInstrument(Instrument):
         if srf.wavelengths_hr_nm.shape != expected_nm.shape or not np.allclose(
             srf.wavelengths_hr_nm, expected_nm, rtol=1e-12, atol=0.0
         ):
-            raise ValueError(
+            raise GridError(
                 "BandInstrument.from_srf: build the SRF on wavelengths_hr_nm = "
                 "1e7 / nu_cm[::-1] (the wavenumber grid in ascending wavelength)."
             )
@@ -180,4 +181,4 @@ def _check_increasing(nu_cm: Float[Array, " G"]) -> None:
     except (jax.errors.TracerBoolConversionError, jax.errors.ConcretizationTypeError):
         return
     if not ok:
-        raise ValueError("BandInstrument: nu_cm must be strictly increasing.")
+        raise GridError("BandInstrument: nu_cm must be strictly increasing.")
