@@ -1,6 +1,6 @@
 # Spectroscopy
 
-Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered atmosphere (`opacity`: the `OpacityProvider` protocol and `TableOpacity`), single-slab interpolation and Beer–Lambert transmittance (`tables`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra). Theory: [HITRAN tables](../../hitran-tables/).
+Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered atmosphere (`opacity`: the `OpacityProvider` protocol and `TableOpacity`), single-slab interpolation and Beer–Lambert transmittance (`tables`), v0's table cache and loader (`table_cache`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra; `python -m radtrax.spectroscopy.hitran CH4 H2O CO2 N2O CO` builds v0's tables into the cache). Theory: [HITRAN tables](../../hitran-tables/).
 
 ::: radtrax.spectroscopy
     options:
@@ -9,6 +9,13 @@ Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered
 ## `opacity`
 
 ::: radtrax.spectroscopy.opacity
+    options:
+      show_root_heading: false
+      heading_level: 3
+
+## `table_cache`
+
+::: radtrax.spectroscopy.table_cache
     options:
       show_root_heading: false
       heading_level: 3
@@ -38,6 +45,13 @@ Needs the `[hitran]` extra; HAPI is imported inside the builders.
 ### `generator`
 
 ::: radtrax.spectroscopy.hitran.generator
+    options:
+      show_root_heading: false
+      heading_level: 4
+
+### `build`
+
+::: radtrax.spectroscopy.hitran.build
     options:
       show_root_heading: false
       heading_level: 4

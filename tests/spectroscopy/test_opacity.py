@@ -9,13 +9,12 @@ import numpy as np
 import pytest
 import xarray as xr
 from _gradcheck import assert_gradients_match
+from _synthetic_table import P_ATM, T_K  # the radtrax · 3 notebook's grid
 
 from radtrax.atmosphere import ATM_TO_PA, AtmosphericState, afgl_us_standard
 from radtrax.spectroscopy import CrossSectionTable, OpacityProvider, TableOpacity
 
 
-P_ATM = np.geomspace(0.03, 1.1, 10)  # the radtrax · 3 notebook's grid
-T_K = np.linspace(200.0, 310.0, 6)
 G = 7
 
 

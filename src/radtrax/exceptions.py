@@ -10,7 +10,7 @@ library keeps working.
 from __future__ import annotations
 
 
-__all__ = ["RadtraxError"]
+__all__ = ["MissingTableError", "RadtraxError"]
 
 
 class RadtraxError(Exception):
@@ -19,5 +19,15 @@ class RadtraxError(Exception):
     Examples:
         >>> from radtrax import RadtraxError
         >>> issubclass(RadtraxError, Exception)
+        True
+    """
+
+
+class MissingTableError(RadtraxError, FileNotFoundError):
+    """A cross-section table is not in the cache; its message names the build command.
+
+    Examples:
+        >>> from radtrax import MissingTableError
+        >>> issubclass(MissingTableError, FileNotFoundError)
         True
     """
