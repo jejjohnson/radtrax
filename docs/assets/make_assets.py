@@ -7,8 +7,7 @@ The SVGs next to this file are generated; edit this script and re-run it::
 It writes the icon (``icon.svg``), the logo (``logo-{light,dark}.svg``),
 the forward-model figure (``forward-model-{light,dark}.svg``), the layer
 stack (``architecture-{light,dark}.svg``) and the place in the stack
-(``ecosystem-{light,dark}.svg``), plus ``icon-candidates.svg`` while the
-icon is being chosen. Standard library only; the style follows gaussx's
+(``ecosystem-{light,dark}.svg``). Standard library only; the style follows gaussx's
 assets (a rounded square with a gradient and a white glyph, chips in a
 monospace face).
 """
@@ -192,13 +191,11 @@ def spectrum_points(x0: float, x1: float, base: float, lines, n: int = 120):
     return "M" + " L".join(f"{px:.1f} {py:.1f}" for px, py in pts)
 
 
-# ── icon candidates (128 × 128, the glyph in white on the gradient) ──────────
-
-W92, W22 = 'fill="#FFFFFF" fill-opacity="0.92"', 'fill="#FFFFFF" fill-opacity="0.22"'
+# ── the icon (128 × 128, the glyph in white on the gradient) ─────────────────
 
 
 def glyph_spectrum(ox: float, oy: float) -> str:
-    """B · An absorption spectrum over its bands, with ∂: spectroscopy you can
+    """An absorption spectrum over its bands, with ∂: spectroscopy you can
     differentiate (gaussx's curve-over-grid, in radtrax's terms)."""
     out = []
     heights = [30, 30, 12, 26, 8, 22, 30]  # band values: deep where the lines are
@@ -239,118 +236,17 @@ def glyph_spectrum(ox: float, oy: float) -> str:
     return "".join(out)
 
 
-def glyph_path(ox: float, oy: float) -> str:
-    """A · Sun → layered atmosphere → surface → sensor: the slant path every
-    radiance in radtrax takes."""
-    out = []
-    for i, op in enumerate((0.14, 0.22, 0.32)):  # denser towards the ground
-        out.append(
-            f'<rect x="{ox + 12}" y="{oy + 50 + i * 15}" width="104" '
-            f'height="12" rx="2.5" fill="#FFFFFF" fill-opacity="{op}"/>'
-        )
-    out.append(f'<ellipse cx="{ox + 66}" cy="{oy + 86}" rx="13" ry="5" {W92}/>')
-    out.append(
-        path(f"M{ox + 12} {oy + 99} L{ox + 116} {oy + 99}", stroke="#FFFFFF", sw=3)
-    )
-    out.append(f'<circle cx="{ox + 28}" cy="{oy + 28}" r="9" {W92}/>')
-    for k in range(8):
-        a = k * math.pi / 4
-        x1, y1 = ox + 28 + 13 * math.cos(a), oy + 28 + 13 * math.sin(a)
-        x2, y2 = ox + 28 + 17 * math.cos(a), oy + 28 + 17 * math.sin(a)
-        out.append(
-            path(f"M{x1:.1f} {y1:.1f} L{x2:.1f} {y2:.1f}", stroke="#FFFFFF", sw=2.2)
-        )
-    out.append(
-        path(
-            f"M{ox + 38} {oy + 40} L{ox + 62} {oy + 97} L{ox + 92} {oy + 36}",
-            stroke="#FFFFFF",
-            sw=4,
-        )
-    )
-    out.append(
-        f'<rect x="{ox + 92}" y="{oy + 20}" width="12" height="10" rx="2" {W92}/>'
-    )
-    out.append(
-        f'<rect x="{ox + 80}" y="{oy + 22}" width="10" height="6" rx="1" {W92}/>'
-    )
-    out.append(
-        f'<rect x="{ox + 106}" y="{oy + 22}" width="10" height="6" rx="1" {W92}/>'
-    )
-    return "".join(out)
-
-
-def glyph_column(ox: float, oy: float) -> str:
-    """C · The layered column seen from above, with a plume in the lowest
-    layer and the nadir beam through it."""
-    out = []
-    for i in range(5):
-        op = 0.14 + 0.09 * i
-        out.append(
-            f'<rect x="{ox + 20}" y="{oy + 22 + i * 17}" width="88" '
-            f'height="13" rx="3" fill="#FFFFFF" fill-opacity="{op:.2f}"/>'
-        )
-    for cx, cy, r in ((50, 98, 8), (61, 93, 9), (73, 96, 7), (84, 99, 5)):
-        out.append(f'<circle cx="{ox + cx}" cy="{oy + cy}" r="{r}" {W92}/>')
-    out.append(
-        path(f"M{ox + 100} {oy + 112} L{ox + 100} {oy + 12}", stroke="#FFFFFF", sw=4)
-    )
-    out.append(
-        path(
-            f"M{ox + 93} {oy + 20} L{ox + 100} {oy + 12} L{ox + 107} {oy + 20}",
-            stroke="#FFFFFF",
-            sw=4,
-        )
-    )
-    return "".join(out)
-
-
-def glyph_tau(ox: float, oy: float) -> str:
-    """D · τ, the optical depth everything is built from, over a spectrum."""
-    out = [
-        text(
-            ox + 64,
-            oy + 76,
-            "τ",
-            size=78,
-            fill="#FFFFFF",
-            weight=700,
-            anchor="middle",
-            family=SERIF,
-            style="italic",
-        )
-    ]
-    lines = [(ox + 46, 14, 2.4), (ox + 54, 9, 2.0), (ox + 80, 16, 2.6)]
-    out.append(
-        path(
-            spectrum_points(ox + 18, ox + 110, oy + 96, lines),
-            stroke="#FFFFFF",
-            sw=3.4,
-            op=0.92,
-        )
-    )
-    return "".join(out)
-
-
-GLYPHS = {
-    "spectrum": glyph_spectrum,
-    "path": glyph_path,
-    "column": glyph_column,
-    "tau": glyph_tau,
-}
-ICON = "spectrum"  # the chosen glyph; the others stay as candidates
-
-
-def tile(ox: float, oy: float, glyph: str, gid: str) -> str:
-    return rect(ox + 4, oy + 4, 120, 120, rx=26, fill=f"url(#{gid})") + GLYPHS[glyph](
+def tile(ox: float, oy: float, gid: str) -> str:
+    return rect(ox + 4, oy + 4, 120, 120, rx=26, fill=f"url(#{gid})") + glyph_spectrum(
         ox, oy
     )
 
 
-def icon(glyph: str = ICON) -> str:
+def icon() -> str:
     return svg(
         128,
         128,
-        f"<defs>{gradient('rt-icon')}</defs>" + tile(0, 0, glyph, "rt-icon"),
+        f"<defs>{gradient('rt-icon')}</defs>" + tile(0, 0, "rt-icon"),
         "radtrax",
     )
 
@@ -358,44 +254,13 @@ def icon(glyph: str = ICON) -> str:
 def logo(theme: str) -> str:
     t = THEMES[theme]
     gid = f"rt-{theme}"
-    body = f"<defs>{gradient(gid)}</defs>" + tile(6, 6, ICON, gid)
+    body = f"<defs>{gradient(gid)}</defs>" + tile(6, 6, gid)
     body += (
         f'<text x="154" y="92" font-family="{SANS}" font-size="72" font-weight="700" '
         f'letter-spacing="-1.5" fill="{t["ink"]}">radtra'
         f'<tspan fill="{t["accent"]}">x</tspan></text>'
     )
     return svg(520, 140, body, "radtrax")
-
-
-def candidates() -> str:
-    names = [
-        ("spectrum", "B · spectrum + ∂"),
-        ("path", "A · slant path"),
-        ("column", "C · column + plume"),
-        ("tau", "D · τ monogram"),
-    ]
-    t = THEMES["light"]
-    body = f"<defs>{gradient('rt-c')}</defs>"
-    for i, (g, label) in enumerate(names):
-        ox = 20 + i * 190
-        body += tile(ox + 21, 16, g, "rt-c")
-        body += text(
-            ox + 85,
-            172,
-            escape(label),
-            size=14,
-            fill=t["ink"],
-            weight=600,
-            anchor="middle",
-        )
-        for j, s in enumerate((32, 16)):  # favicon sizes
-            k = s / 128
-            body += (
-                f'<g transform="translate({ox + 52 + j * 52} 186) scale({k})">'
-                + tile(0, 0, g, "rt-c")
-                + "</g>"
-            )
-    return svg(780, 236, body, "radtrax icon candidates")
 
 
 # ── the forward-model figure ─────────────────────────────────────────────────
@@ -981,7 +846,7 @@ def ecosystem(theme: str) -> str:
     b.append(rect(rx, ry, rw, 84, rx=16, fill=t["chip"], stroke=t["accent"], sw=2.6))
     b.append(
         f'<g transform="translate({rx + 12} {ry + 10}) scale(0.5)">'
-        + tile(0, 0, ICON, gid)
+        + tile(0, 0, gid)
         + "</g>"
     )
     b.append(
@@ -1117,7 +982,7 @@ def ecosystem(theme: str) -> str:
 
 
 def main() -> None:
-    out: dict[str, str] = {"icon.svg": icon(), "icon-candidates.svg": candidates()}
+    out: dict[str, str] = {"icon.svg": icon()}
     for th in THEMES:
         out[f"logo-{th}.svg"] = logo(th)
         out[f"forward-model-{th}.svg"] = forward_model(th)

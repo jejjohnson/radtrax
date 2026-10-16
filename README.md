@@ -46,7 +46,7 @@ uv add "radtrax @ git+https://github.com/jejjohnson/radtrax.git"
 ```python
 import jax
 
-jax.config.update("jax_enable_x64", True)  # float64 for spectroscopy
+jax.config.update("jax_enable_x64", True)  # float64: float32 shifts line centres
 
 import equinox as eqx
 import jax.numpy as jnp
@@ -60,40 +60,57 @@ from radtrax.solvers import BeerLambert
 from radtrax.spectroscopy import TableOpacity, load_opacity
 from radtrax.surface import Lambertian
 
-# Opacity O: per-layer τ from cached HITRAN tables (build them once with radtrax[hitran])
-opacity: TableOpacity = load_opacity(["CH4", "H2O"])
-nu: Float[Array, " G"] = opacity.nu_cm  # wavenumber grid (G,) [cm⁻¹]
+# Shapes: L layers, G wavenumbers, B bands, N pixels.
 
-# Instrument I: EMIT-like bands, 8.5 nm FWHM every 7.5 nm in the 2.3 µm window
-wl_nm = 1e7 / np.asarray(nu)[::-1]  # (G,) ascending wavelength [nm]
-centers_nm = np.arange(2300.0, 2350.0, 7.5)  # (B,)
-srf = SpectralResponseFunction(
+# ── the scene: state x, surface R, geometry g ───────────────────────────────
+# x = (p_l, T_l, x_k,l): AFGL US Standard to 20 km, 1 km layers           L = 20
+atm: AtmosphericState = afgl_us_standard(z_top_km=20.0, gases=["CH4", "H2O"])
+# R(ν) = A, a Lambertian albedo
+surface: Lambertian = Lambertian(0.25)  # A = 0.25
+# μ₀ = cos θ₀, μ = cos θ: solar and viewing zenith cosines
+geometry: ViewingGeometry = ViewingGeometry.from_angles(sza_deg=35.0, vza_deg=10.0)
+
+# ── O: opacity ───────────────────────────────────────────────────────────────
+# τ_l(ν) = ∑_k σ_k(ν; ln p_l, T_l) · n_l · x_k,l · Δz_l   (k: gas, σ from HITRAN tables)
+opacity: TableOpacity = load_opacity(["CH4", "H2O"])  # build once with radtrax[hitran]
+nu: Float[Array, " G"] = opacity.nu_cm  # ν [cm⁻¹]                             (G,)
+
+# ── I: instrument ────────────────────────────────────────────────────────────
+# λ = 10⁷ / ν [nm], reversed so it ascends
+wl_nm: Float[np.ndarray, " G"] = 1e7 / np.asarray(nu)[::-1]  #                 (G,)
+# Gaussian bands across the 2.3 µm CH₄ window: centres λ_b, FWHM 8.5 nm
+centers_nm: Float[np.ndarray, " B"] = np.arange(2300.0, 2350.0, 7.5)  #       (B,)
+srf: SpectralResponseFunction = SpectralResponseFunction(
     wavelengths_hr_nm=wl_nm,
     band_centers_nm=centers_nm,
     band_widths_nm=np.full(centers_nm.size, 8.5),
     band_names=tuple(f"{c:.1f}" for c in centers_nm),
 )
+# f_bg: each band's response on ν, rows summing to 1                        (B, G)
+instrument: BandInstrument = BandInstrument.from_srf(srf, nu)
 
-# y = I(S(O(x), R, g)): state → opacity → solver → instrument
-model = ForwardModel(opacity, BeerLambert(), BandInstrument.from_srf(srf, nu))
+# ── S and the model ──────────────────────────────────────────────────────────
+# L(ν) = (E₀ μ₀ / π) · R(ν) · exp(−m ∑_l τ_l(ν)),   m = 1/μ₀ + 1/μ
+# y_b = ∑_g f_bg · L(ν_g),   i.e.  y = I(S(O(x), R, g))
+model: ForwardModel = ForwardModel(opacity, BeerLambert(), instrument)
+y: Float[Array, " B"] = model(atm, surface, geometry)  # E₀ = 1               (B,)
 
-atm: AtmosphericState = afgl_us_standard(z_top_km=20.0, gases=["CH4", "H2O"])  # L = 20
-surface = Lambertian(0.25)
-geometry = ViewingGeometry.from_angles(sza_deg=35.0, vza_deg=10.0)
-
-y: Float[Array, " B"] = model(atm, surface, geometry)  # (B,) per unit solar irradiance
-
-# Matched-filter target t = ∂ ln y / ∂ΔX [per mol/m²], by forward-mode autodiff
+# ── what autodiff gives ──────────────────────────────────────────────────────
+# t_b = ∂ ln y_b / ∂ΔX at ΔX = 0: the matched-filter target [per mol/m²]
 t: Float[Array, " B"] = unit_absorption_target(model, atm, surface, geometry)  # (B,)
 
 
-# A swath of Jacobians: vmap over pixels, outside jacrev
+# y(θ) for one pixel, θ = (ΔX [mol/m²], A)
 def bands(theta: Float[Array, " 2"]) -> Float[Array, " B"]:
-    """θ = (ΔX [mol/m²], albedo) → y."""
-    return model(atm.add_column("CH4", theta[0]), Lambertian(theta[1]), geometry)
+    plume: AtmosphericState = atm.add_column("CH4", theta[0])
+    return model(plume, Lambertian(theta[1]), geometry)  #                     (B,)
 
 
-theta = jnp.stack([jnp.linspace(0.0, 0.1, 256), jnp.full(256, 0.25)], axis=1)  # (N, 2)
+# θ_n = (ΔX_n, A): a transect from 0 to 0.1 mol/m²                          (N, 2)
+theta: Float[Array, "N 2"] = jnp.stack(
+    [jnp.linspace(0.0, 0.1, 256), jnp.full(256, 0.25)], axis=1
+)
+# K_n = ∂y/∂θ |_θₙ: vmap over pixels outside jacrev, never a Jacobian of a batch
 K: Float[Array, "N B 2"] = eqx.filter_jit(eqx.filter_vmap(jax.jacrev(bands)))(theta)
 ```
 
