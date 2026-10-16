@@ -1,6 +1,6 @@
 # radtrax
 
-> Differentiable radiative transfer in JAX and Equinox for methane and multi-gas remote sensing: a forward model from an atmospheric state to sensor radiance, with every Jacobian from automatic differentiation. Formerly rtmx. radtrax is being assembled: its first releases port plumax's Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, then rebuild them as one layered forward model.
+> Differentiable radiative transfer in JAX and Equinox for methane and multi-gas remote sensing: a forward model from an atmospheric state to sensor radiance, with every Jacobian from automatic differentiation. Formerly rtmx. v0, the layered forward model with matched-filter targets from autodiff, is done; v1's model fidelity (spherical air mass, kernel BRDF, spectral albedo, analytic instrument, noise models), the multi-pass family and band tables are on `main`. 3D-Var still runs on its single-slab observation operator; optimal estimation on vardax and the EMIT, Sentinel-2 and Landsat 8/9 sensors are in progress.
 
 One package, `radtrax`, installed from GitHub: `uv add "radtrax @ git+https://github.com/jejjohnson/radtrax.git"`. Before writing a helper, search the capability index. Code you add should keep three rules:
 
@@ -11,6 +11,7 @@ One package, `radtrax`, installed from GitHub: `uv add "radtrax @ git+https://gi
 ## Start here
 
 - [Home](https://jejjohnson.github.io/radtrax/): what the package is, its status and its rules
+- [Quick start](https://github.com/jejjohnson/radtrax#quick-start): `opacity = load_opacity(["CH4", "H2O"])` (cached tables; a `MissingTableError` names the build command), `BandInstrument.from_srf(SpectralResponseFunction(...), opacity.nu_cm)`, `model = ForwardModel(opacity, BeerLambert(), instrument)`, `y = model(afgl_us_standard(...), Lambertian(A), ViewingGeometry.from_angles(sza, vza))` with `jax_enable_x64` on, `unit_absorption_target(model, state, surface, geometry)`, and a swath's Jacobians as `eqx.filter_jit(eqx.filter_vmap(jax.jacfwd(f)))` over pixels (`jacfwd` for a few parameters, `jacrev` for many)
 - [Capability index](https://jejjohnson.github.io/radtrax/reference/capabilities/): every public name, with a summary
 
 ## API reference

@@ -665,6 +665,7 @@ def architecture(theme: str) -> str:
                 ("afgl_us_standard", False),
                 ("ViewingGeometry", False),
                 ("load_opacity", False),
+                ("load_table", False),
                 ("SpectralResponseFunction", False),
             ],
         ),
@@ -764,9 +765,7 @@ def architecture(theme: str) -> str:
         )
     )
     y2 = 20 + h1 + 24
-    h2 = side(
-        y2, "radtrax[hitran]", "build the tables offline", ["build_table", "load_table"]
-    )
+    h2 = side(y2, "radtrax[hitran]", "build the tables offline", ["build_table"])
     b.append(
         path(
             f"M{x0 + main_w + 38} {y2 + h2 / 2} L{x0 + main_w + 6} {y2 + h2 / 2}",
@@ -836,7 +835,12 @@ def ecosystem(theme: str) -> str:
         )
         return x, y, w, 64
 
-    band(20, 150, "GeoModels", "physical models; never import each other")
+    band(
+        20,
+        150,
+        "GeoModels",
+        "physical models; plumax imports radtrax, never the reverse",
+    )
     band(200, 130, "GeoML", "learning and assimilation")
     band(352, 170, "Numerics", "solvers and operators")
     band(20, 502, "GeoStack", "readers and pipelines", x=810, w=270)

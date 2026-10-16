@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-    <img alt="radtrax" src="docs/assets/logo-light.svg" width="340">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/logo-dark.svg">
+    <img alt="radtrax" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/logo-light.svg" width="340">
   </picture>
 </p>
 
@@ -23,17 +23,12 @@
 
 **Differentiable radiative transfer in JAX, for methane and multi-gas remote sensing.**
 
-Write the forward model once, from an atmospheric state to what a sensor
-measures, $y = F(x)$. Every Jacobian a retrieval needs,
-$K = \partial F / \partial x$, then comes from automatic differentiation:
-the matched-filter target, a multi-band multi-pass signal, a band table,
-3D-Var and optimal estimation all use the same model and its derivatives.
-No adjoint is written by hand. Formerly **rtmx**.
+Write the forward model once, from an atmospheric state to what a sensor measures, $y = F(x)$. Every Jacobian a retrieval needs, $K = \partial F / \partial x$, then comes from automatic differentiation, with no adjoint written by hand: today the matched-filter target and the band tables that invert the multi-pass signals are built from the model and its derivatives. 3D-Var still runs on its single-slab observation operator, and optimal estimation on the layered model is v1 work in progress. Formerly **rtmx**.
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/forward-model-dark.svg">
-    <img alt="Sunlight crosses L atmospheric layers, reflects off the surface and reaches the sensor. In code: state x, then opacity O, then solver S (with surface R and geometry g), then instrument I gives band values y; autodiff gives K = ∂y/∂x, which every retrieval uses" src="docs/assets/forward-model-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/forward-model-dark.svg">
+    <img alt="Sunlight crosses L atmospheric layers, reflects off the surface and reaches the sensor. In code: state x, then opacity O, then solver S (with surface R and geometry g), then instrument I gives band values y; autodiff gives K = ∂y/∂x, which every retrieval uses" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/forward-model-light.svg" width="100%">
   </picture>
 </p>
 
@@ -106,12 +101,13 @@ def bands(theta: Float[Array, " 2"]) -> Float[Array, " B"]:
     return model(plume, Lambertian(theta[1]), geometry)  #                     (B,)
 
 
-# θ_n = (ΔX_n, A): a transect from 0 to 0.1 mol/m²                          (N, 2)
+# θ_n = (ΔX_n, A): a short transect from 0 to 0.1 mol/m²                    (N, 2)
 theta: Float[Array, "N 2"] = jnp.stack(
-    [jnp.linspace(0.0, 0.1, 256), jnp.full(256, 0.25)], axis=1
+    [jnp.linspace(0.0, 0.1, 8), jnp.full(8, 0.25)], axis=1
 )
-# K_n = ∂y/∂θ |_θₙ: vmap over pixels outside jacrev, never a Jacobian of a batch
-K: Float[Array, "N B 2"] = eqx.filter_jit(eqx.filter_vmap(jax.jacrev(bands)))(theta)
+# K_n = ∂y/∂θ |_θₙ: vmap over pixels outside the Jacobian, never a Jacobian of a
+# batch; jacfwd, as θ has two entries (forward mode costs one pass per input)
+K: Float[Array, "N B 2"] = eqx.filter_jit(eqx.filter_vmap(jax.jacfwd(bands)))(theta)
 ```
 
 `load_opacity` reads tables from your cache. If one is missing, the error
@@ -122,8 +118,8 @@ names the command that builds it
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.svg">
-    <img alt="The radtrax layers: retrievals on top of the forward model, the forward model on its components (opacity, solver, surface, instrument, noise), the components on the atmospheric state and the spectroscopy tables; built on JAX, Equinox, lineax, optimistix, gaussx and geonnax, with the geo and hitran extras beside them" src="docs/assets/architecture-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/architecture-dark.svg">
+    <img alt="The radtrax layers: retrievals on top of the forward model, the forward model on its components (opacity, solver, surface, instrument, noise), the components on the atmospheric state and the spectroscopy tables; built on JAX, Equinox, lineax, optimistix, gaussx and geonnax, with the geo and hitran extras beside them" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/architecture-light.svg" width="100%">
   </picture>
 </p>
 
@@ -156,8 +152,8 @@ is a protocol (`OpacityProvider`, `RTSolver`, `Surface`, `Instrument`,
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/ecosystem-dark.svg">
-    <img alt="radtrax in the stack: a GeoModels package that plumax builds on. It depends on gaussx, lineax and optimistix in Numerics and on geonnax in GeoML; vardax arrives through the var extra, and georeader, geotoolz and pipekit through the geo extra" src="docs/assets/ecosystem-light.svg" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/ecosystem-dark.svg">
+    <img alt="radtrax in the stack: a GeoModels package that plumax builds on. It depends on gaussx, lineax and optimistix in Numerics and on geonnax in GeoML; vardax arrives through the var extra, and georeader, geotoolz and pipekit through the geo extra" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/ecosystem-light.svg" width="100%">
   </picture>
 </p>
 
@@ -190,8 +186,8 @@ make lint typecheck
 make docs        # MyST prose + MkDocs API reference into public/
 ```
 
-The rules for contributors and coding agents are in [`AGENTS.md`](AGENTS.md);
-code review follows [`CODE_REVIEW.md`](CODE_REVIEW.md). The figures are
+The rules for contributors and coding agents are in [`AGENTS.md`](https://github.com/jejjohnson/radtrax/blob/main/AGENTS.md);
+code review follows [`CODE_REVIEW.md`](https://github.com/jejjohnson/radtrax/blob/main/CODE_REVIEW.md). The figures are
 generated: edit `docs/assets/make_assets.py` and run it.
 
 ## License
