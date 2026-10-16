@@ -66,7 +66,8 @@ surface: Lambertian = Lambertian(0.25)  # A = 0.25
 geometry: ViewingGeometry = ViewingGeometry.from_angles(sza_deg=35.0, vza_deg=10.0)
 
 # ── O: opacity ───────────────────────────────────────────────────────────────
-# τ_l(ν) = ∑_k σ_k(ν; ln p_l, T_l) · n_l · x_k,l · Δz_l   (k: gas, σ from HITRAN tables)
+# τ_l(ν) = ∑_k σ_k(ν; ln p_l, T_l) · x_k,l · n_l Δz_l   (k: gas, σ from HITRAN tables)
+# σ in cm²/molecule; n_l Δz_l the layer's air column in molecules/cm² (Δz in cm)
 opacity: TableOpacity = load_opacity(["CH4", "H2O"])  # build once with radtrax[hitran]
 nu: Float[Array, " G"] = opacity.nu_cm  # ν [cm⁻¹]                             (G,)
 
@@ -95,24 +96,29 @@ y: Float[Array, " B"] = model(atm, surface, geometry)  # E₀ = 1               
 t: Float[Array, " B"] = unit_absorption_target(model, atm, surface, geometry)  # (B,)
 
 
-# y(θ) for one pixel, θ = (ΔX [mol/m²], A)
-def bands(theta: Float[Array, " 2"]) -> Float[Array, " B"]:
-    plume: AtmosphericState = atm.add_column("CH4", theta[0])
-    return model(plume, Lambertian(theta[1]), geometry)  #                     (B,)
+# K_n = ∂y/∂θ |_θₙ for θ = (ΔX [mol/m²], A). The model is an argument, so its
+# tables stay array leaves rather than constants baked into the compiled code.
+@eqx.filter_jit
+def jacobians(model: ForwardModel, theta: Float[Array, "N 2"]) -> Float[Array, "N B 2"]:
+    def bands(t: Float[Array, " 2"]) -> Float[Array, " B"]:  # y(θ), one pixel
+        plume: AtmosphericState = atm.add_column("CH4", t[0])
+        return model(plume, Lambertian(t[1]), geometry)  #                     (B,)
+
+    # vmap over pixels outside the Jacobian, never a Jacobian of a batch;
+    # jacfwd, as θ has two entries (forward mode costs one pass per input)
+    return eqx.filter_vmap(jax.jacfwd(bands))(theta)
 
 
 # θ_n = (ΔX_n, A): a short transect from 0 to 0.1 mol/m²                    (N, 2)
 theta: Float[Array, "N 2"] = jnp.stack(
     [jnp.linspace(0.0, 0.1, 8), jnp.full(8, 0.25)], axis=1
 )
-# K_n = ∂y/∂θ |_θₙ: vmap over pixels outside the Jacobian, never a Jacobian of a
-# batch; jacfwd, as θ has two entries (forward mode costs one pass per input)
-K: Float[Array, "N B 2"] = eqx.filter_jit(eqx.filter_vmap(jax.jacfwd(bands)))(theta)
+K: Float[Array, "N B 2"] = jacobians(model, theta)
 ```
 
 `load_opacity` reads tables from your cache. If one is missing, the error
 names the command that builds it
-(`python -m radtrax.spectroscopy.hitran CH4 H2O`, with the `[hitran]` extra).
+(`uv run python -m radtrax.spectroscopy.hitran CH4 H2O`, with the `[hitran]` extra).
 
 ## What is inside
 
@@ -153,7 +159,7 @@ is a protocol (`OpacityProvider`, `RTSolver`, `Surface`, `Instrument`,
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/ecosystem-dark.svg">
-    <img alt="radtrax in the stack: a GeoModels package that plumax builds on. It depends on gaussx, lineax and optimistix in Numerics and on geonnax in GeoML; vardax arrives through the var extra, and georeader, geotoolz and pipekit through the geo extra" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/ecosystem-light.svg" width="100%">
+    <img alt="radtrax in the stack: a GeoModels package that plumax builds on. It depends on gaussx, lineax and optimistix in Numerics and on geonnax in GeoML; vardax, for v1's optimal estimation, will arrive through a planned var extra; georeader, geotoolz and pipekit arrive through the geo extra" src="https://raw.githubusercontent.com/jejjohnson/radtrax/main/docs/assets/ecosystem-light.svg" width="100%">
   </picture>
 </p>
 

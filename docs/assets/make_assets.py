@@ -583,7 +583,7 @@ def forward_model(theme: str) -> str:
         text(
             cx0,
             ry + 4,
-            "retrievals on the same model",
+            "retrievals on the same model (dashed: v1)",
             size=13,
             fill=t["muted"],
             weight=600,
@@ -594,7 +594,7 @@ def forward_model(theme: str) -> str:
         ("unit_absorption_target", False),
         ("matched filter", False),
         ("BandTable", False),
-        ("3D-Var", False),
+        ("3D-Var · v1", True),
         ("optimal estimation · vardax", True),
     ):
         c, w = chip(x, ry + 16, s, t, size=12, dashed=dashed)
@@ -980,8 +980,8 @@ def ecosystem(theme: str) -> str:
         "".join(b),
         "Where radtrax sits: a GeoModels package that plumax builds on; it "
         "depends on gaussx, lineax and optimistix in Numerics and geonnax in "
-        "GeoML, takes vardax through the var extra and georeader, geotoolz and "
-        "pipekit through the geo extra",
+        "GeoML, will take vardax through a planned v1 var extra, and takes "
+        "georeader, geotoolz and pipekit through the geo extra",
     )
 
 
