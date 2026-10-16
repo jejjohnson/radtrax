@@ -61,8 +61,8 @@ they cannot see.
 ### 2. The contracts
 
 - **Boundaries**: no import of `plumax`, lazily or not; nothing from
-  geotoolz or georeader outside `radtrax.geo` and the `[geo]` extra; no
-  `geotoolz._src` import anywhere; an optional dependency is imported inside
+  geoops or georeader outside `radtrax.geo` and the `[geo]` extra; no
+  `geoops._src` import anywhere; an optional dependency is imported inside
   the function and a missing extra names itself in the `ImportError`.
 - **Forward-model components** are `eqx.Module`s; arrays are leaves, never
   `eqx.field(static=True)`; abstract bases use `eqx.AbstractVar` and

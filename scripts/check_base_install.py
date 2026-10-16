@@ -22,7 +22,7 @@ import sys
 
 #: Packages the base install must not contain (package-boundaries rule 3;
 #: plumax is above radtrax in the package graph).
-FORBIDDEN = ("georeader", "geotoolz", "pipekit", "plumax")
+FORBIDDEN = ("georeader", "geoops", "geotoolz", "pipekit", "plumax")
 
 #: The only modules that may refuse to import in the base install, each with
 #: the extra its ImportError must name. Anything else that fails to import

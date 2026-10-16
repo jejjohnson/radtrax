@@ -745,7 +745,7 @@ def test_matched_filter_keeps_the_carrier_contract() -> None:
     ``(T, C, H, W)`` stack by design, which the checker's frame-by-frame rule
     rejects (geotoolz exempts it in its own contract test for that reason).
     """
-    from geotoolz.testing import check_operator
+    from geoops.testing import check_operator
 
     gt, _, _ = _fill_cube(-9999.0)
     gt.attrs = {"band_names": ["b1", "b2", "b3"]}

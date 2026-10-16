@@ -32,7 +32,7 @@ from radtrax.retrieval.mbmp import (
 
 
 try:
-    from geotoolz.carrier import (
+    from geoops.carrier import (
         SENTINEL2_L2A_BANDS,
         BandRef,
         invalid_values,

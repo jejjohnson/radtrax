@@ -45,7 +45,7 @@ are given. Read "The contracts" and "What it is built on" in `AGENTS.md`.
    the comparison needs (a parity test against ported code should be near
    rounding, about 1e-12 relative).
 9. **Boundaries.** Any import of `plumax`; geotoolz or georeader outside
-   `radtrax.geo`; `geotoolz._src`; an optional dependency imported at module
+   `radtrax.geo`; `geoops._src`; an optional dependency imported at module
    level.
 
 ## Report

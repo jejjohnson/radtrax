@@ -87,7 +87,7 @@ from radtrax.retrieval.var3d.obs_operator import RadianceObservationModel
 
 
 try:
-    from geotoolz.carrier import (
+    from geoops.carrier import (
         callable_name,
         cube_to_samples,
         fit_once,

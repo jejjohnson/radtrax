@@ -105,7 +105,7 @@ def swir_contrast(
     """Single-pass normalised SWIR contrast ``(R₁₁ − R₁₂) / (R₁₁ + R₁₂ + ε)``.
 
     The normalised difference of bands 11 and 12 (the NBR2 index, as in
-    ``geotoolz.indices.nbr2``) after clipping at zero, in JAX. A detection
+    ``geoops.indices.nbr2``) after clipping at zero, in JAX. A detection
     prefilter, not a column retrieval.
 
     Examples:

@@ -1,6 +1,6 @@
 """The one matched-filter core (radtrax#26): geotoolz's array-level cases.
 
-geotoolz's matched-filter primitives (``geotoolz.matched_filter._src.array``)
+geotoolz's matched-filter primitives (``geoops.matched_filter._src.array``)
 are absorbed here, so its array tests are ported against radtrax: shrinkage
 equal to scikit-learn, exact streaming fourth moments, cluster and adaptive
 filters, and non-finite pixels left out of every statistic. Two conventions
