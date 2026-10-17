@@ -62,7 +62,7 @@ GeoStack package graph gets a cycle.
   (with the `openpyxl`, `tqdm` and `typing-extensions` it needs but does not
   declare), geotoolz and pipekit; the base install stays JAX-only. The
   dev group installs `radtrax[geo]`, so CI runs the geo tests. Code in `geo/` imports only
-  public geotoolz names, never `geotoolz._src`.
+  public geotoolz names, never `geoops._src`.
 - **Optional dependencies are lazy.** Anything behind an extra (`hitran`,
   `geo`, `bayes`) is imported inside the function that needs it,
   and a missing extra raises an `ImportError` that names the extra.

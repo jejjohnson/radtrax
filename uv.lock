@@ -131,7 +131,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -709,9 +709,9 @@ wheels = [
 ]
 
 [[package]]
-name = "geotoolz"
+name = "geotoolz-ops"
 version = "0.10.3"
-source = { git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&tag=geotoolz-v0.10.3#9c41acdfa546f9405fb3f53b320cc7d7be814337" }
+source = { git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz-ops&rev=278b8afbc675b9e082ac75488200a4729da38097#278b8afbc675b9e082ac75488200a4729da38097" }
 dependencies = [
     { name = "affine" },
     { name = "einx" },
@@ -1969,7 +1969,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -2463,7 +2463,7 @@ dependencies = [
 [package.optional-dependencies]
 geo = [
     { name = "georeader-spaceml" },
-    { name = "geotoolz" },
+    { name = "geotoolz-ops" },
     { name = "openpyxl" },
     { name = "pipekit" },
     { name = "tqdm" },
@@ -2507,7 +2507,7 @@ requires-dist = [
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax?tag=v0.0.9" },
     { name = "georeader-spaceml", marker = "extra == 'geo'", specifier = ">=2.4.1" },
-    { name = "geotoolz", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz&tag=geotoolz-v0.10.3" },
+    { name = "geotoolz-ops", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz-ops&rev=278b8afbc675b9e082ac75488200a4729da38097" },
     { name = "hitran-api", marker = "extra == 'hitran'" },
     { name = "jax", specifier = ">=0.10" },
     { name = "jaxlib", specifier = ">=0.10" },

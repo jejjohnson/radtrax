@@ -17,7 +17,7 @@ pytestmark = pytest.mark.integration
 GeoTensor = pytest.importorskip("georeader.geotensor").GeoTensor
 rasterio = pytest.importorskip("rasterio")
 
-from geotoolz.carrier import SENTINEL2_L2A_BANDS
+from geoops.carrier import SENTINEL2_L2A_BANDS
 from pipekit import Operator
 
 from geo._carriers import TRANSFORM
@@ -135,7 +135,7 @@ def test_carrier_kwarg_is_gone_and_config_round_trips() -> None:
 
 
 def test_keeps_the_carrier_contract() -> None:
-    from geotoolz.testing import check_operator
+    from geoops.testing import check_operator
 
     values = np.random.default_rng(1).uniform(0.1, 1.0, size=(2, 4, 4))
     values[:, 0, 0] = -9999.0
@@ -224,7 +224,7 @@ def test_new_operators_round_trip_their_config() -> None:
 
 
 def test_new_operators_keep_the_carrier_contract() -> None:
-    from geotoolz.testing import check_operator
+    from geoops.testing import check_operator
 
     values = np.random.default_rng(1).uniform(0.1, 1.0, size=(2, 4, 4))
     values[:, 0, 0] = -9999.0
