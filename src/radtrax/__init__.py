@@ -29,7 +29,7 @@ from radtrax.forward_model import ForwardModel
 from radtrax.retrieval.matched_filter.target import unit_absorption_target
 
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"
 
 __all__ = [
     "ArgumentTypeError",
