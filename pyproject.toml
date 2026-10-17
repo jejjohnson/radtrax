@@ -73,12 +73,13 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 
 # gaussx and geotoolz-ops are not on PyPI yet: resolve them from git, as plumax
 # does. geotoolz-ops is geotoolz's operator package, renamed from `geotoolz`
-# in geotoolz#489; pinned to that PR's commit until a geotoolz-ops tag exists. A plain `pip install` reads only the PyPI-style
+# in geotoolz#489; pinned to its merge commit on main until a geotoolz-ops tag
+# exists. A plain `pip install` reads only the PyPI-style
 # requirements above, so radtrax installs with uv until both are on PyPI (#25).
 [tool.uv.sources]
 gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
-geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "19cd94ae8ed790cbc3c099f8a0e2c379cd632505", subdirectory = "packages/geotoolz-ops" }
+geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "278b8afbc675b9e082ac75488200a4729da38097", subdirectory = "packages/geotoolz-ops" }
 
 [dependency-groups]
 dev = [
