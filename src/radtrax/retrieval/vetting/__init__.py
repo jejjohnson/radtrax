@@ -10,12 +10,20 @@ p-value against the same scene's clutter. Theory: the plume-vetting page.
 - `transmittance`: `transmittance_table`, the band transmittance of a
   column enhancement from `ForwardModel`, exact or constant-coefficient
   (#154).
+- `seeds`: `select_seeds` and `background_pool`, a candidate's in-plume
+  seeds and the background pool they are paired from (#148).
 """
 
 from __future__ import annotations
 
+from radtrax.retrieval.vetting.seeds import background_pool, select_seeds
 from radtrax.retrieval.vetting.transmittance import transmittance_table
 from radtrax.retrieval.vetting.window import VettingWindow
 
 
-__all__ = ["VettingWindow", "transmittance_table"]
+__all__ = [
+    "VettingWindow",
+    "background_pool",
+    "select_seeds",
+    "transmittance_table",
+]
