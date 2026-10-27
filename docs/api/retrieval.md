@@ -122,7 +122,7 @@ A band observable `g(m[, h], ΔΩ)` (one band's `τ₁₂`, or `τ₁₂ − τ�
 
 # Plume vetting
 
-A spectral test for matched-filter candidates (Xiang et al. 2024): seeds and a background pool from the matched filter, one-to-one pairs on bands the gas does not absorb, the ratio spectrum, its fit to the forward model's transmittance and its score. Theory: [plume vetting](../../plume-vetting/).
+A spectral test for matched-filter candidates (Xiang et al. 2024): seeds and a background pool from the matched filter, one-to-one pairs on bands the gas does not absorb, the ratio spectrum, its fit to the forward model's transmittance, its score and a p-value against the same scene's clutter. Theory: [plume vetting](../../plume-vetting/).
 
 ::: radtrax.retrieval.vetting
     options:
@@ -159,6 +159,13 @@ A spectral test for matched-filter candidates (Xiang et al. 2024): seeds and a b
 ## `fit`
 
 ::: radtrax.retrieval.vetting.fit
+    options:
+      show_root_heading: false
+      heading_level: 3
+
+## `null`
+
+::: radtrax.retrieval.vetting.null
     options:
       show_root_heading: false
       heading_level: 3

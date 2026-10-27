@@ -17,11 +17,15 @@ p-value against the same scene's clutter. Theory: the plume-vetting page.
 - `fit`: `TransmittanceFit`, `fit_transmittance` and `d_norm`, the profile
   fit of the ratio to a Legendre continuum times the transmittance, and its
   score (#150).
+- `null`: `null_masks` and `null_pvalue`, rotated and translated copies of
+  a candidate's mask off every candidate, and the candidate's p-value
+  among their scores (#152).
 """
 
 from __future__ import annotations
 
 from radtrax.retrieval.vetting.fit import TransmittanceFit, d_norm, fit_transmittance
+from radtrax.retrieval.vetting.null import null_masks, null_pvalue
 from radtrax.retrieval.vetting.pairing import pair_pixels, ratio_spectrum
 from radtrax.retrieval.vetting.seeds import background_pool, select_seeds
 from radtrax.retrieval.vetting.transmittance import transmittance_table
@@ -34,6 +38,8 @@ __all__ = [
     "background_pool",
     "d_norm",
     "fit_transmittance",
+    "null_masks",
+    "null_pvalue",
     "pair_pixels",
     "ratio_spectrum",
     "select_seeds",
