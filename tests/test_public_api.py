@@ -31,6 +31,7 @@ SUBPACKAGES = [
     "retrieval",
     "retrieval.matched_filter",
     "retrieval.var3d",
+    "retrieval.vetting",
     "slab",
     "solvers",
     "spectroscopy",
