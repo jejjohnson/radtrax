@@ -122,7 +122,7 @@ A band observable `g(m[, h], ΔΩ)` (one band's `τ₁₂`, or `τ₁₂ − τ�
 
 # The absorption-shape test
 
-A plume-agnostic retrieval: given two sets of pixels, does the ratio of their paired mean radiances have the shape of a gas's transmittance? One-to-one pairs on bands the gas does not absorb, the ratio spectrum, its fit to the forward model's transmittance, the fitted column `ΔX̂` and the misfit `D_norm` (Xiang et al. 2024). `plumax.vetting` runs it on plume candidates. Theory: [plume vetting](../../plume-vetting/).
+A plume-agnostic retrieval: given two sets of pixels, does the ratio of their paired mean radiances have the shape of a gas's transmittance? One-to-one pairs on bands the gas does not absorb, the ratio spectrum, its fit to the forward model's transmittance, the fitted column `ΔX̂` and the misfit `D_norm` (Xiang et al. 2024). `plumax.vetting` runs it on plume candidates. Theory: [the absorption-shape test](../../absorption-test/).
 
 ::: radtrax.retrieval.absorption
     options:

@@ -141,7 +141,7 @@ is a protocol (`OpacityProvider`, `RTSolver`, `Surface`, `Instrument`,
 | Surface | `Lambertian`, `PolynomialAlbedo` (Legendre in ν), `RossLi` (RossThick + LiSparse-Reciprocal) |
 | Instrument | `BandInstrument` (any SRF matrix, shift on the grid), `GaussianInstrument` (analytic shift in cm⁻¹ or nm) |
 | Noise | `DiagonalNoise`, `SNRNoise`, as lineax operators with `log_prob` through gaussx |
-| Retrieval | the matched filter (backgrounds, clusters, streaming, a target from autodiff), the multi-pass family (`mbmp_signal`, `sbmp_signal`, `mbsp_signal`), `BandTable`, 3D-Var |
+| Retrieval | the matched filter (backgrounds, clusters, streaming, a target from autodiff), the multi-pass family (`mbmp_signal`, `sbmp_signal`, `mbsp_signal`), `BandTable`, 3D-Var, the absorption-shape test (`radtrax.retrieval.absorption`: `pair_pixels`, `fit_transmittance`, `d_norm`) |
 | `[geo]` | the same retrievals as pipekit operators on georeader `GeoTensor`s, with Sentinel-2 SRFs |
 
 ## Status
