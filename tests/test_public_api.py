@@ -29,6 +29,7 @@ SUBPACKAGES = [
     "instrument",
     "optics",
     "retrieval",
+    "retrieval.absorption",
     "retrieval.matched_filter",
     "retrieval.var3d",
     "slab",
