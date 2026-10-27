@@ -19,8 +19,12 @@ Other packages build on it (plumax first), so **the package is a library of
 primitives**: new code composes what is here, and anything new lands where
 the next person will find and reuse it.
 
-It is one package, `src/radtrax/`. The public API is `radtrax.__all__`,
-re-exported from `src/radtrax/__init__.py`. It holds v0, the layered forward
+It is one package, `src/radtrax/`. Its public API is every name in a public
+module's or subpackage's `__all__`, each at one public home
+([`docs/api/capabilities.md`](docs/api/capabilities.md) lists them); the
+package root, `radtrax.__all__` in `src/radtrax/__init__.py`, re-exports only
+the headline names (the exceptions, `ForwardModel`, `unit_absorption_target`).
+It holds v0, the layered forward
 model, in the layout below (issues #1–#4 are the wave epics of v0, #100 is
 v1's), and `tests/test_public_api.py` fails if the layout drifts:
 
@@ -198,15 +202,22 @@ Everything composes because it keeps these contracts.
 
 ### The public API
 
-- Export a public name from its module's `__all__` and from
-  `src/radtrax/__init__.py` (import and `__all__`); both stay sorted (ruff's
-  `RUF022` and `test_all_is_sorted_and_unique` agree on the order).
+- Export a public name from the `__all__` of the module that defines it and
+  of its subpackage's `__init__.py`: that is its public home
+  (`radtrax.retrieval.absorption.fit_transmittance`,
+  `radtrax.retrieval.band_table.BandTable`). Re-export it from
+  `src/radtrax/__init__.py` (import and `__all__`) only if it is a headline
+  name, which today means the exceptions, `ForwardModel` and
+  `unit_absorption_target`; widening the root is a design decision, not a
+  per-PR default. Every `__all__` stays sorted (ruff's `RUF022` and
+  `test_all_is_sorted_and_unique` agree on the order).
 - A new top-level module declares a sorted `__all__`, joins `SUBMODULES` in
   `tests/test_public_api.py`, and gets its own page in `docs/api/` (a
   `::: radtrax.<module>` block), a `nav` entry in `mkdocs.yml` and a row in
   `docs/api/index.md`.
 - Run `make capabilities` after any public API change.
-- Link prose to the API by the **top-level** name, see "Documentation".
+- Link prose to the API by the name at its public home (the top-level name
+  when the root re-exports it), see "Documentation".
 
 ## What enforces them
 
@@ -427,7 +438,9 @@ clone of the theme.
 - **Link to the API** with the `xref:` protocol and the **top-level**
   exported name: ``[`RadtraxError`](xref:api#radtrax.RadtraxError)``, not
   `radtrax.exceptions.RadtraxError` (mystmd lowercases `$`-abbreviated anchors;
-  see `docs/README.md`). A missing target fails `myst build --strict`.
+  see `docs/README.md`). A name the root does not re-export links at its
+  public home: ``[`d_norm`](xref:api#radtrax.retrieval.absorption.d_norm)``.
+  A missing target fails `myst build --strict`.
 - **URLs are flat**: a page's URL is its basename, with `_` turned into `-`
   (`guide/quickstart.md` → `/quickstart/`,
   `notebooks/smoothing_deep_dive.ipynb` → `/smoothing-deep-dive/`), so keep
