@@ -14,10 +14,14 @@ p-value against the same scene's clutter. Theory: the plume-vetting page.
   seeds and the background pool they are paired from (#148).
 - `pairing`: `pair_pixels` and `ratio_spectrum`, one-to-one pairs on the
   pairing bands and the ratio of their mean radiances (#149).
+- `fit`: `TransmittanceFit`, `fit_transmittance` and `d_norm`, the profile
+  fit of the ratio to a Legendre continuum times the transmittance, and its
+  score (#150).
 """
 
 from __future__ import annotations
 
+from radtrax.retrieval.vetting.fit import TransmittanceFit, d_norm, fit_transmittance
 from radtrax.retrieval.vetting.pairing import pair_pixels, ratio_spectrum
 from radtrax.retrieval.vetting.seeds import background_pool, select_seeds
 from radtrax.retrieval.vetting.transmittance import transmittance_table
@@ -25,8 +29,11 @@ from radtrax.retrieval.vetting.window import VettingWindow
 
 
 __all__ = [
+    "TransmittanceFit",
     "VettingWindow",
     "background_pool",
+    "d_norm",
+    "fit_transmittance",
     "pair_pixels",
     "ratio_spectrum",
     "select_seeds",
