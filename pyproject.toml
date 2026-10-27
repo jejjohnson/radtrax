@@ -47,6 +47,8 @@ dependencies = [
     # the matched filter's background estimators (empirical, Ledoit-Wolf,
     # OAS, truncated SVD, Gaussian mixtures); imported inside the estimators.
     "scikit-learn>=1.3",
+    # plume vetting's one-to-one pairing (linear_sum_assignment, cdist).
+    "scipy>=1.11",
 ]
 
 [project.optional-dependencies]

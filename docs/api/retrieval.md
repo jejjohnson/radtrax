@@ -148,3 +148,10 @@ A spectral test for matched-filter candidates (Xiang et al. 2024): seeds and a b
     options:
       show_root_heading: false
       heading_level: 3
+
+## `pairing`
+
+::: radtrax.retrieval.vetting.pairing
+    options:
+      show_root_heading: false
+      heading_level: 3
