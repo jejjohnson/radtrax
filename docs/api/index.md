@@ -16,7 +16,7 @@ a one-line summary each.
 | [Surface](surface.md) | `Surface`, `Lambertian` |
 | [Slab models](slab.md) | single-slab forward models, the nB table, observation config |
 | [Instrument](instrument.md) | `Instrument`, `BandInstrument`, `SpectralResponseFunction`, `PointSpreadFunction`, `GroundSamplingDistance` |
-| [Retrieval](retrieval.md) | the matched filter; 3D-Var; the MBMP signal; band tables; the absorption-shape test (`AbsorptionWindow`, `transmittance_table`, `pair_pixels`, `ratio_spectrum`) |
+| [Retrieval](retrieval.md) | the matched filter; 3D-Var; the MBMP signal; band tables; the absorption-shape test (`AbsorptionWindow`, `transmittance_table`, `pair_pixels`, `ratio_spectrum`, `fit_transmittance`, `d_norm`) |
 | [Geo](geo.md) | `sentinel2_srf` (the `[geo]` extra) |
 | [Exceptions](exceptions.md) | `RadtraxError`, `MissingTableError` |
 

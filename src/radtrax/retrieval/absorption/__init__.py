@@ -18,10 +18,18 @@ and decides on the scores. Theory: the absorption-shape test page.
 - `pairing`: `pair_pixels` and `ratio_spectrum`, one-to-one pairs of two
   flat pixel-index sets on the pairing bands and the ratio of their mean
   radiances (#149).
+- `fit`: `TransmittanceFit`, `fit_transmittance` and `d_norm`, the profile
+  fit of the ratio to a Legendre continuum times the transmittance, and its
+  misfit score (#150).
 """
 
 from __future__ import annotations
 
+from radtrax.retrieval.absorption.fit import (
+    TransmittanceFit,
+    d_norm,
+    fit_transmittance,
+)
 from radtrax.retrieval.absorption.pairing import pair_pixels, ratio_spectrum
 from radtrax.retrieval.absorption.transmittance import transmittance_table
 from radtrax.retrieval.absorption.window import AbsorptionWindow
@@ -29,6 +37,9 @@ from radtrax.retrieval.absorption.window import AbsorptionWindow
 
 __all__ = [
     "AbsorptionWindow",
+    "TransmittanceFit",
+    "d_norm",
+    "fit_transmittance",
     "pair_pixels",
     "ratio_spectrum",
     "transmittance_table",
