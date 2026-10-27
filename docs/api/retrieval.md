@@ -141,3 +141,10 @@ A plume-agnostic retrieval: given two sets of pixels, does the ratio of their pa
     options:
       show_root_heading: false
       heading_level: 3
+
+## `pairing`
+
+::: radtrax.retrieval.absorption.pairing
+    options:
+      show_root_heading: false
+      heading_level: 3

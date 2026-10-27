@@ -15,12 +15,21 @@ and decides on the scores. Theory: the absorption-shape test page.
 - `transmittance`: `transmittance_table`, the band transmittance of a
   column enhancement from `ForwardModel`, exact or constant-coefficient
   (#154).
+- `pairing`: `pair_pixels` and `ratio_spectrum`, one-to-one pairs of two
+  flat pixel-index sets on the pairing bands and the ratio of their mean
+  radiances (#149).
 """
 
 from __future__ import annotations
 
+from radtrax.retrieval.absorption.pairing import pair_pixels, ratio_spectrum
 from radtrax.retrieval.absorption.transmittance import transmittance_table
 from radtrax.retrieval.absorption.window import AbsorptionWindow
 
 
-__all__ = ["AbsorptionWindow", "transmittance_table"]
+__all__ = [
+    "AbsorptionWindow",
+    "pair_pixels",
+    "ratio_spectrum",
+    "transmittance_table",
+]
