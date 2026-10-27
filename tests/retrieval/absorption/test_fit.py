@@ -211,7 +211,9 @@ def test_nan_bands_are_left_out_of_the_fit_and_the_score() -> None:
     keep = np.setdiff1d(np.arange(WL.size), GAPS)
     fit = fit_transmittance(gapped, TABLE, GRID, WL)
     ref = fit_transmittance(ratio[keep], TABLE[:, keep], GRID, WL[keep])
-    assert float(fit.delta) == float(ref.delta)
+    # ΔX̂ is a parabola vertex between nodes, so the masked and the band-dropped
+    # fits agree to rounding, not bit for bit (BLAS and XLA builds differ).
+    np.testing.assert_allclose(fit.delta, ref.delta, rtol=1e-10)
     np.testing.assert_allclose(fit.coefficients, ref.coefficients, rtol=1e-10)
     np.testing.assert_allclose(fit.continuum[keep], ref.continuum, rtol=1e-10)
     np.testing.assert_allclose(fit.residual_ss, ref.residual_ss, rtol=1e-10)

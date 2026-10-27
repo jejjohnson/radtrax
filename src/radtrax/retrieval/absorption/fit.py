@@ -82,8 +82,8 @@ def fit_transmittance(
     at a grid end), clipped to their span; ``E(ΔX̂)`` interpolates ``ln E``
     linearly between the two rows around it (so ``E > 0``), and ``ĉ`` is
     solved again there. The refined fit replaces the node's only where the
-    parabola is convex and the refit lowers the residual, so a fit exact on
-    a node stays there. For ``RSS ≈ a u² + b u³`` near its minimum (``u``
+    parabola is convex and the refit lowers the residual by more than
+    rounding (10⁻¹² of ``‖R‖²``), so a fit exact on a node stays there. For ``RSS ≈ a u² + b u³`` near its minimum (``u``
     the distance to it) and spacing ``h``, the vertex is off by
     ``(b / 2a)(3δ² − h²)``, ``δ`` the middle node's distance to the
     minimum: at most ``|b| h² / a``, against ``h / 2`` for the node alone.
@@ -268,9 +268,11 @@ def _profile_fit(
     c_hat = solve(e, r)  # (K,)
     continuum = basis @ c_hat  # (B,)
     rss_hat = jnp.sum(w * (ratio_safe - e * continuum) ** 2)  # ()
-    # The refined fit replaces the node's only where it lowers the residual,
-    # so a fit exact on a node stays on it.
-    better = convex & (rss_hat < rss[k])
+    # The refined fit replaces the node's only where it lowers the residual by
+    # more than rounding (1e-12 of ‖R‖² on the usable bands), so a fit exact on
+    # a node stays on it whatever the platform's last bits say.
+    tol = 1e-12 * jnp.sum(w * ratio_safe**2)  # ()
+    better = convex & (rss_hat < rss[k] - tol)
     refined = TransmittanceFit(
         delta=delta,
         coefficients=c_hat,
