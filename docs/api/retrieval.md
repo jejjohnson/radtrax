@@ -148,3 +148,10 @@ A plume-agnostic retrieval: given two sets of pixels, does the ratio of their pa
     options:
       show_root_heading: false
       heading_level: 3
+
+## `fit`
+
+::: radtrax.retrieval.absorption.fit
+    options:
+      show_root_heading: false
+      heading_level: 3
