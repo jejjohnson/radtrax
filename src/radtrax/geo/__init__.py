@@ -11,8 +11,9 @@
   and :func:`landsat_geometry` (:mod:`radtrax.geo.landsat`): Landsat 8/9 OLI
   B6 and B7 from the USGS spectral responses radtrax bundles, radiance from
   Level-1 digital numbers and the MTL rescaling, and a per-pixel
-  ``ViewingGeometry`` from the Collection 2 angle bands (radtrax#121); no
-  extra needed.
+  ``ViewingGeometry`` from the Collection 2 angle bands (radtrax#121); the
+  TIRS bands B10 and B11 with band radiance per µm, and their NEΔT as a
+  noise model, :func:`landsat_noise` (radtrax#225); no extra needed.
 - :func:`emit_instrument` and :func:`emit_geometry` (:mod:`radtrax.geo.emit`):
   an EMIT L1B image read by georeader's ``EMITImage`` as a ``BandInstrument``
   with Gaussian bands of its FWHM, and a per-pixel ``ViewingGeometry`` from
@@ -37,8 +38,11 @@ from typing import TYPE_CHECKING, Any
 
 from radtrax.geo.emit import emit_geometry, emit_instrument
 from radtrax.geo.landsat import (
+    LANDSAT_CALIBRATION_K,
+    LANDSAT_NETD_K,
     landsat_geometry,
     landsat_instrument,
+    landsat_noise,
     landsat_radiance,
     landsat_srf,
 )
@@ -117,6 +121,8 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "LANDSAT_CALIBRATION_K",
+    "LANDSAT_NETD_K",
     "MBMP",
     "MBSP",
     "SBMP",
@@ -144,6 +150,7 @@ __all__ = [
     "emit_instrument",
     "landsat_geometry",
     "landsat_instrument",
+    "landsat_noise",
     "landsat_radiance",
     "landsat_srf",
     "sentinel2_band_responses",

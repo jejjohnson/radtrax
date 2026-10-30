@@ -189,3 +189,65 @@ def test_band_instrument_is_linear_in_radiance() -> None:
     np.testing.assert_allclose(
         instrument.response_matrix() @ l1, instrument(l1), rtol=1e-14
     )
+
+
+# ── per µm (radtrax#225) ─────────────────────────────────────────────────────
+
+NU_TIR = np.linspace(800.0, 1000.0, 2001)  # 10–12.5 µm, 0.1 cm⁻¹
+
+
+@pytest.fixture(scope="module")
+def tir_srf() -> SpectralResponseFunction:
+    return SpectralResponseFunction(
+        wavelengths_hr_nm=1e7 / NU_TIR[::-1],
+        band_centers_nm=np.array([10900.0, 11500.0]),
+        band_widths_nm=np.array([900.0, 900.0]),
+        band_names=("B10", "B11"),
+    )
+
+
+def test_per_um_folds_the_jacobian_into_the_response(
+    tir_srf: SpectralResponseFunction,
+) -> None:
+    per_cm = BandInstrument.from_srf(tir_srf, NU_TIR)
+    per_um = BandInstrument.from_srf(tir_srf, NU_TIR, per_um=True)
+    np.testing.assert_allclose(
+        per_um.response, per_cm.response * NU_TIR**2 / 1e4, rtol=1e-14
+    )
+    np.testing.assert_allclose(per_cm.response.sum(axis=1), 1.0, rtol=1e-12)
+    # Rows sum to the band's mean of ν²/10⁴: about 84 at 10.9 µm.
+    assert np.all(np.abs(np.asarray(per_um.response.sum(axis=1)) - 80.0) < 10.0)
+
+
+def test_a_flat_spectrum_per_um_reads_its_value_in_every_band(
+    tir_srf: SpectralResponseFunction,
+) -> None:
+    """L_ν = c·10⁴/ν² is c per µm everywhere, so every band reads c (1e-12)."""
+    c = 3.7
+    band = BandInstrument.from_srf(tir_srf, NU_TIR, per_um=True)
+    np.testing.assert_allclose(band(c * 1e4 / NU_TIR**2), c, rtol=1e-12)
+
+
+def test_per_um_is_not_a_per_cm_average_times_a_constant(
+    tir_srf: SpectralResponseFunction,
+) -> None:
+    """The conversion belongs inside the integral: converting the per-cm⁻¹
+    band average at the centroid misses by far more than rounding."""
+    per_cm = BandInstrument.from_srf(tir_srf, NU_TIR)
+    per_um = BandInstrument.from_srf(tir_srf, NU_TIR, per_um=True)
+    flat = 1e4 / NU_TIR**2  # 1 per µm
+    centroid = np.asarray(per_cm.response @ NU_TIR)
+    converted = np.asarray(per_cm(flat)) * centroid**2 / 1e4
+    assert np.all(np.abs(converted - 1.0) > 1e-4)
+    np.testing.assert_allclose(per_um(flat), 1.0, rtol=1e-12)
+
+
+def test_per_um_gradient_in_the_shift(tir_srf: SpectralResponseFunction) -> None:
+    band = BandInstrument.from_srf(tir_srf, NU_TIR, per_um=True)
+    # A slope, so dy/dδ is not lost in the rounding of y (~8 per µm).
+    radiance = jnp.asarray(0.1 + 1e-3 * (NU_TIR - 900.0) + 0.01 * np.sin(NU_TIR / 3.0))
+
+    def bands(shift: jax.Array) -> jax.Array:
+        return eqx.tree_at(lambda i: i.shift_cm, band, shift[0])(radiance)
+
+    assert_gradients_match(bands, jnp.array([0.037]))

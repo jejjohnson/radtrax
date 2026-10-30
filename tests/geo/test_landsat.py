@@ -1,11 +1,12 @@
-"""Landsat 8/9 OLI as SRF, instrument, radiance and geometry (radtrax#121).
+"""Landsat 8/9 OLI and TIRS as SRF, instrument, noise, radiance and geometry.
 
-The SRFs come from the USGS responses bundled in ``radtrax/geo/data``; the
-radiance and geometry tests use tiny synthetic arrays in place of the
-Level-1 bands, so nothing is downloaded. One real scene runs when
+OLI's B6 and B7 (radtrax#121) and TIRS's B10 and B11 (radtrax#225). The SRFs
+come from the USGS responses bundled in ``radtrax/geo/data``; the radiance
+and geometry tests use tiny synthetic arrays in place of the Level-1 bands,
+so nothing is downloaded. Two real-scene tests run when
 ``RADTRAX_LANDSAT_L1`` points at an unpacked Collection 2 Level-1 product
-directory (its ``*_MTL.json``, ``*_B6.TIF``, ``*_B7.TIF`` and the four angle
-bands); it is skipped otherwise.
+directory (its ``*_MTL.json``, ``*_B6.TIF``, ``*_B7.TIF``, ``*_B10.TIF``,
+``*_B11.TIF`` and the four angle bands); they are skipped otherwise.
 """
 
 from __future__ import annotations
@@ -16,16 +17,23 @@ from importlib import resources
 from pathlib import Path
 
 import equinox as eqx
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+from _gradcheck import assert_gradients_match
 
 from radtrax.geo import (
+    LANDSAT_CALIBRATION_K,
+    LANDSAT_NETD_K,
     landsat_geometry,
     landsat_instrument,
+    landsat_noise,
     landsat_radiance,
     landsat_srf,
 )
+from radtrax.instrument import BandInstrument
+from radtrax.radiometry import band_brightness_temperature, band_planck_radiance
 
 
 def _bundled() -> dict[tuple[str, str], tuple[np.ndarray, np.ndarray]]:
@@ -42,15 +50,25 @@ def _bundled() -> dict[tuple[str, str], tuple[np.ndarray, np.ndarray]]:
 # ---------------------------------------------------------------- the table
 
 
-def test_bundled_table_holds_b6_and_b7_of_both_satellites() -> None:
+def test_bundled_table_holds_oli_and_tirs_of_both_satellites() -> None:
     table = _bundled()
-    assert sorted(table) == [("L8", "B6"), ("L8", "B7"), ("L9", "B6"), ("L9", "B7")]
-    for wl, response in table.values():
-        np.testing.assert_array_equal(np.diff(wl), 1.0)  # the 1 nm grid
+    assert sorted(table) == [
+        (sat, band) for sat in ("L8", "L9") for band in ("B10", "B11", "B6", "B7")
+    ]
+    for (_, band), (wl, response) in table.items():
+        step = 50.0 if band in ("B10", "B11") else 1.0  # TIRS every 0.05 µm
+        np.testing.assert_array_equal(np.diff(wl), step)
         assert 0.99 < response.max() <= 1.0  # peak-normalised RSR
     # Spot values copied from the USGS workbooks (sheets SWIR1 and SWIR2).
     assert table["L9", "B6"][1][0] == 0.00102868  # 1515 nm
     assert table["L8", "B7"][1][0] == -1e-05  # 2037 nm, as published
+    # TIRS: the workbooks' sheets "TIRS BA RSR" (L8) and "TIRS Band 1x BA RSR" (L9).
+    assert table["L8", "B10"][0][[0, -1]].tolist() == [9000.0, 14000.0]
+    assert table["L8", "B10"][1][0] == 0.00076333455919908  # 9.00 µm
+    assert table["L8", "B11"][1][37] == 0.0  # 10.85 µm, as published
+    assert table["L9", "B10"][0][[0, -1]].tolist() == [9800.0, 11800.0]
+    assert table["L9", "B10"][1][25] == 1.0  # 11.05 µm, the peak
+    assert table["L9", "B11"][0][[0, -1]].tolist() == [11000.0, 13000.0]
 
 
 @pytest.mark.parametrize("satellite", ["L8", "L9"])
@@ -76,8 +94,8 @@ def test_srf_band_centres_sit_in_the_swir_windows() -> None:
 def test_srf_rejects_unknown_satellite_and_band() -> None:
     with pytest.raises(ValueError, match="unknown satellite"):
         landsat_srf("L7")
-    with pytest.raises(KeyError, match="B10"):
-        landsat_srf("L9", bands=("B6", "B10"))
+    with pytest.raises(KeyError, match="B12"):
+        landsat_srf("L9", bands=("B6", "B12"))
 
 
 # ---------------------------------------------------------------- instrument
@@ -294,3 +312,215 @@ def test_one_level1_scene() -> None:
     sza = np.rad2deg(np.arccos(np.asarray(geometry.mu0)))
     # The scene-centre sun elevation is close to every pixel's (a 185 km swath).
     assert np.all(np.abs(sza - (90.0 - sun_elevation)) < 5.0)
+
+
+# ------------------------------------------------------- TIRS (radtrax#225)
+
+NU_TIR = np.arange(700.0, 1120.0, 0.5)  # 8.9–14.3 µm: all of L8's 9–14 µm table
+TIRS = ("B10", "B11")
+SATELLITES = ("L8", "L9")
+
+
+def _tirs(satellite: str, **kwargs: object):
+    return landsat_instrument(satellite, NU_TIR, bands=TIRS, per_um=True, **kwargs)
+
+
+def _planck_per_um(wavelength_um: np.ndarray, t_k: float) -> np.ndarray:
+    """Planck per µm written directly in wavelength, ``2hc²/λ⁵ / (e^{hc/λkT} − 1)``.
+
+    Independent of radtrax's wavenumber Planck: c₁ in W m⁻² sr⁻¹ µm⁴, c₂ in
+    µm K, from the SI 2019 exact h, c, k.
+    """
+    h, c, k = 6.62607015e-34, 299792458.0, 1.380649e-23
+    c1 = 2.0 * h * c**2 * 1e24  # m⁴ → µm⁴
+    c2 = h * c / k * 1e6  # m K → µm K
+    return c1 / wavelength_um**5 / np.expm1(c2 / (wavelength_um * t_k))
+
+
+def _slope(instrument: BandInstrument, t_k: float) -> np.ndarray:
+    """∂B̄_b/∂T at ``t_k`` by forward mode, computed outside NEdTNoise."""
+    return np.asarray(
+        jax.jacfwd(lambda t: band_planck_radiance(instrument, t))(jnp.asarray(t_k))
+    )
+
+
+@pytest.mark.parametrize("satellite", SATELLITES)
+def test_tirs_responses_are_piecewise_linear_between_the_samples(
+    satellite: str,
+) -> None:
+    """On the 1 nm grid, B10's band average is Σ R L / Σ R with R
+    interpolated linearly between the 50 nm samples (rounding, 1e-12)."""
+    srf = landsat_srf(satellite, bands=("B10",))
+    wl = srf.wavelengths_hr_nm
+    spectrum = 1.0 + 0.2 * np.sin(wl / 170.0)
+    wl_b, r_b = _bundled()[satellite, "B10"]
+    r = np.interp(wl, wl_b, r_b, left=0.0, right=0.0)
+    np.testing.assert_allclose(
+        srf.apply(spectrum)[0], (r * spectrum).sum() / r.sum(), rtol=1e-12
+    )
+
+
+def test_tirs_band_centres_sit_in_the_thermal_windows() -> None:
+    """The L9 workbook's band summary gives centres of 10.83 and 12.04 µm;
+    ours are response-weighted means of the interpolated table (within 20 nm)."""
+    c10, c11 = landsat_srf("L9", bands=TIRS).band_centers_nm
+    assert abs(c10 - 10830.0) < 20.0
+    assert abs(c11 - 12040.0) < 20.0
+    c10, c11 = landsat_srf("L8", bands=TIRS).band_centers_nm
+    assert 10700.0 < c10 < 11100.0
+    assert 11800.0 < c11 < 12200.0
+
+
+def test_oli_and_tirs_bands_mix_in_one_srf() -> None:
+    srf = landsat_srf("L9", bands=("B7", "B10"))
+    assert srf.band_names == ("B7", "B10")
+    expected = [
+        landsat_srf("L9").band_centers_nm[1],
+        landsat_srf("L9", bands=TIRS).band_centers_nm[0],
+    ]
+    np.testing.assert_allclose(srf.band_centers_nm, expected, rtol=1e-12)
+
+
+@pytest.mark.parametrize("satellite", SATELLITES)
+def test_a_flat_spectrum_per_um_reads_its_value(satellite: str) -> None:
+    """The issue's invariant: L_ν = c·10⁴/ν² gives c in both bands (1e-12)."""
+    c = 9.6
+    np.testing.assert_allclose(_tirs(satellite)(c * 1e4 / NU_TIR**2), c, rtol=1e-12)
+
+
+@pytest.mark.parametrize("satellite", SATELLITES)
+@pytest.mark.parametrize("t_k", [180.0, 250.0, 300.0, 340.0])
+def test_blackbody_band_radiance_per_um_is_the_wavelength_integral(
+    satellite: str, t_k: float
+) -> None:
+    """Per-µm band radiance of Planck per cm⁻¹ equals the SRF's band average
+    of Planck written in wavelength on the same grid; they differ by rounding
+    only (bound 1e-10), from the cold end (180 K) up."""
+    ours = np.asarray(band_planck_radiance(_tirs(satellite), t_k))
+    srf = landsat_srf(satellite, bands=TIRS, wavelengths_hr_nm=1e7 / NU_TIR[::-1])
+    direct = srf.apply(_planck_per_um(srf.wavelengths_hr_nm / 1e3, t_k))
+    np.testing.assert_allclose(ours, direct, rtol=1e-10)
+
+
+def test_an_l8_thermal_band_cut_by_the_grid_warns() -> None:
+    """L8's out-of-band floor spans 9–14 µm, so 10–12.5 µm misses > 0.1 %."""
+    with pytest.warns(UserWarning, match="of band B10"):
+        landsat_instrument("L8", np.arange(800.0, 1000.0), bands=("B10",))
+
+
+def test_netd_constants_are_the_cited_values() -> None:
+    # radtrax#225, from Barsi, LPS 2022: median on-orbit NEΔT at 300 K.
+    assert {k: dict(v) for k, v in LANDSAT_NETD_K.items()} == {
+        "L8": {"B10": 0.048, "B11": 0.054},
+        "L9": {"B10": 0.048, "B11": 0.066},
+    }
+    assert {k: dict(v) for k, v in LANDSAT_CALIBRATION_K.items()} == {
+        "L9": {"B10": 0.16, "B11": 0.61}
+    }
+    with pytest.raises(TypeError):
+        LANDSAT_NETD_K["L9"]["B10"] = 1.0  # type: ignore[index]
+
+
+@pytest.mark.parametrize("satellite", SATELLITES)
+def test_noise_is_the_netd_through_the_band_planck_slope(satellite: str) -> None:
+    """σ_b / (∂B̄_b/∂T at 300 K) is the tabulated NEΔT (1e-10)."""
+    tirs = _tirs(satellite)
+    sigma = np.asarray(landsat_noise(satellite, tirs).radiance_sigma(np.zeros(2)))
+    netd = [LANDSAT_NETD_K[satellite][b] for b in TIRS]
+    np.testing.assert_allclose(sigma / _slope(tirs, 300.0), netd, rtol=1e-10)
+
+
+@pytest.mark.parametrize("t_k", [180.0, 270.0, 320.0])
+def test_netd_at_another_scene_temperature(t_k: float) -> None:
+    """NEΔT(T) = σ / ∂B̄/∂T|_T (1e-10), larger in a colder scene; 180 K
+    exercises the band brightness-temperature solve at the cold end."""
+    tirs = _tirs("L9")
+    noise = landsat_noise("L9", tirs)
+    y = band_planck_radiance(tirs, t_k)
+    netd = np.asarray(noise.netd_at(y))
+    sigma = np.asarray(noise.radiance_sigma(y))
+    np.testing.assert_allclose(netd, sigma / _slope(tirs, t_k), rtol=1e-10)
+    assert np.all(netd > [0.048, 0.066]) == (t_k < 300.0)
+
+
+def test_noise_rejects_unknown_satellite_and_oli_bands() -> None:
+    with pytest.raises(ValueError, match="unknown satellite"):
+        landsat_noise("L7", _tirs("L9"))
+    with pytest.raises(KeyError, match="B6"):
+        landsat_noise("L9", landsat_instrument("L9", NU))
+
+
+def test_gradient_of_the_band_planck_radiance_in_temperature() -> None:
+    tirs = _tirs("L9")
+    assert_gradients_match(
+        lambda t: band_planck_radiance(tirs, t), jnp.array([180.0, 300.0])
+    )
+
+
+@pytest.mark.slow  # the Newton solve compiles twice (value, implicit gradient)
+@pytest.mark.parametrize("t_k", [180.0, 300.0])
+def test_gradient_of_the_band_brightness_temperature_in_radiance(t_k: float) -> None:
+    tirs = _tirs("L8")
+    y = band_planck_radiance(tirs, t_k)
+    np.testing.assert_allclose(band_brightness_temperature(tirs, y), t_k, rtol=1e-10)
+    assert_gradients_match(lambda yy: band_brightness_temperature(tirs, yy), y)
+
+
+@pytest.mark.slow  # compiles NEdTNoise under jacrev
+def test_gradient_of_the_noise_in_the_reference_temperature() -> None:
+    tirs = _tirs("L9")
+
+    def sigma(t: jax.Array) -> jax.Array:
+        return landsat_noise("L9", tirs, t_ref_k=t[0]).radiance_sigma(jnp.zeros(2))
+
+    assert_gradients_match(sigma, jnp.array([300.0]))
+
+
+def test_thermal_radiance_reads_bands_10_and_11_from_the_mtl() -> None:
+    mtl = {
+        "LEVEL1_RADIOMETRIC_RESCALING": {
+            "RADIANCE_MULT_BAND_10": "3.3420E-04",
+            "RADIANCE_MULT_BAND_11": "3.3420E-04",
+            "RADIANCE_ADD_BAND_10": "0.10000",
+            "RADIANCE_ADD_BAND_11": "0.10000",
+        }
+    }
+    dn = _dn()
+    np.testing.assert_allclose(
+        landsat_radiance(dn, bands=TIRS, mtl=mtl),
+        landsat_radiance(dn, mult=[3.342e-4] * 2, add=[0.1] * 2),
+        rtol=1e-14,
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.skipif(
+    "RADTRAX_LANDSAT_L1" not in os.environ,
+    reason="set RADTRAX_LANDSAT_L1 to a Collection 2 Level-1 product directory",
+)
+def test_one_level1_scene_thermal() -> None:
+    """B10 and B11 radiance read, brightness temperatures plausible and the
+    geometry on the same pixels; L8 or L9 from the product id."""
+    rasterio = pytest.importorskip("rasterio")
+    root = Path(os.environ["RADTRAX_LANDSAT_L1"])
+    window = rasterio.windows.Window(3000, 3000, 8, 8)
+
+    def read(suffix: str) -> np.ndarray:
+        (path,) = root.glob(f"*_{suffix}.TIF")
+        with rasterio.open(path) as src:
+            return src.read(1, window=window)
+
+    mtl = json.loads(next(root.glob("*_MTL.json")).read_text())
+    product = mtl["LANDSAT_METADATA_FILE"]["PRODUCT_CONTENTS"]["LANDSAT_PRODUCT_ID"]
+    satellite = {"LC08": "L8", "LC09": "L9"}[product[:4]]
+    dn = np.stack([read("B10"), read("B11")])
+    radiance = landsat_radiance(dn, bands=TIRS, mtl=mtl)  # W m⁻² sr⁻¹ µm⁻¹
+    geometry = landsat_geometry(read("SZA"), read("SAA"), read("VZA"), read("VAA"))
+    assert radiance.shape == (2, 8, 8)
+    assert np.all(np.isfinite(radiance))
+    assert geometry.mu.shape == (8, 8)
+    tirs = _tirs(satellite)
+    pixels = jnp.asarray(radiance.reshape(2, -1).T)  # (N, B)
+    t_b = eqx.filter_vmap(lambda y: band_brightness_temperature(tirs, y))(pixels)
+    assert np.all((np.asarray(t_b) > 180.0) & (np.asarray(t_b) < 350.0))
