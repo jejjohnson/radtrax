@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from radtrax.exceptions import MissingKeyError, ParameterError
+from radtrax.exceptions import MissingExtraError, MissingKeyError, ParameterError
 
 
 # Typical dry-air volume mixing ratios, used as the "self" fraction when
@@ -110,11 +110,21 @@ class GasConfig:
         isotopologue order.
 
         Raises:
+            MissingExtraError: If the ids must come from ``hapi.ISO`` and the
+                ``[hitran]`` extra is not installed.
             KeyError: If ``hapi.ISO`` has no such molecule or isotopologue.
         """
         if self.isotopologue_ids is not None:
             return self.isotopologue_ids
-        from hapi import ISO
+        try:
+            from hapi import ISO
+        except ModuleNotFoundError as err:
+            if err.name != "hapi":
+                raise
+            raise MissingExtraError(
+                f"GasConfig({self.name!r}).resolve_isotopologue_ids() needs the "
+                "[hitran] extra: pip install 'radtrax[hitran]'"
+            ) from err
 
         global_ids = {
             local: int(entry[0])
