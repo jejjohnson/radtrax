@@ -8,7 +8,7 @@ integration with a differentiable spectral shift (radtrax#36), and
 ``GaussianInstrument``, Gaussian bands shifted analytically in cm⁻¹ or nm
 (radtrax#96). ``noise``
 holds the ``NoiseModel`` protocol, the measurement-noise covariance
-(radtrax#108).
+(radtrax#108), with ``NEdTNoise`` for thermal bands (radtrax#249).
 
 Ported from plumax 0.1.2 at 28f257e (``plumax.radtran.srf``,
 ``plumax.radtran.instrument``).
@@ -17,7 +17,7 @@ Ported from plumax 0.1.2 at 28f257e (``plumax.radtran.srf``,
 from __future__ import annotations
 
 from radtrax.instrument import noise, psf, spectral, srf
-from radtrax.instrument.noise import DiagonalNoise, NoiseModel, SNRNoise
+from radtrax.instrument.noise import DiagonalNoise, NEdTNoise, NoiseModel, SNRNoise
 from radtrax.instrument.psf import GroundSamplingDistance, PointSpreadFunction
 from radtrax.instrument.spectral import BandInstrument, GaussianInstrument, Instrument
 from radtrax.instrument.srf import SpectralResponseFunction
@@ -29,6 +29,7 @@ __all__ = [
     "GaussianInstrument",
     "GroundSamplingDistance",
     "Instrument",
+    "NEdTNoise",
     "NoiseModel",
     "PointSpreadFunction",
     "SNRNoise",
