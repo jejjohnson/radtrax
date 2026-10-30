@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.0](https://github.com/jejjohnson/radtrax/compare/v0.1.0...v0.2.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **spectroscopy:** build the HITRAN tables from every isotopologue, with lines cut at ±25 cm⁻¹ ([#276](https://github.com/jejjohnson/radtrax/issues/276))
+
+### Features
+
+* **geo:** ecostress five-band and three-band instrument, nedt noise, l1b radiance and per-pixel geometry ([#288](https://github.com/jejjohnson/radtrax/issues/288)) ([c67f495](https://github.com/jejjohnson/radtrax/commit/c67f49546817067f7ffa59141ab3900e0ca77107)), closes [#226](https://github.com/jejjohnson/radtrax/issues/226)
+* **geo:** emit instrument and per-pixel geometry from georeader's EMITImage ([#283](https://github.com/jejjohnson/radtrax/issues/283)) ([c53a07d](https://github.com/jejjohnson/radtrax/commit/c53a07db639cd38f9f75b195e66754f26c3b1ae5)), closes [#114](https://github.com/jejjohnson/radtrax/issues/114)
+* **geo:** landsat 8/9 oli instrument, radiance and per-pixel geometry from plain inputs ([#280](https://github.com/jejjohnson/radtrax/issues/280)) ([5cc0d78](https://github.com/jejjohnson/radtrax/commit/5cc0d78e5f61f419e7365c3b9db75113bba02fc2)), closes [#121](https://github.com/jejjohnson/radtrax/issues/121)
+* **geo:** landsat 8/9 tirs b10 and b11 responses, per-µm band radiance and nedt noise ([#286](https://github.com/jejjohnson/radtrax/issues/286)) ([05d51d0](https://github.com/jejjohnson/radtrax/commit/05d51d08a975f932701f9c1e7bbff4b66e5f37ec)), closes [#225](https://github.com/jejjohnson/radtrax/issues/225)
+* **geo:** matched-filter operators take v0's ForwardModel target ([#285](https://github.com/jejjohnson/radtrax/issues/285)) ([1806a1d](https://github.com/jejjohnson/radtrax/commit/1806a1d7d5258732214ad68f42485f1c2d6826ba)), closes [#98](https://github.com/jejjohnson/radtrax/issues/98)
+* **geo:** sentinel-2 instrument, radiance and per-pixel geometry from georeader's L1C reader ([#278](https://github.com/jejjohnson/radtrax/issues/278)) ([5bd14eb](https://github.com/jejjohnson/radtrax/commit/5bd14eb589e1f3f676e065f125784105d8c09e11)), closes [#120](https://github.com/jejjohnson/radtrax/issues/120)
+* **instrument:** add NEdTNoise, NEΔT to radiance noise through ∂B̄/∂T at a reference or scene temperature ([#274](https://github.com/jejjohnson/radtrax/issues/274)) ([b920acc](https://github.com/jejjohnson/radtrax/commit/b920acc86d6534f2dbfdb50feb97a05a8df13bc9)), closes [#249](https://github.com/jejjohnson/radtrax/issues/249)
+* **radiometry:** add brightness temperature by Newton with implicit differentiation ([#273](https://github.com/jejjohnson/radtrax/issues/273)) ([c4c0e7e](https://github.com/jejjohnson/radtrax/commit/c4c0e7e671c82dd12f65e9a0f82e63a0d6392200))
+* **radiometry:** add Planck radiance in wavenumber with closed-form ∂B/∂T ([#272](https://github.com/jejjohnson/radtrax/issues/272)) ([7bdee35](https://github.com/jejjohnson/radtrax/commit/7bdee350d3da35a503469ba2013667e8fe2bcbc8))
+* **spectroscopy:** solar irradiance spectrum on the model grid ([#282](https://github.com/jejjohnson/radtrax/issues/282)) ([8b0bd17](https://github.com/jejjohnson/radtrax/commit/8b0bd1779037975af21f02941ffe73058be395ba)), closes [#107](https://github.com/jejjohnson/radtrax/issues/107)
+* **spectroscopy:** SumOpacity, per-layer optical depth from several opacity providers on one grid ([#277](https://github.com/jejjohnson/radtrax/issues/277)) ([03b8972](https://github.com/jejjohnson/radtrax/commit/03b8972a94f7f0154e42a13041bcf9a50700895d)), closes [#184](https://github.com/jejjohnson/radtrax/issues/184)
+
+
+### Bug Fixes
+
+* **spectroscopy:** build the HITRAN tables from every isotopologue, with lines cut at ±25 cm⁻¹ ([#276](https://github.com/jejjohnson/radtrax/issues/276)) ([39a4d68](https://github.com/jejjohnson/radtrax/commit/39a4d682936eb312d182357bb117f6805a2e5261))
+
 ## 0.1.0 (2026-10-27)
 
 
