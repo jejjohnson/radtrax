@@ -76,3 +76,81 @@ def test_jit_runs(obs_model_no_optics):
     fwd = jax.jit(model.make_forward(linear=False))
     y = fwd(jnp.zeros((5, 5)))
     assert y.shape == (5, 5, model.n_bands)
+
+
+# ── the band integration is a BandInstrument (radtrax#95) ────────────────────
+
+
+def _vmr_field() -> jnp.ndarray:
+    rows, cols = jnp.meshgrid(jnp.arange(5.0), jnp.arange(4.0), indexing="ij")
+    return 1e-7 * (1.0 + 0.3 * rows + 0.1 * cols)
+
+
+def test_forward_equals_the_former_wavelength_ordered_srf_product(
+    obs_model_with_psf_and_gsd, hyperspectral_srf
+):
+    """The einsum the model used before radtrax#95, on the same inputs."""
+    model = obs_model_with_psf_and_gsd
+    a_wl = model.absorption_coeff_hr[::-1]  # back to ascending wavelength
+    x = _vmr_field()
+    L_hr = jnp.exp(-(x - model.vmr_reference)[..., None] * a_wl)
+    L_hr = model.gsd.apply(model.psf.apply(L_hr))
+    former = jnp.einsum("bl, ijl -> ijb", jnp.asarray(hyperspectral_srf.matrix), L_hr)
+    # Same products summed in reverse order: rounding only.
+    np.testing.assert_allclose(model.forward(x), former, rtol=1e-12, atol=0)
+
+
+def test_from_lut_puts_both_on_the_srf_wavenumbers(
+    obs_model_no_optics, hyperspectral_srf
+):
+    model = obs_model_no_optics
+    nu = np.asarray(model.instrument.nu_cm)
+    np.testing.assert_allclose(1e7 / nu[::-1], hyperspectral_srf.wavelengths_hr_nm)
+    assert np.all(np.diff(nu) > 0) and float(model.instrument.shift_cm) == 0.0
+    assert model.absorption_coeff_hr.shape == nu.shape
+
+
+def test_the_spectral_shift_is_differentiable(synthetic_lut, hyperspectral_srf):
+    """A 3D-Var retrieval can estimate δ. y is piecewise linear in δ, so the
+    check sits mid-segment of the 2.5 cm⁻¹ grid, as for BandInstrument, and at
+    VMRs of 1e-5, where the lines are deep enough (τ ≈ 1) that every entry of
+    ∂y/∂δ stands above the central difference's rounding."""
+    import equinox as eqx
+    from _gradcheck import assert_gradients_match
+
+    from radtrax.retrieval.var3d import RadianceObservationModel
+
+    model = RadianceObservationModel.from_lut(
+        synthetic_lut,
+        srf=hyperspectral_srf,
+        T_K=280.0,
+        p_atm=1.0,
+        path_length_cm=8.4e5,
+        amf=2.0,
+        shift_cm=0.9,
+    )
+    assert float(model.instrument.shift_cm) == 0.9
+    x = 100.0 * _vmr_field()
+
+    def y(shift: jnp.ndarray) -> jnp.ndarray:
+        return eqx.tree_at(lambda m: m.instrument.shift_cm, model, shift[0]).forward(x)
+
+    assert_gradients_match(y, jnp.array([0.9]))
+
+
+def test_the_deprecated_srf_matrix_forms_give_the_same_numbers(
+    obs_model_no_optics, hyperspectral_srf
+):
+    import pytest
+
+    from radtrax.retrieval.var3d import RadianceObservationModel
+
+    model = obs_model_no_optics
+    with pytest.warns(DeprecationWarning, match="srf_matrix"):
+        srf_matrix = model.srf_matrix
+    np.testing.assert_array_equal(srf_matrix, model.instrument.response[:, ::-1])
+    np.testing.assert_allclose(srf_matrix, hyperspectral_srf.matrix, rtol=1e-15)
+    with pytest.warns(DeprecationWarning, match="BandInstrument"):
+        old = RadianceObservationModel(model.absorption_coeff_hr[::-1], srf_matrix)
+    x = _vmr_field()
+    np.testing.assert_allclose(old.forward(x), model.forward(x), rtol=1e-14, atol=0)

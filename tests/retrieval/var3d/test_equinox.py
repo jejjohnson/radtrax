@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
 
+from radtrax.instrument import BandInstrument
 from radtrax.retrieval.var3d import (
     Cost,
     IdentityTransform,
@@ -48,11 +49,17 @@ def test_classes_are_equinox_modules(cls) -> None:
 def test_model_arrays_are_leaves(obs_model_with_psf) -> None:
     m = obs_model_with_psf
     leaves = jax.tree_util.tree_leaves(m)
-    for array in (m.absorption_coeff_hr, m.srf_matrix, m.psf.kernel):
+    arrays = (
+        m.absorption_coeff_hr,
+        m.instrument.response,
+        m.instrument.shift_cm,
+        m.psf.kernel,
+    )
+    for array in arrays:
         assert any(leaf is array for leaf in leaves)
     assert (m.n_lambda, m.n_bands) == (
         m.absorption_coeff_hr.size,
-        m.srf_matrix.shape[0],
+        m.instrument.response.shape[0],
     )
 
 
@@ -69,23 +76,32 @@ def test_filter_grad_with_respect_to_the_model(obs_model_with_psf) -> None:
         return jnp.sum((model.forward(VMR) - y_obs) ** 2)
 
     g = eqx.filter_grad(loss)(m)
-    for leaf in (g.srf_matrix, g.absorption_coeff_hr, g.vmr_reference, g.psf.kernel):
+    for leaf in (
+        g.instrument.response,
+        g.absorption_coeff_hr,
+        g.vmr_reference,
+        g.psf.kernel,
+    ):
         assert leaf is not None and bool(jnp.any(leaf != 0))
 
     # The SRF entries of that gradient, against central differences.
-    flat = m.srf_matrix.ravel()
+    flat = m.instrument.response.ravel()
     idx = list(range(0, flat.size, flat.size // 12))[:12]
 
     def loss_of_srf(srf_flat: jax.Array) -> jax.Array:
         return loss(
             eqx.tree_at(
-                lambda mm: mm.srf_matrix, m, srf_flat.reshape(m.srf_matrix.shape)
+                lambda mm: mm.instrument.response,
+                m,
+                srf_flat.reshape(m.instrument.response.shape),
             )
         )
 
     result = assert_gradients_match(loss_of_srf, flat, indices=idx)
     np.testing.assert_allclose(
-        result.jac_autodiff[0], np.asarray(g.srf_matrix).ravel()[idx], rtol=1e-12
+        result.jac_autodiff[0],
+        np.asarray(g.instrument.response).ravel()[idx],
+        rtol=1e-12,
     )
     # And the scalar background VMR, which was static as a Python float. In
     # ppm, so the variable is O(1): _gradcheck's step is ε^{1/3}·max(1, |x|),
@@ -124,7 +140,7 @@ def test_one_compilation_serves_two_models(obs_model_no_optics) -> None:
     )
     # A different background VMR, set the way a user would: through __init__.
     m3 = RadianceObservationModel(
-        m1.absorption_coeff_hr, m1.srf_matrix, vmr_reference=1e-8
+        m1.absorption_coeff_hr, m1.instrument, vmr_reference=1e-8
     )
     outs = [forward(mm, VMR) for mm in (m1, m2, m3)]
     assert len(traces) == 1
@@ -157,7 +173,15 @@ def test_vmap_over_a_stack_of_models_equals_a_loop(obs_model_with_psf) -> None:
 
 @pytest.mark.usefixtures("shapes_unchecked")
 def test_constructor_still_validates_shapes() -> None:
+    instrument = BandInstrument(jnp.arange(5.0), jnp.full((3, 5), 0.2))
     with pytest.raises(ValueError, match="1-D"):
-        RadianceObservationModel(jnp.ones((2, 2)), jnp.ones((3, 2)))
+        RadianceObservationModel(jnp.ones((2, 2)), instrument)
     with pytest.raises(ValueError, match="does not"):
+        RadianceObservationModel(jnp.ones(4), instrument)
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(ValueError, match="does not"),
+    ):
         RadianceObservationModel(jnp.ones(4), jnp.ones((3, 5)))
+    with pytest.raises(TypeError, match="BandInstrument"):
+        RadianceObservationModel(jnp.ones(5), IdentityTransform())

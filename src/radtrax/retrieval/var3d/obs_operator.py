@@ -12,7 +12,7 @@ The full forward map factors as
          │
          ▼ PSF (per channel)
          ▼ GSD (per channel)
-         ▼ SRF (band integration)
+         ▼ BandInstrument (band integration, per pixel)
         y_obs(I, J, b)
 
 Everything below the LUT lookup is JAX, so
@@ -30,12 +30,19 @@ The factory :meth:`RadianceObservationModel.from_lut` precomputes ``a(ν)`` once
 from the HAPI cross-section LUT so the per-iteration cost in 3D-Var is dominated
 by the cube-shaped operations (PSF, GSD, SRF).
 
+The band integration is :class:`~radtrax.instrument.BandInstrument`, the one
+JAX band product in radtrax, mapped over pixels with ``eqx.filter_vmap``; its
+spectral shift is a leaf, so a 3D-Var retrieval can estimate it too
+(radtrax#95). The high-resolution axis is the instrument's wavenumber grid,
+ascending.
+
 Ported from plumax 0.1.2 at 28f257e (``src/plumax/assimilation/obs_operator.py``); its frozen
 dataclasses became Equinox modules in radtrax#58.
 """
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
@@ -44,11 +51,12 @@ import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Float
 
-from radtrax.exceptions import MissingKeyError, ShapeError
+from radtrax.exceptions import ArgumentTypeError, MissingKeyError, ShapeError
 from radtrax.instrument.psf import (
     GroundSamplingDistance,
     PointSpreadFunction,
 )
+from radtrax.instrument.spectral import BandInstrument
 from radtrax.slab.config import number_density_cm3
 
 
@@ -69,11 +77,14 @@ class RadianceObservationModel(eqx.Module):
     Attributes
     ----------
     absorption_coeff_hr : jnp.ndarray
-        Per-wavenumber absorption coefficient ``a(ν) = σ(ν,T,P) · N · ΔX · AMF``,
-        shape ``(n_lambda,)``. Captures everything *except* the VMR field, so the
-        forward map is just ``L_hr(i,j,ν) = exp(-a(ν) · ΔVMR(i,j))``.
-    srf_matrix : jnp.ndarray
-        L1-normalised SRF matrix, shape ``(n_bands, n_lambda)``.
+        Per-wavenumber absorption coefficient ``a(ν) = σ(ν,T,P) · N · ΔX · AMF``
+        on ``instrument.nu_cm`` (ascending wavenumber), shape ``(n_lambda,)``.
+        Captures everything *except* the VMR field, so the forward map is just
+        ``L_hr(i,j,ν) = exp(-a(ν) · ΔVMR(i,j))``.
+    instrument : BandInstrument
+        The band integration on the same wavenumber grid, ``(n_lambda,) →
+        (n_bands,)``, applied per pixel; its ``shift_cm`` (0 by default) is a
+        differentiable leaf.
     vmr_reference : Array
         Scalar background VMR, stored as an array so it is traced, not static,
         under ``eqx.filter_jit`` and differentiable with ``eqx.filter_grad``. Background VMR ``x_ref`` around which radiances are normalised. Setting
@@ -87,7 +98,7 @@ class RadianceObservationModel(eqx.Module):
     """
 
     absorption_coeff_hr: Float[Array, " Ghr"]
-    srf_matrix: Float[Array, "B Ghr"]
+    instrument: BandInstrument
     vmr_reference: Float[Array, ""]
     psf: PointSpreadFunction | None = None
     gsd: GroundSamplingDistance | None = None
@@ -95,25 +106,27 @@ class RadianceObservationModel(eqx.Module):
     def __init__(
         self,
         absorption_coeff_hr: Float[ArrayLike, " Ghr"],
-        srf_matrix: Float[ArrayLike, "B Ghr"],
+        instrument: BandInstrument | Float[ArrayLike, "B Ghr"],
         vmr_reference: Float[ArrayLike, ""] = 0.0,
         psf: PointSpreadFunction | None = None,
         gsd: GroundSamplingDistance | None = None,
     ) -> None:
         a = jnp.asarray(absorption_coeff_hr)
-        s = jnp.asarray(srf_matrix)
         if a.ndim != 1:
             raise ShapeError(
                 f"RadianceObservationModel: absorption_coeff_hr must be 1-D, "
                 f"got shape {a.shape}."
             )
-        if s.ndim != 2 or s.shape[1] != a.size:
+        if not isinstance(instrument, BandInstrument):
+            instrument, a = _from_srf_matrix(instrument, a)
+        if instrument.response.shape[1] != a.size:
             raise ShapeError(
-                f"RadianceObservationModel: srf_matrix shape {s.shape} does not "
-                f"align with absorption_coeff_hr (n_lambda={a.size})."
+                f"RadianceObservationModel: the instrument's response "
+                f"{instrument.response.shape} does not align with "
+                f"absorption_coeff_hr (n_lambda={a.size})."
             )
         self.absorption_coeff_hr = a
-        self.srf_matrix = s
+        self.instrument = instrument
         # An array, not a Python float: a float field is static under
         # eqx.filter_jit, so a new value would recompile and get no gradient.
         self.vmr_reference = jnp.asarray(vmr_reference, dtype=a.dtype)
@@ -128,7 +141,18 @@ class RadianceObservationModel(eqx.Module):
     @property
     def n_bands(self) -> int:
         """Number of sensor bands."""
-        return int(self.srf_matrix.shape[-2])
+        return int(self.instrument.response.shape[-2])
+
+    @property
+    def srf_matrix(self) -> Float[Array, "B Ghr"]:
+        """Deprecated: the response in ascending wavelength, ``instrument.response[:, ::-1]``."""
+        warnings.warn(
+            "RadianceObservationModel.srf_matrix is deprecated; use "
+            "instrument.response (on instrument.nu_cm, ascending wavenumber).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.instrument.response[:, ::-1]
 
     # ── factory ──────────────────────────────────────────────────────────────
 
@@ -146,21 +170,28 @@ class RadianceObservationModel(eqx.Module):
         psf: PointSpreadFunction | None = None,
         gsd: GroundSamplingDistance | None = None,
         var: str = "absorption_cross_section",
+        shift_cm: float = 0.0,
     ) -> RadianceObservationModel:
         """Build the operator from a HAPI σ(ν,T,P) LUT and an SRF.
 
         Pre-collapses ``σ · N · ΔX · AMF`` into a single ``a(ν)`` vector so the
         forward call only multiplies by ``ΔVMR`` per pixel.
 
-        The HR spectral grid is **taken from the SRF** (``srf.wavelengths_hr_nm``)
-        and converted to wavenumbers for the σ lookup. This is the grid the SRF
-        matrix's columns are indexed by, so the subsequent
-        ``einsum("bl, ijl -> ijb")`` band integration contracts aligned spectral
-        bins by construction. Earlier revisions accepted a separate ``nu_obs``
-        argument; when callers passed a wavenumber-ordered grid while the SRF
-        was wavelength-ordered (common whenever ``wl = 1e7/ν`` was sorted),
-        the einsum silently mixed non-corresponding bins — self-consistent for
-        twin retrievals but physically wrong for anything cross-validated.
+        The HR spectral grid is **taken from the SRF**: its wavelengths
+        ``srf.wavelengths_hr_nm``, reversed into ascending wavenumber
+        ``ν = 10⁷ / λ``, are the grid of both ``a(ν)`` and the
+        :class:`~radtrax.instrument.BandInstrument` built by
+        :meth:`BandInstrument.from_srf
+        <radtrax.instrument.BandInstrument.from_srf>`, so the band
+        integration contracts aligned spectral bins by construction. Earlier
+        revisions accepted a separate ``nu_obs`` argument; when callers
+        passed a wavenumber-ordered grid while the SRF was wavelength-ordered
+        (common whenever ``wl = 1e7/ν`` was sorted), the product silently
+        mixed non-corresponding bins — self-consistent for twin retrievals
+        but physically wrong for anything cross-validated.
+
+        ``shift_cm`` is the instrument's spectral shift ``δ`` [cm⁻¹], 0 by
+        default (the band integration of earlier revisions).
         """
         if var not in lut:
             raise MissingKeyError(
@@ -169,12 +200,11 @@ class RadianceObservationModel(eqx.Module):
             )
         import xarray as xr_mod
 
-        # Source-of-truth HR grid: the SRF's own wavelength axis (ascending
-        # by wavelength = descending by wavenumber). Convert to cm⁻¹ for σ
-        # interpolation; keep the wavelength ordering for the output array so
-        # axis l aligns with srf.matrix[:, l].
+        # Source-of-truth HR grid: the SRF's own wavelength axis, reversed into
+        # ascending wavenumber, the grid BandInstrument.from_srf puts the
+        # response on.
         wl_hr_nm = np.asarray(srf.wavelengths_hr_nm, dtype=float)
-        nu_hr = 1e7 / wl_hr_nm
+        nu_hr = 1e7 / wl_hr_nm[::-1]
         nu_da = xr_mod.DataArray(nu_hr, dims=["obs_nu"])
         sigma = lut[var].interp(
             wavenumber=nu_da, temperature=T_K, pressure=p_atm, method="linear"
@@ -184,7 +214,7 @@ class RadianceObservationModel(eqx.Module):
         a = sigma_np * N_total * path_length_cm * amf
         return cls(
             absorption_coeff_hr=jnp.asarray(a),
-            srf_matrix=jnp.asarray(srf.matrix),
+            instrument=BandInstrument.from_srf(srf, nu_hr, shift_cm=shift_cm),
             vmr_reference=vmr_reference,
             psf=psf,
             gsd=gsd,
@@ -228,8 +258,8 @@ class RadianceObservationModel(eqx.Module):
             L_hr = self.psf.apply(L_hr)
         if self.gsd is not None:
             L_hr = self.gsd.apply(L_hr)
-        # Band integration: contract last (HR-λ) axis with SRF.
-        return jnp.einsum("bl, ijl -> ijb", self.srf_matrix, L_hr)
+        # Band integration per pixel: (h, w, n_lambda) → (h, w, n_bands).
+        return eqx.filter_vmap(eqx.filter_vmap(self.instrument))(L_hr)
 
     def make_forward(
         self, *, linear: bool = False
@@ -252,3 +282,34 @@ class RadianceObservationModel(eqx.Module):
             return self.forward(vmr_field, linear=linear_flag)
 
         return _fwd
+
+
+def _from_srf_matrix(
+    srf_matrix: Float[ArrayLike, "B Ghr"], absorption_coeff_hr: Float[Array, " Ghr"]
+) -> tuple[BandInstrument, Float[Array, " Ghr"]]:
+    """The deprecated ``(absorption_coeff_hr, srf_matrix)`` form, in ascending wavelength.
+
+    Both are reversed into ascending wavenumber. No wavenumber grid comes with
+    them, so the instrument's grid is the sample index: exact at zero shift,
+    the only shift the old form had.
+    """
+    if isinstance(srf_matrix, eqx.Module):
+        raise ArgumentTypeError(
+            "RadianceObservationModel: `instrument` must be a BandInstrument, got "
+            f"{type(srf_matrix).__name__}."
+        )
+    warnings.warn(
+        "RadianceObservationModel(absorption_coeff_hr, srf_matrix) is deprecated; "
+        "pass a BandInstrument and absorption_coeff_hr on its wavenumber grid, or "
+        "use RadianceObservationModel.from_lut.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+    s = jnp.asarray(srf_matrix)
+    if s.ndim != 2 or s.shape[1] != absorption_coeff_hr.size:
+        raise ShapeError(
+            f"RadianceObservationModel: srf_matrix shape {s.shape} does not "
+            f"align with absorption_coeff_hr (n_lambda={absorption_coeff_hr.size})."
+        )
+    index = jnp.arange(s.shape[1], dtype=float)
+    return BandInstrument(index, s[:, ::-1]), absorption_coeff_hr[::-1]
