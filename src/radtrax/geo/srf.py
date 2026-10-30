@@ -8,8 +8,10 @@ one into the other (radtrax#28). It needs the ``[geo]`` extra.
 
 from __future__ import annotations
 
+import math
 import warnings
 from collections.abc import Sequence
+from importlib import resources
 
 import numpy as np
 from jaxtyping import ArrayLike, Float
@@ -105,6 +107,37 @@ def sentinel2_srf(
     full = table.reindex(grid, fill_value=0.0).to_numpy(dtype=float).T  # (B, N)
     names = tuple(str(c) for c in table.columns)
     return _projected_srf("sentinel2_srf", grid, full, names, wavelengths_hr_nm)
+
+
+def _bundled_rows(filename: str) -> list[list[str]]:
+    """The data rows of a CSV bundled in ``radtrax/geo/data``, as strings.
+
+    ``#`` lines (the provenance header) and the column-name line are dropped.
+    """
+    path = resources.files("radtrax.geo") / "data" / filename
+    lines = [ln for ln in path.read_text("utf-8").splitlines() if ln[:1] != "#"]
+    return [line.split(",") for line in lines[1:]]  # after the column names
+
+
+def _tabulated_srf(
+    caller: str,
+    samples: Sequence[tuple[np.ndarray, np.ndarray]],
+    names: tuple[str, ...],
+    wavelengths_hr_nm: Sequence[float] | Float[ArrayLike, " Ghr"] | None,
+) -> SpectralResponseFunction:
+    """A ``custom`` SRF from tabulated responses ``(wavelength [nm], R)``.
+
+    Each band's samples (ascending wavelength) are taken as piecewise linear
+    in wavelength and zero outside, placed on one 1 nm grid spanning every
+    band (integer nanometres) and projected as :func:`_projected_srf` does.
+    Shared by :func:`radtrax.geo.landsat_srf` and
+    :func:`radtrax.geo.ecostress_srf`.
+    """
+    lo = math.floor(min(wl[0] for wl, _ in samples))
+    hi = math.ceil(max(wl[-1] for wl, _ in samples))
+    grid = np.arange(lo, hi + 1.0)  # the full 1 nm grid
+    full = np.stack([np.interp(grid, wl, r, left=0.0, right=0.0) for wl, r in samples])
+    return _projected_srf(caller, grid, full, names, wavelengths_hr_nm)
 
 
 def _projected_srf(

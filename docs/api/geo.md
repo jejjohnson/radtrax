@@ -30,6 +30,8 @@ quoted in radtrax#225. The TIRS responses are the USGS band-average RSR workbook
 (`L8_TIRS_RSR.xlsx`, `L9_TIRS2_RSR.xlsx`), recorded with their SHA-256 in
 the bundled table's header.
 
+ECOSTRESS's five thermal bands, B1 to B5 at about 8.3, 8.8, 9.2, 10.5 and 12.1 µm, follow the same pattern from plain inputs, no extra needed: `ecostress_instrument(nu_cm, bands=...)` integrates the science team's spectral responses (revision 3, as the EUMETSAT NWP SAF redistributes them, bundled with their SHA-256 in the table's header) and returns band radiance per µm by default, the L1B unit. Bands 1 and 3 hold fill values from 15 May 2019 until five-band mode resumed on 28 April 2023 (`ECOSTRESS_3BAND_PERIOD`), and the two modes have been interleaved since, so `ecostress_bands` reads a granule's band set from its `BandSpecification` metadata (the date alone decides only before 28 April 2023); the three-band set is `ECOSTRESS_3BAND`, bands 2, 4 and 5. `ecostress_noise` uses `ECOSTRESS_NETD_K`, 0.1 K per band at 300 K: that is the requirement (NEΔT < 0.1 K, ECOSTRESS L2 LSTE ATBD, 2018), an upper bound until per-band on-orbit values are sourced. `ecostress_radiance` stacks the L1B `radiance_<n>` datasets with their fill values as NaN, and `ecostress_geometry` builds a per-pixel `ViewingGeometry` from the L1B geolocation angles.
+
 ::: radtrax.geo
     options:
       members: false
@@ -58,6 +60,13 @@ the bundled table's header.
 ## `landsat`
 
 ::: radtrax.geo.landsat
+    options:
+      show_root_heading: false
+      heading_level: 3
+
+## `ecostress`
+
+::: radtrax.geo.ecostress
     options:
       show_root_heading: false
       heading_level: 3
