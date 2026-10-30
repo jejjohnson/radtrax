@@ -1,26 +1,37 @@
-"""Landsat 8/9 OLI on radtrax's terms: SRF, instrument, radiance and geometry.
+"""Landsat 8/9 OLI and TIRS: SRF, instrument, noise, radiance and geometry.
 
 OLI (Landsat 8) and OLI-2 (Landsat 9) carry a SWIR band pair, B6 at 1.6 µm
 and B7 at 2.2 µm, like Sentinel-2's B11 and B12, so the multi-pass family
-and the band-table inversion apply unchanged (radtrax#121). georeader has
-neither a Collection 2 Level-1 reader (spaceml-org/georeader#99) nor the OLI
-spectral responses (spaceml-org/georeader#100), so this module works on
-plain inputs:
+and the band-table inversion apply unchanged (radtrax#121). TIRS (Landsat 8)
+and TIRS-2 (Landsat 9) add the thermal pair, B10 at about 10.9 µm and B11 at
+about 12 µm (radtrax#225). georeader has neither a Collection 2 Level-1
+reader (spaceml-org/georeader#99) nor the Landsat spectral responses
+(spaceml-org/georeader#100), so this module works on plain inputs:
 
 - :func:`landsat_srf` and :func:`landsat_instrument`: the USGS band-average
   relative spectral responses, bundled with radtrax
-  (``geo/data/landsat_oli_rsr.csv``, B6 and B7 of each satellite; its header
-  records the source workbooks, their SHA-256 and the retrieval date), as a
-  :class:`~radtrax.instrument.SpectralResponseFunction` and a
+  (``geo/data/landsat_oli_rsr.csv``, B6, B7, B10 and B11 of each satellite;
+  its header records the source workbooks, their SHA-256 and the retrieval
+  date), as a :class:`~radtrax.instrument.SpectralResponseFunction` and a
   :class:`~radtrax.instrument.BandInstrument`;
+- :func:`landsat_noise`: the thermal bands' NEΔT (``LANDSAT_NETD_K``) as an
+  :class:`~radtrax.instrument.NEdTNoise`; the TIRS-2 calibration residual is
+  ``LANDSAT_CALIBRATION_K``;
 - :func:`landsat_radiance`: TOA radiance from the Level-1 digital numbers
   and the MTL's rescaling, ``L = M Q + A``;
 - :func:`landsat_geometry`: a per-pixel
   :class:`~radtrax.atmosphere.ViewingGeometry` from the four Collection 2
   angle bands (SZA, SAA, VZA, VAA).
 
-The table is long-format (satellite, band, wavelength, response), so the
-TIRS bands B10 and B11 (radtrax#225) are more rows, not a new table. None of
+Units. Level-1 radiance is per µm (W m⁻² sr⁻¹ µm⁻¹, the MTL's unit); the
+forward model's is per cm⁻¹. ``landsat_instrument(..., per_um=True)`` takes
+radiance per cm⁻¹ and returns band averages per µm, the conversion inside
+the band integral (:meth:`BandInstrument.from_srf
+<radtrax.instrument.BandInstrument.from_srf>`), so its output, the noise
+:func:`landsat_noise` builds on it and :func:`landsat_radiance` share one
+unit.
+
+The table is long-format (satellite, band, wavelength, response). None of
 these functions needs the ``[geo]`` extra; :func:`landsat_radiance` returns a
 GeoTensor when it is given one.
 """
@@ -30,6 +41,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from functools import cache
 from importlib import resources
+from types import MappingProxyType
 from typing import Any
 
 import equinox as eqx
@@ -44,16 +56,42 @@ from radtrax.exceptions import (
     ShapeError,
 )
 from radtrax.geo.srf import _projected_srf
+from radtrax.instrument.noise import NEdTNoise
 from radtrax.instrument.spectral import BandInstrument
 from radtrax.instrument.srf import SpectralResponseFunction
 
 
-__all__ = ["landsat_geometry", "landsat_instrument", "landsat_radiance", "landsat_srf"]
+__all__ = [
+    "LANDSAT_CALIBRATION_K",
+    "LANDSAT_NETD_K",
+    "landsat_geometry",
+    "landsat_instrument",
+    "landsat_noise",
+    "landsat_radiance",
+    "landsat_srf",
+]
 
 #: Collection 2 angle bands are signed 16-bit integers in hundredths of a
 #: degree (LSDS-1822, Landsat 8-9 OLI/TIRS C2 L1 Data Format Control Book,
 #: v7.0, section 3.4 and table 3-5).
 _ANGLE_SCALE_DEG = 0.01
+
+#: Median on-orbit NEΔT at 300 K [K] of the thermal bands, TIRS (L8) and
+#: TIRS-2 (L9), from J. Barsi's presentation at the ESA Living Planet
+#: Symposium 2022 (session H2-02), as quoted in radtrax#225.
+LANDSAT_NETD_K: Mapping[str, Mapping[str, float]] = MappingProxyType(
+    {
+        "L8": MappingProxyType({"B10": 0.048, "B11": 0.054}),
+        "L9": MappingProxyType({"B10": 0.048, "B11": 0.066}),
+    }
+)
+
+#: Vicarious calibration residual [K] of TIRS-2 (same source as
+#: ``LANDSAT_NETD_K``), a systematic error rather than noise.
+#: TODO(radtrax#225): Landsat 8 TIRS's residual is not sourced yet.
+LANDSAT_CALIBRATION_K: Mapping[str, Mapping[str, float]] = MappingProxyType(
+    {"L9": MappingProxyType({"B10": 0.16, "B11": 0.61})}
+)
 
 
 @cache
@@ -78,19 +116,26 @@ def landsat_srf(
     bands: Sequence[str] = ("B6", "B7"),
     wavelengths_hr_nm: Sequence[float] | Float[ArrayLike, " Ghr"] | None = None,
 ) -> SpectralResponseFunction:
-    """Build an OLI or OLI-2 SRF from the bundled USGS band-average RSRs.
+    """Build a Landsat 8/9 SRF from the bundled USGS band-average RSRs.
 
-    Each band's 1 nm response is placed on one 1 nm grid spanning the
-    requested bands, zero where it was not measured, and projected onto
+    Each band's response is placed on one 1 nm grid spanning the requested
+    bands, zero where it was not measured, and projected onto
     ``wavelengths_hr_nm`` with the linear-interpolation (hat) basis, as
     :func:`~radtrax.geo.sentinel2_srf` does: band integration is then exact
-    for any radiance linear between grid points. The responses are used as
-    published, including the few small negative values in Landsat 8's tails.
+    for any radiance linear between grid points. OLI's responses are
+    published every 1 nm and used as they are; TIRS's every 50 nm, and are
+    taken as piecewise linear between the published values (interpolated
+    onto the 1 nm grid). The values are used as published, including the
+    few small negative values in Landsat 8 OLI's tails and the floor of
+    about 1e-3 Landsat 8 TIRS reports across 9–14 µm (so a grid narrower
+    than 9–14 µm misses more than 0.1 % of an L8 thermal band, and warns).
+    The responses are relative to radiance (energy), as the Landsat 8 TIRS
+    workbook states, so the band average is ``∫R L dλ / ∫R dλ``.
 
     Args:
-        satellite: ``"L8"`` (OLI) or ``"L9"`` (OLI-2).
-        bands: Band names, in order; ``"B6"`` (SWIR1) and ``"B7"`` (SWIR2)
-            are bundled.
+        satellite: ``"L8"`` (OLI, TIRS) or ``"L9"`` (OLI-2, TIRS-2).
+        bands: Band names, in order; ``"B6"`` (SWIR1), ``"B7"`` (SWIR2),
+            ``"B10"`` (~10.9 µm) and ``"B11"`` (~12 µm) are bundled.
         wavelengths_hr_nm: The high-resolution grid [nm] to integrate on,
             strictly increasing. Defaults to the table's 1 nm grid.
 
@@ -114,6 +159,9 @@ def landsat_srf(
         ('B6', 'B7')
         >>> [round(float(c)) for c in srf.band_centers_nm]
         [1608, 2201]
+        >>> tirs = landsat_srf("L9", bands=("B10", "B11"))
+        >>> [round(float(c)) for c in tirs.band_centers_nm]
+        [10837, 12025]
     """
     table = _rsr_table()
     satellites = sorted({sat for sat, _ in table})
@@ -133,8 +181,8 @@ def landsat_srf(
     grid = np.arange(lo, hi + 1.0)  # the full 1 nm grid
     full = np.zeros((len(names), grid.size))
     for i, b in enumerate(names):
-        wl, response = table[satellite, b]
-        full[i, np.searchsorted(grid, wl)] = response
+        wl, response = table[satellite, b]  # every 1 nm (OLI) or 50 nm (TIRS)
+        full[i] = np.interp(grid, wl, response, left=0.0, right=0.0)
     return _projected_srf("landsat_srf", grid, full, names, wavelengths_hr_nm)
 
 
@@ -144,8 +192,9 @@ def landsat_instrument(
     *,
     bands: Sequence[str] = ("B6", "B7"),
     shift_cm: float = 0.0,
+    per_um: bool = False,
 ) -> BandInstrument:
-    """OLI or OLI-2 bands as a :class:`~radtrax.instrument.BandInstrument`.
+    """Landsat 8/9 bands as a :class:`~radtrax.instrument.BandInstrument`.
 
     The RSRs (:func:`landsat_srf`) projected onto the wavelengths of the
     model grid, ``λ_g = 10⁷ / ν_g``, and turned onto the wavenumber grid by
@@ -161,12 +210,18 @@ def landsat_instrument(
     <radtrax.instrument.SpectralResponseFunction.apply>` of the same SRF on
     the spectrum in ascending wavelength.
 
+    For the thermal bands pass ``per_um=True``: the instrument then takes
+    radiance per cm⁻¹ [W m⁻² sr⁻¹ (cm⁻¹)⁻¹] and returns the band average per
+    µm [W m⁻² sr⁻¹ µm⁻¹], the unit of :func:`landsat_radiance`, with
+    ``f_bg = w_bg ν_g² / 10⁴`` (rows no longer summing to 1).
+
     Args:
         satellite: ``"L8"`` or ``"L9"``.
         nu_cm: The model's wavenumber grid [cm⁻¹], strictly increasing,
             ``(G,)``; it should cover each band's response.
         bands: Band names, in order.
         shift_cm: Spectral shift ``δ`` [cm⁻¹], a differentiable leaf.
+        per_um: Band radiance per µm from radiance per cm⁻¹.
 
     Returns:
         The instrument, ``(G,) → (B,)``.
@@ -188,6 +243,12 @@ def landsat_instrument(
         ('B6', 'B7')
         >>> [round(float(y), 6) for y in instrument(np.ones(nu.size))]
         [1.0, 1.0]
+        >>> nu_tir = np.arange(700.0, 1120.0, 0.5)  # 8.9–14.3 µm, B10 and B11
+        >>> tirs = landsat_instrument(
+        ...     "L9", nu_tir, bands=("B10", "B11"), per_um=True
+        ... )
+        >>> [round(float(y), 9) for y in tirs(2.0 * 1e4 / nu_tir**2)]  # 2 per µm
+        [2.0, 2.0]
     """
     nu = np.asarray(nu_cm, dtype=float)
     if nu.ndim != 1 or nu.size < 2 or np.any(np.diff(nu) <= 0.0):
@@ -196,7 +257,63 @@ def landsat_instrument(
             "with at least two points."
         )
     srf = landsat_srf(satellite, bands=bands, wavelengths_hr_nm=1e7 / nu[::-1])
-    return BandInstrument.from_srf(srf, nu, shift_cm=shift_cm)
+    return BandInstrument.from_srf(srf, nu, shift_cm=shift_cm, per_um=per_um)
+
+
+def landsat_noise(
+    satellite: str, instrument: BandInstrument, *, t_ref_k: Real[ArrayLike, ""] = 300.0
+) -> NEdTNoise:
+    """The thermal bands' NEΔT as a noise model on ``instrument``'s bands.
+
+    $$
+    σ_b = \\mathrm{NEΔT}_b \\, \\frac{\\partial \\bar B_b}{\\partial T}\\Big|_{T_\\mathrm{ref}},
+    \\qquad S_ε = \\mathrm{diag}(σ^2),
+    $$
+
+    with $\\bar B_b$ the Planck radiance integrated by ``instrument`` and
+    NEΔT the median on-orbit value at 300 K (``LANDSAT_NETD_K``). $σ$ is in
+    the instrument's units: build it with ``per_um=True`` to compare $σ$
+    with :func:`landsat_radiance`. The same $σ$ is a different NEΔT at
+    another scene temperature (:meth:`NEdTNoise.netd_at
+    <radtrax.instrument.NEdTNoise.netd_at>`), larger in a colder scene. The
+    calibration residual (``LANDSAT_CALIBRATION_K``) is systematic and is
+    not part of this noise.
+
+    Args:
+        satellite: ``"L8"`` or ``"L9"``.
+        instrument: The thermal bands, from :func:`landsat_instrument`; its
+            ``band_names`` pick the NEΔT values.
+        t_ref_k: The temperature NEΔT is quoted at [K], a scalar.
+
+    Returns:
+        An :class:`~radtrax.instrument.NEdTNoise` in the ``"reference"`` mode.
+
+    Raises:
+        ValueError: If ``satellite`` is unknown.
+        KeyError: If a band has no tabulated NEΔT (OLI's B6 and B7).
+
+    Examples:
+        >>> import numpy as np
+        >>> nu = np.arange(700.0, 1120.0, 0.5)
+        >>> tirs = landsat_instrument("L9", nu, bands=("B10", "B11"), per_um=True)
+        >>> sigma = landsat_noise("L9", tirs).radiance_sigma(np.zeros(2))
+        >>> [f"{float(s):.2e}" for s in sigma]  # W m⁻² sr⁻¹ µm⁻¹
+        ['6.92e-03', '8.00e-03']
+    """
+    if satellite not in LANDSAT_NETD_K:
+        raise ParameterError(
+            f"landsat_noise: unknown satellite {satellite!r}; use one of "
+            f"{sorted(LANDSAT_NETD_K)}."
+        )
+    table = LANDSAT_NETD_K[satellite]
+    missing = [b for b in instrument.band_names if b not in table]
+    if missing:
+        raise MissingKeyError(
+            f"landsat_noise: no NEΔT for band(s) {missing} of {satellite}; "
+            f"tabulated: {sorted(table)}."
+        )
+    netd = np.array([table[b] for b in instrument.band_names])
+    return NEdTNoise(netd, instrument, t_ref_k=t_ref_k)
 
 
 def landsat_radiance(
@@ -216,7 +333,11 @@ def landsat_radiance(
     with ``Q_b`` the calibrated digital numbers and ``M_b``, ``A_b`` the
     MTL's ``RADIANCE_MULT_BAND_n`` and ``RADIANCE_ADD_BAND_n`` (group
     ``LEVEL1_RADIOMETRIC_RESCALING``). ``Q = 0`` is fill (no data) in
-    Collection 2 and stays 0.
+    Collection 2 and stays 0. The thermal bands B10 and B11 rescale the same
+    way; their radiance is a band average per µm, so model it with
+    ``landsat_instrument(..., per_um=True)``. The product resamples TIRS's
+    100 m samples onto the 30 m grid; no point-spread or ground-sampling
+    operator is applied here.
 
     Args:
         dn: The digital numbers, ``(B, ...)``, one band per entry of
@@ -287,7 +408,10 @@ def landsat_geometry(
     The four Level-1 angle bands (``_SZA``, ``_SAA``, ``_VZA``, ``_VAA``,
     computed for band 4) are signed 16-bit integers in hundredths of a
     degree (LSDS-1822 v7.0, section 3.4), hence ``scale_deg = 0.01``; pass
-    ``scale_deg=1.0`` for angles already in degrees. The relative azimuth
+    ``scale_deg=1.0`` for angles already in degrees. The angle bands are
+    computed for band 4 (OLI) only, and serve the thermal bands B10 and B11
+    here as well; a difference between OLI's and TIRS's lines of sight, if
+    any, is not modelled. The relative azimuth
 
     $$
     \\phi = \\arccos\\big(\\cos(\\varphi_v - \\varphi_s)\\big) \\in [0, \\pi],

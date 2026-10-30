@@ -60,6 +60,7 @@ from jaxtyping import Array, ArrayLike, Float
 
 from radtrax.exceptions import GridError, ParameterError, ShapeError
 from radtrax.instrument.srf import FWHM_PER_SIGMA, SpectralResponseFunction
+from radtrax.radiometry.planck import to_per_um
 
 
 __all__ = ["BandInstrument", "GaussianInstrument", "Instrument"]
@@ -181,6 +182,7 @@ class BandInstrument(Instrument):
         nu_cm: Float[ArrayLike, " G"],
         *,
         shift_cm: Float[ArrayLike, ""] = 0.0,
+        per_um: bool = False,
     ) -> BandInstrument:
         """From a :class:`~radtrax.instrument.SpectralResponseFunction` built
         on the wavelengths of ``nu_cm``.
@@ -189,8 +191,56 @@ class BandInstrument(Instrument):
         order (``nu_cm`` reversed), so the response is the SRF's own matrix,
         its columns reversed onto the wavenumber grid.
 
+        With ``per_um=True`` the instrument takes radiance per cm⁻¹ and
+        returns the band average per µm, which is what a thermal Level-1
+        product reports (Landsat TIRS, ECOSTRESS). The SRF's rows ``w`` are
+        weights in wavelength (``R Δλ``, summing to 1), so the band average
+        of $L_\\lambda = L_{\\tilde\\nu} \\tilde\\nu^2 / 10^4$ is
+
+        $$
+        \\bar L_{\\lambda,b} = \\frac{\\int R_b L_\\lambda \\, d\\lambda}{\\int R_b \\, d\\lambda}
+            = \\sum_g w_{bg} \\frac{\\tilde\\nu_g^2}{10^4} L_{\\tilde\\nu}(\\tilde\\nu_g),
+        $$
+
+        and the factor is folded into the response,
+        $f_{bg} = w_{bg} \\tilde\\nu_g^2 / 10^4$, whose rows then sum to the
+        band's mean of $\\tilde\\nu^2 / 10^4$ (about 84 at 10.9 µm), not to 1.
+        Averaging $L_{\\tilde\\nu}$ with ``w`` and converting afterwards is not
+        the same: across a 0.9 µm band at 10.9 µm, $\\tilde\\nu^2$ changes by
+        about ±8 %. The factor is taken at the unshifted grid, so a shift
+        $\\delta$ adds a relative error of about $2\\delta/\\tilde\\nu$
+        (2e-4 for 0.1 cm⁻¹ at 900 cm⁻¹).
+
+        Args:
+            srf: The SRF, on ``wavelengths_hr_nm = 1e7 / nu_cm[::-1]``.
+            nu_cm: Wavenumber grid [cm⁻¹], strictly increasing, ``(G,)``.
+            shift_cm: Spectral shift ``δ`` [cm⁻¹].
+            per_um: Return band radiance per µm [W m⁻² sr⁻¹ µm⁻¹] from
+                radiance per cm⁻¹ [W m⁻² sr⁻¹ (cm⁻¹)⁻¹]; otherwise the band
+                average is in the input's units.
+
+        Returns:
+            The instrument, ``(G,) → (B,)``.
+
         Raises:
             ValueError: If the SRF is on a different grid.
+
+        Examples:
+            A flat spectrum per µm, $L_{\\tilde\\nu} = c \\cdot 10^4 / \\tilde\\nu^2$,
+            reads ``c`` in every band:
+
+            >>> import numpy as np
+            >>> from radtrax.instrument import SpectralResponseFunction
+            >>> nu = np.linspace(800.0, 1000.0, 2001)
+            >>> srf = SpectralResponseFunction(
+            ...     wavelengths_hr_nm=1e7 / nu[::-1],
+            ...     band_centers_nm=np.array([10900.0, 11500.0]),
+            ...     band_widths_nm=np.array([900.0, 900.0]),
+            ...     band_names=("B10", "B11"),
+            ... )
+            >>> band = BandInstrument.from_srf(srf, nu, per_um=True)
+            >>> [round(float(y), 12) for y in band(7.5 * 1e4 / nu**2)]
+            [7.5, 7.5]
         """
         nu = np.asarray(nu_cm, dtype=float)
         expected_nm = 1e7 / nu[::-1]
@@ -201,7 +251,10 @@ class BandInstrument(Instrument):
                 "BandInstrument.from_srf: build the SRF on wavelengths_hr_nm = "
                 "1e7 / nu_cm[::-1] (the wavenumber grid in ascending wavelength)."
             )
-        return cls(nu, srf.matrix[:, ::-1], shift_cm, srf.band_names)
+        response = srf.matrix[:, ::-1]  # (B, G), rows summing to 1
+        if per_um:  # f_bg = w_bg ν_g² / 10⁴, so y_b = Σ_g w_bg L_λ(ν_g)
+            response = np.asarray(to_per_um(response, nu))
+        return cls(nu, response, shift_cm, srf.band_names)
 
 
 class GaussianInstrument(Instrument):
