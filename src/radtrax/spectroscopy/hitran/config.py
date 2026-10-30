@@ -2,24 +2,33 @@
 
 A LUT is an N-dimensional array of absorption cross-sections
 
-    σ(ν, T, P)           [cm² / molecule]
+    σ(ν, T, P) = Σ_l S_l(T) f_V(ν − ν_l; Γ_D, Γ_L) · 1[|ν − ν_l| ≤ w]    [cm² / molecule]
 
-computed line-by-line via HAPI's Voigt routine. ``GasConfig`` identifies the
-HITRAN line set (molecule + isotopologue + spectral range) and ``LUTGridConfig``
-describes the common (T, P, ν-step) grid used across gases.
+computed line-by-line via HAPI's Voigt routine, over the lines l of every
+isotopologue of the gas, each cut at w = ±25 cm⁻¹ from its centre, the
+convention continua are defined against (Korkin et al. 2025, eqs. 16–18).
+HITRAN's intensities S_l are already weighted by each isotopologue's natural
+abundance, so the sum needs no rescaling. ``GasConfig`` identifies the
+HITRAN line set (molecule + isotopologues + spectral range) and
+``LUTGridConfig`` describes the common (T, P, ν-step, cut-off) grid used
+across gases.
 
 The ``ATMOSPHERIC_GASES`` registry covers the six species most commonly needed
 for SWIR/NIR remote sensing (CH₄, CO₂, H₂O, O₂, N₂O, CO). Add entries for
 other HITRAN species by constructing a ``GasConfig`` directly.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/hapi_lut/config.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/hapi_lut/config.py``); every
+isotopologue and the ±25 cm⁻¹ cut-off since radtrax#172.
 """
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
+
+from radtrax.exceptions import MissingExtraError, MissingKeyError, ParameterError
 
 
 # Typical dry-air volume mixing ratios, used as the "self" fraction when
@@ -40,23 +49,104 @@ class GasConfig:
     """Configuration for a single HITRAN gas species.
 
     Attributes:
-        name:            Short name used as HAPI SourceTable id (e.g. 'CH4').
-        molecule_id:     HITRAN molecule id (see `hitran.org`).
-        isotopologue_id: HITRAN isotopologue id (1 = most abundant).
-        nu_min:          Lower wavenumber bound [cm⁻¹].
-        nu_max:          Upper wavenumber bound [cm⁻¹].
-        description:     Free-text description for dataset metadata.
+        name:             Short name used as HAPI SourceTable id (e.g. 'CH4').
+        molecule_id:      HITRAN molecule id (see `hitran.org`).
+        nu_min:           Lower wavenumber bound [cm⁻¹].
+        nu_max:           Upper wavenumber bound [cm⁻¹].
+        description:      Free-text description for dataset metadata.
+        isotopologue_ids: HITRAN *global* isotopologue ids (the ``id`` of
+                          ``hapi.ISO``, e.g. 32–35 for CH₄); ``None`` (the
+                          default) takes every isotopologue of the molecule.
+                          Restrict it only on purpose, e.g. for an
+                          isotopologue retrieval.
+        isotopologue_id:  Deprecated: one *local* isotopologue number
+                          (1 = most abundant); use ``isotopologue_ids``.
+
+    Raises:
+        ParameterError: If both ``isotopologue_ids`` and ``isotopologue_id``
+            are given, or ``description`` is not a string (before radtrax#172
+            the positional order was name, molecule_id, isotopologue_id,
+            nu_min, nu_max).
     """
 
     name: str
     molecule_id: int
-    isotopologue_id: int
     nu_min: float
     nu_max: float
     description: str = ""
+    isotopologue_ids: tuple[int, ...] | None = field(default=None, kw_only=True)
+    isotopologue_id: int | None = field(default=None, kw_only=True, repr=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.description, str):
+            raise ParameterError(
+                f"GasConfig({self.name!r}): description must be a string, got "
+                f"{self.description!r}; since radtrax#172 the positional order "
+                "is (name, molecule_id, nu_min, nu_max, description)."
+            )
+        if self.isotopologue_id is not None:
+            if self.isotopologue_ids is not None:
+                raise ParameterError(
+                    f"GasConfig({self.name!r}): give isotopologue_ids, not both "
+                    "it and the deprecated isotopologue_id."
+                )
+            warnings.warn(
+                "GasConfig(isotopologue_id=...) is deprecated: pass "
+                "isotopologue_ids=(global ids, ...), or leave it None for every "
+                "isotopologue.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
+        if self.isotopologue_ids is not None:
+            ids = tuple(int(i) for i in self.isotopologue_ids)
+            object.__setattr__(self, "isotopologue_ids", ids)
+
+    def resolve_isotopologue_ids(self) -> tuple[int, ...]:
+        """The HITRAN global isotopologue ids to fetch (needs ``[hitran]``).
+
+        ``isotopologue_ids`` as given; else the deprecated local
+        ``isotopologue_id`` mapped through ``hapi.ISO``; else every global id
+        whose ``hapi.ISO`` entry has this ``molecule_id``, in HITRAN's
+        isotopologue order.
+
+        Raises:
+            MissingExtraError: If the ids must come from ``hapi.ISO`` and the
+                ``[hitran]`` extra is not installed.
+            KeyError: If ``hapi.ISO`` has no such molecule or isotopologue.
+        """
+        if self.isotopologue_ids is not None:
+            return self.isotopologue_ids
+        try:
+            from hapi import ISO
+        except ModuleNotFoundError as err:
+            if err.name != "hapi":
+                raise
+            raise MissingExtraError(
+                f"GasConfig({self.name!r}).resolve_isotopologue_ids() needs the "
+                "[hitran] extra: pip install 'radtrax[hitran]'"
+            ) from err
+
+        global_ids = {
+            local: int(entry[0])
+            for (molecule, local), entry in ISO.items()
+            if molecule == self.molecule_id and self.isotopologue_id in (None, local)
+        }
+        if not global_ids:
+            number = "" if self.isotopologue_id is None else f" {self.isotopologue_id}"
+            raise MissingKeyError(
+                f"GasConfig({self.name!r}): hapi.ISO has no isotopologue{number} "
+                f"of molecule {self.molecule_id}."
+            )
+        return tuple(global_ids[local] for local in sorted(global_ids))
 
     def __repr__(self) -> str:
-        return f"GasConfig({self.name}, M{self.molecule_id}, I{self.isotopologue_id})"
+        if self.isotopologue_ids is not None:
+            isotopologues = "ids " + ",".join(map(str, self.isotopologue_ids))
+        elif self.isotopologue_id is not None:
+            isotopologues = f"I{self.isotopologue_id}"
+        else:
+            isotopologues = "all isotopologues"
+        return f"GasConfig({self.name}, M{self.molecule_id}, {isotopologues})"
 
 
 @dataclass
@@ -73,6 +163,13 @@ class LUTGridConfig:
                  ≤ 0.01 cm⁻¹ for hyperspectral work, 0.05 cm⁻¹ for tutorials.
         diluent_composition: Optional override for the air diluent fractions.
                  If None, each gas gets {'air': 1-VMR, 'self': VMR}.
+        wing_cm: Absolute line cut-off w [cm⁻¹]: each line is evaluated
+                 within ±w of its centre (HAPI's ``WavenumberWing``). The
+                 default 25 cm⁻¹ is the convention HITRAN line parameters are
+                 used with and continua (MT_CKD) are defined against.
+        wing_halfwidths: Relative cut-off in half-widths max(Γ_L, Γ_D)
+                 (HAPI's ``WavenumberWingHW``); the larger of the two applies.
+                 0 by default, so the absolute cut-off alone applies.
     """
 
     T_grid: np.ndarray = field(
@@ -85,6 +182,8 @@ class LUTGridConfig:
     )
     nu_step: float = 0.01
     diluent_composition: dict[str, float] | None = None
+    wing_cm: float = 25.0
+    wing_halfwidths: float = 0.0
 
     def get_diluent_for_gas(
         self,
@@ -110,7 +209,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "CH4": GasConfig(
         name="CH4",
         molecule_id=6,
-        isotopologue_id=1,  # 12CH4
         nu_min=4000.0,  # SWIR (2500 nm)
         nu_max=8000.0,  # NIR (1250 nm)
         description="Methane — primary greenhouse-gas retrieval target.",
@@ -118,7 +216,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "CO2": GasConfig(
         name="CO2",
         molecule_id=2,
-        isotopologue_id=1,  # 12C16O2
         nu_min=4000.0,
         nu_max=8000.0,
         description="Carbon dioxide — reference gas for column retrievals.",
@@ -126,7 +223,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "H2O": GasConfig(
         name="H2O",
         molecule_id=1,
-        isotopologue_id=1,  # H2-16O
         nu_min=4000.0,
         nu_max=25000.0,
         description="Water vapour — dominant atmospheric absorber.",
@@ -134,7 +230,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "O2": GasConfig(
         name="O2",
         molecule_id=7,
-        isotopologue_id=1,  # 16O2
         nu_min=12500.0,  # O2 A-band (~760 nm)
         nu_max=14000.0,
         description="Oxygen — surface-pressure retrievals via A-band.",
@@ -142,7 +237,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "N2O": GasConfig(
         name="N2O",
         molecule_id=4,
-        isotopologue_id=1,  # 14N2-16O
         nu_min=4000.0,
         nu_max=5000.0,
         description="Nitrous oxide — greenhouse-gas side channel.",
@@ -150,7 +244,6 @@ ATMOSPHERIC_GASES: dict[str, GasConfig] = {
     "CO": GasConfig(
         name="CO",
         molecule_id=5,
-        isotopologue_id=1,  # 12C-16O
         nu_min=4000.0,
         nu_max=5000.0,
         description="Carbon monoxide — pollution / combustion tracer.",

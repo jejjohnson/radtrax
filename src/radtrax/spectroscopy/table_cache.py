@@ -7,8 +7,8 @@ D6). Each is built once with the ``[hitran]`` extra,
 
     python -m radtrax.spectroscopy.hitran CH4 H2O CO2 N2O CO
 
-and cached under the user cache directory, keyed by gas, grid and HITRAN
-version; :func:`load_table` and :func:`load_opacity` read them back, and a
+and cached under the user cache directory, keyed by gas, grid, HITRAN
+version and table version; :func:`load_table` and :func:`load_opacity` read them back, and a
 missing table raises :class:`~radtrax.MissingTableError` naming that
 command. Loading needs no extra (xarray and netCDF4 are base dependencies).
 
@@ -49,6 +49,7 @@ __all__ = [
     "GRIDS",
     "HITRAN_VERSION",
     "TABLE_DIR_ENV",
+    "TABLE_VERSION",
     "V0_GRID",
     "TableGrid",
     "build_command",
@@ -62,6 +63,11 @@ __all__ = [
 #: label, not detected from HAPI: when HITRANonline moves to a new edition,
 #: change it (or pass ``hitran_version``) so new builds get new cache keys.
 HITRAN_VERSION = "HITRAN2020"
+#: The builder's conventions; part of every table's cache key, bumped when a
+#: rebuild changes the numbers. 2: every isotopologue, lines cut at ±25 cm⁻¹
+#: (radtrax#172); tables of version 1 (isotopologue 1, 50 half-widths) no
+#: longer load.
+TABLE_VERSION = 2
 #: Environment variable that overrides the table cache directory.
 TABLE_DIR_ENV = "RADTRAX_TABLE_DIR"
 
@@ -127,9 +133,9 @@ def table_path(
     hitran_version: str = HITRAN_VERSION,
     cache_dir: Path | str | None = None,
 ) -> Path:
-    """The cache file of ``gas`` on ``grid``: ``<gas>_<grid key>_<version>.nc``."""
+    """The cache file of ``gas`` on ``grid``: ``<gas>_<grid key>_<HITRAN>_v<table>.nc``."""
     root = Path(cache_dir) if cache_dir is not None else table_cache_dir()
-    return root / f"{gas}_{grid.key()}_{hitran_version}.nc"
+    return root / f"{gas}_{grid.key()}_{hitran_version}_v{TABLE_VERSION}.nc"
 
 
 def build_command(gases: Sequence[str], grid: TableGrid = V0_GRID) -> str:

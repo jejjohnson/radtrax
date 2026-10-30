@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-from radtrax.exceptions import MissingExtraError, MissingKeyError
+from radtrax.exceptions import MissingExtraError, MissingKeyError, ParameterError
 from radtrax.spectroscopy.hitran.config import (
     ATMOSPHERIC_GASES,
     GasConfig,
@@ -33,6 +33,7 @@ from radtrax.spectroscopy.hitran.generator import (
 from radtrax.spectroscopy.table_cache import (
     GRIDS,
     HITRAN_VERSION,
+    TABLE_VERSION,
     V0_GRID,
     TableGrid,
     table_path,
@@ -45,7 +46,8 @@ logger = logging.getLogger(__name__)
 
 
 #: Lines are fetched this far beyond the grid [cm⁻¹], so lines just outside
-#: it still add their wings (HAPI cuts wings at 50 half-widths).
+#: it still add their wings; at least the line cut-off
+#: (:attr:`~radtrax.spectroscopy.hitran.LUTGridConfig.wing_cm`, ±25 cm⁻¹).
 LINE_MARGIN_CM = 25.0
 
 
@@ -106,19 +108,26 @@ def build_table(
 
     Raises:
         KeyError: If ``gas`` has no HITRAN configuration.
+        ValueError: If the line cut-off exceeds :data:`LINE_MARGIN_CM`, so
+            lines outside the fetched range would be silently dropped.
         ImportError: Without the ``[hitran]`` extra, naming it.
     """
     gas_config = gas_config_for(gas, grid)
-    path = table_path(gas, grid, hitran_version=hitran_version, cache_dir=cache_dir)
-    if path.is_file() and not overwrite:
-        logger.info("%s table already built at %s", gas, path)
-        return path
-    fetch_lines(gas, grid, line_cache_dir=line_cache_dir)
     lut_grid = LUTGridConfig(
         T_grid=np.asarray(grid.t_k, dtype=float),
         P_grid=np.asarray(grid.p_atm, dtype=float),
         nu_step=grid.nu_step_cm,
     )
+    if lut_grid.wing_cm > LINE_MARGIN_CM:
+        raise ParameterError(
+            f"line cut-off {lut_grid.wing_cm} cm⁻¹ exceeds the fetch margin "
+            f"LINE_MARGIN_CM = {LINE_MARGIN_CM} cm⁻¹."
+        )
+    path = table_path(gas, grid, hitran_version=hitran_version, cache_dir=cache_dir)
+    if path.is_file() and not overwrite:
+        logger.info("%s table already built at %s", gas, path)
+        return path
+    fetch_lines(gas, grid, line_cache_dir=line_cache_dir)
     ds = _with_extra(
         generate_single_gas_lut, gas_config, lut_grid, cache_dir=line_cache_dir
     )
@@ -126,6 +135,7 @@ def build_table(
         radtrax_grid=grid.name,
         radtrax_grid_key=grid.key(),
         hitran_version=hitran_version,
+        radtrax_table_version=TABLE_VERSION,
     )
     save_lut(ds, path.parent, gas, filename=path.name)
     logger.info("Built %s table at %s (%.1f MB)", gas, path, path.stat().st_size / 1e6)

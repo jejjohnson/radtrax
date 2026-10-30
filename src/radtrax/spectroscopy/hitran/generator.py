@@ -8,7 +8,9 @@ CF-conformant ``xarray.Dataset`` ready for NetCDF persistence.
 HAPI is imported lazily inside the functions that need it so ``import
 radtrax.spectroscopy.hitran`` does not require ``hitran-api`` to be installed.
 
-Ported from plumax 0.1.2 at 28f257e (``src/plumax/hapi_lut/generator.py``); only import paths changed.
+Ported from plumax 0.1.2 at 28f257e (``src/plumax/hapi_lut/generator.py``);
+every isotopologue (``fetch_by_ids``) and the ±25 cm⁻¹ cut-off since
+radtrax#172.
 """
 
 from __future__ import annotations
@@ -81,30 +83,51 @@ def _range_sidecar_path(cache: Path, name: str) -> Path:
     return cache / f"{name}.range.json"
 
 
-def _write_cached_range(cache: Path, name: str, nu_min: float, nu_max: float) -> None:
-    """Record the ν range a successful fetch wrote into the cache."""
+def _write_cached_range(
+    cache: Path, name: str, nu_min: float, nu_max: float, ids: tuple[int, ...]
+) -> None:
+    """Record the ν range and isotopologues a successful fetch wrote."""
     _range_sidecar_path(cache, name).write_text(
-        json.dumps({"nu_min": float(nu_min), "nu_max": float(nu_max)})
+        json.dumps(
+            {
+                "nu_min": float(nu_min),
+                "nu_max": float(nu_max),
+                "isotopologue_ids": list(ids),
+            }
+        )
     )
 
 
-def _read_cached_range(cache: Path, name: str) -> tuple[float, float] | None:
-    """Return the cached ``(nu_min, nu_max)`` or ``None`` if unrecorded/unreadable."""
+def _read_cached_range(
+    cache: Path, name: str
+) -> tuple[float, float, tuple[int, ...] | None] | None:
+    """The cached ``(nu_min, nu_max, isotopologue ids)``, ``None`` if unrecorded.
+
+    The ids are ``None`` for a sidecar written before radtrax#172.
+    """
     path = _range_sidecar_path(cache, name)
     if not path.exists():
         return None
     try:
         payload = json.loads(path.read_text())
-        return float(payload["nu_min"]), float(payload["nu_max"])
-    except (ValueError, KeyError, OSError):
+        ids = payload.get("isotopologue_ids")
+        return (
+            float(payload["nu_min"]),
+            float(payload["nu_max"]),
+            None if ids is None else tuple(int(i) for i in ids),
+        )
+    except (ValueError, KeyError, OSError, TypeError):
         return None
 
 
 def _range_covers(
-    cached: tuple[float, float], gas_config: GasConfig, *, tol: float = 1e-6
+    cached: tuple[float, float, tuple[int, ...] | None],
+    gas_config: GasConfig,
+    *,
+    tol: float = 1e-6,
 ) -> bool:
     """True iff the cached range spans the requested ``[nu_min, nu_max]``."""
-    lo, hi = cached
+    lo, hi, _ = cached
     return lo <= gas_config.nu_min + tol and hi + tol >= gas_config.nu_max
 
 
@@ -114,28 +137,34 @@ def fetch_hitran_data(
 ) -> Path:
     """Fetch HITRAN line parameters for ``gas_config`` into ``cache_dir``.
 
+    Fetches the lines of :meth:`GasConfig.resolve_isotopologue_ids
+    <radtrax.spectroscopy.hitran.GasConfig.resolve_isotopologue_ids>`, every
+    isotopologue of the molecule by default, with HAPI's ``fetch_by_ids``.
     HAPI writes a ``<GasConfig.name>.data`` + ``.header`` pair under
-    ``cache_dir``, **overwriting** any existing pair (HAPI's ``fetch`` does not
-    no-op on a cache hit). A successful fetch also records the fetched ν range
-    in a ``<name>.range.json`` sidecar.
+    ``cache_dir``, **overwriting** any existing pair (HAPI does not no-op on
+    a cache hit). A successful fetch also records the fetched ν range and
+    isotopologue ids in a ``<name>.range.json`` sidecar.
 
-    When ``fetch()`` fails (no network, API error) the previously-cached pair is
+    When the fetch fails (no network, API error) the previously-cached pair is
     only reused if its recorded range **covers** the requested
-    ``[nu_min, nu_max]`` — otherwise a narrowed cache (e.g. left by
-    :func:`radtrax.spectroscopy.hitran.multi.create_combined_lut`, which fetches over the
-    gas intersection range) would silently serve a truncated line list, and
-    ``absorptionCoefficient_Voigt`` would return σ ≈ 0 outside it.
+    ``[nu_min, nu_max]`` and it holds the same isotopologues — otherwise a
+    narrowed cache (e.g. left by
+    :func:`radtrax.spectroscopy.hitran.multi.create_combined_lut`, which
+    fetches over the gas intersection range) or one isotopologue's lines would
+    silently serve a truncated line list.
 
     Raises:
-        RuntimeError: if ``fetch()`` raises and either no cached pair is present
-            or its recorded range does not cover the request. The underlying
-            HAPI exception is chained so the network / API error is visible.
+        RuntimeError: if the fetch raises and either no cached pair is
+            present or its recorded range or isotopologues do not match the
+            request. The underlying HAPI exception is chained so the network /
+            API error is visible.
 
     Returns:
         The resolved cache directory.
     """
-    from hapi import fetch
+    from hapi import fetch_by_ids
 
+    ids = gas_config.resolve_isotopologue_ids()
     cache = Path(cache_dir) if cache_dir is not None else default_cache_dir()
     _init_hapi_cache(cache)
 
@@ -144,10 +173,10 @@ def fetch_hitran_data(
     already_cached = data_path.exists() and header_path.exists()
 
     logger.info(
-        "Fetching HITRAN %s (M%d I%d, %.1f-%.1f cm^-1)%s",
+        "Fetching HITRAN %s (M%d, isotopologue ids %s, %.1f-%.1f cm^-1)%s",
         gas_config.name,
         gas_config.molecule_id,
-        gas_config.isotopologue_id,
+        ids,
         gas_config.nu_min,
         gas_config.nu_max,
         " [cache present]" if already_cached else "",
@@ -155,49 +184,42 @@ def fetch_hitran_data(
 
     fetched = True
     try:
-        fetch(
-            gas_config.name,
-            gas_config.molecule_id,
-            gas_config.isotopologue_id,
-            gas_config.nu_min,
-            gas_config.nu_max,
-        )
+        fetch_by_ids(gas_config.name, list(ids), gas_config.nu_min, gas_config.nu_max)
     except Exception as exc:
         # HAPI raises plain Exceptions on network failures and API errors. A
         # cached pair is only trustworthy if its recorded range covers the
-        # request — otherwise proceeding would feed a truncated line list to
-        # the Voigt sum and silently produce σ ≈ 0 outside the cached window.
+        # request and it holds the same isotopologues — otherwise proceeding
+        # would feed a truncated line list to the Voigt sum.
         fetched = False
-        cached_range = _read_cached_range(cache, gas_config.name)
-        if (
-            not already_cached
-            or cached_range is None
-            or not _range_covers(cached_range, gas_config)
-        ):
+        cached = _read_cached_range(cache, gas_config.name)
+        if not already_cached:
+            detail = "no cached data was found"
+        elif cached is None:
+            detail = "the cached line list has no recorded range"
+        elif not _range_covers(cached, gas_config):
             detail = (
-                "no cached data was found"
-                if not already_cached
-                else (
-                    "the cached line list has no recorded range"
-                    if cached_range is None
-                    else f"the cached line list covers only "
-                    f"{cached_range[0]:.1f}-{cached_range[1]:.1f} cm^-1"
-                )
+                f"the cached line list covers only {cached[0]:.1f}-{cached[1]:.1f} "
+                "cm^-1"
             )
+        elif cached[2] != ids:
+            detail = (
+                f"the cached line list holds isotopologue ids {cached[2]}, not {ids}"
+            )
+        else:
+            detail = ""
+        if detail:
             raise TableBuildError(
                 f"HITRAN fetch failed for {gas_config.name} "
-                f"(M{gas_config.molecule_id} I{gas_config.isotopologue_id}, "
+                f"(M{gas_config.molecule_id}, isotopologue ids {ids}, "
                 f"{gas_config.nu_min:.1f}-{gas_config.nu_max:.1f} cm^-1) and "
                 f"{detail} at {cache}. Re-fetch online or point `cache_dir` at "
                 "a cache whose range spans the request."
             ) from exc
         logger.warning(
-            "fetch() raised %s — proceeding with cached %s (range %.1f-%.1f "
-            "cm^-1 covers the request).",
+            "fetch_by_ids() raised %s — proceeding with cached %s (its range "
+            "and isotopologues match the request).",
             type(exc).__name__,
             data_path,
-            cached_range[0],
-            cached_range[1],
         )
 
     if not (data_path.exists() and header_path.exists()):
@@ -207,7 +229,7 @@ def fetch_hitran_data(
         )
     if fetched:
         _write_cached_range(
-            cache, gas_config.name, gas_config.nu_min, gas_config.nu_max
+            cache, gas_config.name, gas_config.nu_min, gas_config.nu_max, ids
         )
     return cache
 
@@ -223,14 +245,18 @@ def compute_absorption_lut(
 ]:
     """Evaluate σ(ν, T, P) on the full LUT grid.
 
-    Assumes ``fetch_hitran_data`` has already populated the cache. Fails
+    ``σ(ν) = Σ_l S_l(T) f_V(ν − ν_l) · 1[|ν − ν_l| ≤ w]`` over every line in
+    the fetched table, each cut at ``w = max(wing_cm, wing_halfwidths ·
+    max(Γ_L, Γ_D))`` from its centre (HAPI's rule; ±25 cm⁻¹ by default).
+    Assumes ``fetch_hitran_data`` has already populated the cache, over the
+    grid plus ``w`` so lines just outside it add their wings. Fails
     fast — a HAPI failure at any ``(T, P)`` knot, or any non-finite
     cross-section in the result, raises rather than leaving silent NaN
     holes in the LUT.
 
     Args:
-        gas_config:   Target gas (molecule + isotopologue + ν range).
-        grid_config:  Common T/P/ν-step grid.
+        gas_config:   Target gas (molecule + isotopologues + ν range).
+        grid_config:  Common T/P/ν-step grid and line cut-off.
         cache_dir:    Where the fetched HITRAN ``.data/.header`` pair lives.
         progress:     Emit per-(T, P) log lines at INFO.
 
@@ -279,6 +305,8 @@ def compute_absorption_lut(
                     Environment={"T": float(T), "p": float(P)},
                     Diluent=diluent,
                     HITRAN_units=True,  # cm²/molecule
+                    WavenumberWing=float(grid_config.wing_cm),
+                    WavenumberWingHW=float(grid_config.wing_halfwidths),
                 )
             except Exception as exc:
                 raise TableBuildError(
@@ -304,7 +332,13 @@ def build_lut_dataset(
     sigma_lut: Float[np.ndarray, "G T P"],
     wavelength_nm: Float[np.ndarray, " G"],
 ) -> xr.Dataset:
-    """Wrap the raw LUT arrays in a CF-conformant ``xarray.Dataset``."""
+    """Wrap the raw LUT arrays in a CF-conformant ``xarray.Dataset``.
+
+    The attributes record the line set and its cut-off: ``isotopologue_ids``
+    (HITRAN global ids, from
+    :meth:`~radtrax.spectroscopy.hitran.GasConfig.resolve_isotopologue_ids`,
+    so it needs ``[hitran]``), ``line_wing_cm`` and ``line_wing_halfwidths``.
+    """
     now = datetime.now(UTC).isoformat()
     ds = xr.Dataset(
         data_vars={
@@ -368,7 +402,9 @@ def build_lut_dataset(
             "source": "HITRAN molecular spectroscopic database",
             "molecule": gas_config.name,
             "molecule_id": gas_config.molecule_id,
-            "isotopologue_id": gas_config.isotopologue_id,
+            "isotopologue_ids": list(gas_config.resolve_isotopologue_ids()),
+            "line_wing_cm": float(grid_config.wing_cm),
+            "line_wing_halfwidths": float(grid_config.wing_halfwidths),
             "spectral_range_cm_1": f"{nu_grid.min():.1f}-{nu_grid.max():.1f}",
             "spectral_range_nm": f"{wavelength_nm[-1]:.1f}-{wavelength_nm[0]:.1f}",
             "temperature_range_K": f"{float(grid_config.T_grid.min()):.0f}-{float(grid_config.T_grid.max()):.0f}",
