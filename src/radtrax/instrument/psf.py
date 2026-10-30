@@ -250,7 +250,7 @@ class GroundSamplingDistance(eqx.Module):
     -----
     The classmethod :meth:`from_optics` derives ``f`` from the standard
     pinhole-camera GSD formula
-    ``GSD [m/px] = sensor_width [mm] · altitude [m] · 1000 / (focal_length [mm] · image_width [px])``
+    ``GSD [m/px] = sensor_width [mm] · altitude [m] / (focal_length [mm] · image_width [px])``
     and rounds to the nearest integer. For non-integer ratios you should
     pre-resample the HR cube — block-mean is only well-defined for integer
     factors.
