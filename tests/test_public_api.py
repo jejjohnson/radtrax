@@ -28,6 +28,7 @@ SUBPACKAGES = [
     "geo",
     "instrument",
     "optics",
+    "radiometry",
     "retrieval",
     "retrieval.absorption",
     "retrieval.matched_filter",

@@ -12,6 +12,7 @@ a one-line summary each.
 | [Atmosphere](atmosphere.md) | `AtmosphericState`, `ViewingGeometry`, `layers_from_levels`, `afgl_us_standard`, ideal-gas constants, `number_density`, `air_mass_factor` |
 | [Spectroscopy](spectroscopy.md) | `OpacityProvider`, `TableOpacity`, v0's table cache (`load_opacity`), `tables` (single-slab σ interpolation, Beer–Lambert), `hitran` (table building, `[hitran]`) |
 | [Optics](optics.md) | `OpticalProperties` |
+| [Radiometry](radiometry.md) | `planck_radiance`, `log_planck_radiance`, the radiation constants, the per-µm and per-GHz views |
 | [Solvers](solvers.md) | `RTSolver`, `BeerLambert` |
 | [Surface](surface.md) | `Surface`, `Lambertian` |
 | [Slab models](slab.md) | single-slab forward models, the nB table, observation config |
