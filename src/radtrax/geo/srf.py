@@ -103,23 +103,39 @@ def sentinel2_srf(
     wl_table = table.index.to_numpy(dtype=float)
     grid = np.arange(wl_table[0], wl_table[-1] + 1.0)  # the full 1 nm grid
     full = table.reindex(grid, fill_value=0.0).to_numpy(dtype=float).T  # (B, N)
+    names = tuple(str(c) for c in table.columns)
+    return _projected_srf("sentinel2_srf", grid, full, names, wavelengths_hr_nm)
 
+
+def _projected_srf(
+    caller: str,
+    grid: np.ndarray,
+    full: np.ndarray,
+    names: tuple[str, ...],
+    wavelengths_hr_nm: Sequence[float] | Float[ArrayLike, " Ghr"] | None,
+) -> SpectralResponseFunction:
+    """A ``custom`` SRF from 1 nm responses ``full`` ``(B, N)`` on ``grid``.
+
+    The projection, coverage warning, centres and widths of
+    :func:`sentinel2_srf`, shared with :func:`radtrax.geo.landsat_srf`.
+    ``grid`` is the full 1 nm grid, with zeros where a band was not measured.
+    """
     wl = grid if wavelengths_hr_nm is None else np.asarray(wavelengths_hr_nm, float)
     if wl.ndim != 1 or wl.size < 2 or np.any(np.diff(wl) <= 0.0):
         raise GridError(
-            "sentinel2_srf: `wavelengths_hr_nm` must be 1-D, strictly increasing, "
+            f"{caller}: `wavelengths_hr_nm` must be 1-D, strictly increasing, "
             "with at least two points."
         )
     weights = full @ _hat_weights(grid, wl).T  # (B, len(wl))
     covered = weights.sum(axis=1) / full.sum(axis=1)
-    for name, frac in zip(table.columns, covered, strict=True):
+    for name, frac in zip(names, covered, strict=True):
         if frac < 0.999:
             warnings.warn(
-                f"sentinel2_srf: the grid [{wl[0]:g}, {wl[-1]:g}] nm covers "
+                f"{caller}: the grid [{wl[0]:g}, {wl[-1]:g}] nm covers "
                 f"{100 * frac:.1f} % of band {name}'s response; the band is "
                 "normalised over that part, which biases its value.",
                 UserWarning,
-                stacklevel=2,
+                stacklevel=3,
             )
     responses = weights / _bin_widths(wl)
     centers = (full * grid).sum(axis=1) / full.sum(axis=1)
@@ -128,7 +144,7 @@ def sentinel2_srf(
         wavelengths_hr_nm=wl,
         band_centers_nm=centers,
         band_widths_nm=widths,
-        band_names=tuple(str(c) for c in table.columns),
+        band_names=names,
         srf_type="custom",
         custom_srfs=responses,
     )
