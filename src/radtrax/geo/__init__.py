@@ -7,6 +7,12 @@
   :func:`sentinel2_radiance` (:mod:`radtrax.geo.sentinel2`): a Sentinel-2
   L1C image read by georeader as a ``BandInstrument``, a per-pixel
   ``ViewingGeometry`` and TOA radiance (radtrax#120).
+- :func:`landsat_srf`, :func:`landsat_instrument`, :func:`landsat_radiance`
+  and :func:`landsat_geometry` (:mod:`radtrax.geo.landsat`): Landsat 8/9 OLI
+  B6 and B7 from the USGS spectral responses radtrax bundles, radiance from
+  Level-1 digital numbers and the MTL rescaling, and a per-pixel
+  ``ViewingGeometry`` from the Collection 2 angle bands (radtrax#121); no
+  extra needed.
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
   the one matched-filter core (radtrax#29), ported from geotoolz.
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
@@ -23,6 +29,12 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from radtrax.geo.landsat import (
+    landsat_geometry,
+    landsat_instrument,
+    landsat_radiance,
+    landsat_srf,
+)
 from radtrax.geo.sentinel2 import (
     sentinel2_geometry,
     sentinel2_instrument,
@@ -118,6 +130,10 @@ __all__ = [
     "StreamingBackground",
     "StreamingBackgroundResult",
     "ValidateMFInputs",
+    "landsat_geometry",
+    "landsat_instrument",
+    "landsat_radiance",
+    "landsat_srf",
     "sentinel2_band_responses",
     "sentinel2_geometry",
     "sentinel2_instrument",
