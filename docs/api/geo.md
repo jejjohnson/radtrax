@@ -8,7 +8,9 @@ georeader as a `BandInstrument`, a per-pixel `ViewingGeometry` and TOA
 radiance; Landsat 8/9 OLI B6 and B7 from the USGS spectral responses
 radtrax bundles, with radiance from Level-1 digital numbers and the MTL
 rescaling and a per-pixel `ViewingGeometry` from the Collection 2 angle
-bands (no extra needed); and the matched filter as
+bands (no extra needed); an EMIT L1B image read by georeader's `EMITImage` as a
+`BandInstrument` with Gaussian bands of its FWHM and a per-pixel
+`ViewingGeometry` from its obs file; and the matched filter as
 pipekit operators on GeoTensors, around the one core in
 [`radtrax.retrieval.matched_filter`](retrieval.md), and `MBMP`, the
 Sentinel-2 multi-band multi-pass signal (geotoolz's former `plume.SBMP`).
@@ -27,6 +29,13 @@ Sentinel-2 multi-band multi-pass signal (geotoolz's former `plume.SBMP`).
 ## `sentinel2`
 
 ::: radtrax.geo.sentinel2
+    options:
+      show_root_heading: false
+      heading_level: 3
+
+## `emit`
+
+::: radtrax.geo.emit
     options:
       show_root_heading: false
       heading_level: 3
