@@ -74,6 +74,7 @@ nav:
   - Atmosphere: atmosphere.md
   - Spectroscopy: spectroscopy.md
   - Optics: optics.md
+  - Radiometry: radiometry.md
   - Solvers: solvers.md
   - Surface: surface.md
   - Slab models: slab.md
