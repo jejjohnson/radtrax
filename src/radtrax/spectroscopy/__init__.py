@@ -11,17 +11,24 @@ in ``(ln p, T)`` (radtrax#33), and ``SumOpacity``, the sum of several
 providers on one grid (radtrax#184). Line-by-line opacity arrives in v2 of the
 roadmap. ``synthetic`` builds the synthetic methane spectra the docs,
 notebooks and tests use without HITRAN (radtrax#115). ``table_cache``
-locates and loads v0's built tables (radtrax#34).
+locates and loads v0's built tables (radtrax#34). ``solar`` gives the solar
+irradiance on the model grid from the TSIS-1 HSRS, fetched once into the same
+cache, and the Earth–Sun distance (radtrax#107).
 """
 
 from __future__ import annotations
 
-from radtrax.spectroscopy import hitran, opacity, synthetic, table_cache, tables
+from radtrax.spectroscopy import hitran, opacity, solar, synthetic, table_cache, tables
 from radtrax.spectroscopy.opacity import (
     CrossSectionTable,
     OpacityProvider,
     SumOpacity,
     TableOpacity,
+)
+from radtrax.spectroscopy.solar import (
+    earth_sun_distance,
+    fetch_solar_spectrum,
+    solar_irradiance,
 )
 from radtrax.spectroscopy.table_cache import (
     V0_GRID,
@@ -51,6 +58,8 @@ __all__ = [
     "absorption_coefficient",
     "air_mass_factor",
     "beers_law_from_lut",
+    "earth_sun_distance",
+    "fetch_solar_spectrum",
     "hitran",
     "interpolate_cross_section",
     "load_opacity",
@@ -58,6 +67,8 @@ __all__ = [
     "number_density",
     "opacity",
     "plume_ratio_spectrum",
+    "solar",
+    "solar_irradiance",
     "synthetic",
     "table_cache",
     "table_cache_dir",

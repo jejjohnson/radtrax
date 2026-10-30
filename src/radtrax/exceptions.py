@@ -124,7 +124,7 @@ class MissingFileError(RadtraxError, FileNotFoundError):
 
 
 class MissingTableError(MissingFileError):
-    """A cross-section table is not in the cache; its message names the build command.
+    """A table (cross sections, a solar spectrum) is not in the cache; its message names the command that builds or fetches it.
 
     Examples:
         >>> from radtrax import MissingTableError

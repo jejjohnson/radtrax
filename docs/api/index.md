@@ -10,7 +10,7 @@ a one-line summary each.
 |---|---|
 | [Forward model](forward_model.md) | `ForwardModel`, `unit_absorption_target` |
 | [Atmosphere](atmosphere.md) | `AtmosphericState`, `ViewingGeometry`, `layers_from_levels`, `afgl_us_standard`, ideal-gas constants, `number_density`, `air_mass_factor` |
-| [Spectroscopy](spectroscopy.md) | `OpacityProvider`, `TableOpacity`, v0's table cache (`load_opacity`), `tables` (single-slab σ interpolation, Beer–Lambert), `hitran` (table building, `[hitran]`) |
+| [Spectroscopy](spectroscopy.md) | `OpacityProvider`, `TableOpacity`, v0's table cache (`load_opacity`), the solar spectrum (`solar_irradiance`), `tables` (single-slab σ interpolation, Beer–Lambert), `hitran` (table building, `[hitran]`) |
 | [Optics](optics.md) | `OpticalProperties` |
 | [Radiometry](radiometry.md) | `planck_radiance`, `log_planck_radiance`, the radiation constants, the per-µm and per-GHz views; `brightness_temperature`, `band_planck_radiance`, `band_brightness_temperature` |
 | [Solvers](solvers.md) | `RTSolver`, `BeerLambert` |
