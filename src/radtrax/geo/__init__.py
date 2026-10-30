@@ -13,6 +13,10 @@
   Level-1 digital numbers and the MTL rescaling, and a per-pixel
   ``ViewingGeometry`` from the Collection 2 angle bands (radtrax#121); no
   extra needed.
+- :func:`emit_instrument` and :func:`emit_geometry` (:mod:`radtrax.geo.emit`):
+  an EMIT L1B image read by georeader's ``EMITImage`` as a ``BandInstrument``
+  with Gaussian bands of its FWHM, and a per-pixel ``ViewingGeometry`` from
+  its obs file (radtrax#114).
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
   the one matched-filter core (radtrax#29), ported from geotoolz.
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
@@ -29,6 +33,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from radtrax.geo.emit import emit_geometry, emit_instrument
 from radtrax.geo.landsat import (
     landsat_geometry,
     landsat_instrument,
@@ -130,6 +135,8 @@ __all__ = [
     "StreamingBackground",
     "StreamingBackgroundResult",
     "ValidateMFInputs",
+    "emit_geometry",
+    "emit_instrument",
     "landsat_geometry",
     "landsat_instrument",
     "landsat_radiance",

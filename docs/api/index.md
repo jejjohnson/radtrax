@@ -18,7 +18,7 @@ a one-line summary each.
 | [Slab models](slab.md) | single-slab forward models, the nB table, observation config |
 | [Instrument](instrument.md) | `Instrument`, `BandInstrument`, `SpectralResponseFunction`, `PointSpreadFunction`, `GroundSamplingDistance`, `NoiseModel` (`DiagonalNoise`, `SNRNoise`, `NEdTNoise`) |
 | [Retrieval](retrieval.md) | the matched filter; 3D-Var; the MBMP signal; band tables; the absorption-shape test (`AbsorptionWindow`, `transmittance_table`, `pair_pixels`, `ratio_spectrum`, `fit_transmittance`, `d_norm`) |
-| [Geo](geo.md) | `sentinel2_srf`; `sentinel2_instrument`, `sentinel2_geometry`, `sentinel2_radiance` (the `[geo]` extra); `landsat_srf`, `landsat_instrument`, `landsat_radiance`, `landsat_geometry` |
+| [Geo](geo.md) | `sentinel2_srf`; `sentinel2_instrument`, `sentinel2_geometry`, `sentinel2_radiance` (the `[geo]` extra); `emit_instrument`, `emit_geometry`; `landsat_srf`, `landsat_instrument`, `landsat_radiance`, `landsat_geometry` |
 | [Exceptions](exceptions.md) | `RadtraxError`, `MissingTableError` |
 
 ## Package overview
