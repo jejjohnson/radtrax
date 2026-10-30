@@ -1,6 +1,6 @@
 # Instrument
 
-From radiance to what a sensor records: the `Instrument` protocol, `BandInstrument`, JAX band integration with a differentiable spectral shift, and `GaussianInstrument`, Gaussian bands shifted analytically in cm⁻¹ or nm (`spectral`); spectral response functions and NumPy band integration (`srf`), point-spread and ground-sampling operators (`psf`); the `NoiseModel` protocol and its diagonal and SNR noise (`noise`).
+From radiance to what a sensor records: the `Instrument` protocol, `BandInstrument`, JAX band integration with a differentiable spectral shift, and `GaussianInstrument`, Gaussian bands shifted analytically in cm⁻¹ or nm (`spectral`); spectral response functions and NumPy band integration (`srf`), point-spread and ground-sampling operators (`psf`); the `NoiseModel` protocol and its diagonal, SNR and NEΔT noise (`noise`).
 
 ::: radtrax.instrument
     options:

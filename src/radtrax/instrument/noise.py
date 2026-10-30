@@ -8,11 +8,14 @@ and ``lx.CG`` all take it), draws ``ε ~ 𝒩(0, S_ε(y))`` from a
 ``jax.random`` key the caller passes, and scores an observation with
 ``log 𝒩(y_obs | y, S_ε(y))``.
 
-Two diagonal models:
+Three diagonal models:
 
 - ``DiagonalNoise``: a fixed per-band standard deviation, ``S_ε = diag(σ²)``.
 - ``SNRNoise``: a signal-to-noise ratio with a noise floor,
   ``σ_b = √((y_b / SNR_b)² + σ_floor,b²)``.
+- ``NEdTNoise``: a thermal band's noise-equivalent temperature difference
+  turned into radiance, ``σ_b = NEΔT_b · ∂B̄_b/∂T`` at a reference
+  temperature or at the scene's band brightness temperature (radtrax#249).
 
 Shapes: ``B`` bands.
 """
@@ -20,6 +23,7 @@ Shapes: ``B`` bands.
 from __future__ import annotations
 
 import abc
+from typing import Literal
 
 import equinox as eqx
 import gaussx as gx
@@ -29,9 +33,14 @@ import lineax as lx
 from jaxtyping import Array, ArrayLike, Float, PRNGKeyArray, Real
 
 from radtrax.exceptions import ParameterError, ShapeError
+from radtrax.instrument.spectral import Instrument
+from radtrax.radiometry.brightness import (
+    band_brightness_temperature,
+    band_planck_radiance,
+)
 
 
-__all__ = ["DiagonalNoise", "NoiseModel", "SNRNoise"]
+__all__ = ["DiagonalNoise", "NEdTNoise", "NoiseModel", "SNRNoise"]
 
 
 class NoiseModel(eqx.Module):
@@ -151,6 +160,134 @@ class SNRNoise(NoiseModel):
         """``diag((y / SNR)² + σ_floor²)``, differentiable in ``y``."""
         y = _check_y("SNRNoise", y, self.snr)
         return _diagonal_covariance((y / self.snr) ** 2 + self.floor**2)
+
+
+class NEdTNoise(NoiseModel):
+    """Thermal-band noise from a noise-equivalent temperature difference.
+
+    $$
+    S_ε = \\mathrm{diag}(σ^2), \\qquad
+    σ_b = \\mathrm{NEΔT}_b \\, \\frac{\\partial \\bar B_b}{\\partial T}\\Big|_{T},
+    \\qquad \\bar B_b(T) = \\sum_g A_{bg} B(\\tilde\\nu_g, T),
+    $$
+
+    with $A$ the instrument's response matrix and $B$ the Planck radiance
+    (`radtrax.radiometry.band_planck_radiance`). Two conventions for $T$:
+
+    - ``"reference"`` (the default): $T = T_\\mathrm{ref}$, the temperature the
+      specification quotes NEΔT at (300 K for TIRS-2 and ECOSTRESS). $σ$ is
+      constant in ``y``, as for a detector-noise-limited instrument;
+      $\\partial \\bar B / \\partial T$ at a scalar $T_\\mathrm{ref}$ is one JVP.
+    - ``"scene"``: $T = T_b(y)$, each band's brightness temperature of ``y``
+      (`radtrax.radiometry.band_brightness_temperature`), for "NEΔT at the
+      scene temperature" taken literally. $σ$ depends on ``y``, so
+      ``log_prob`` keeps $\\log |S_ε|$ (the `NoiseModel` contract), and a
+      band with $y_b \\le 0$ has no brightness temperature: its $σ$ is NaN.
+
+    $σ$ is recomputed in every call (not cached at construction), so
+    gradients reach the instrument's parameters; it is in the instrument's
+    radiance units (W m⁻² sr⁻¹ (cm⁻¹)⁻¹ for rows that sum to 1).
+
+    Attributes:
+        netd_k: NEΔT per band [K], ``(B,)``; each strictly positive.
+        instrument: The bands $\\bar B$ is integrated over.
+        t_ref_k: Reference temperature [K], a scalar > 0 (used in the
+            ``"reference"`` mode).
+        mode: ``"reference"`` or ``"scene"``.
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> from radtrax.instrument import GaussianInstrument
+        >>> nu = jnp.linspace(916.0, 919.5, 3501)  # a 1 nm band at 10.9 µm
+        >>> band = GaussianInstrument(nu, jnp.array([10900.0]), jnp.array([1.0]))
+        >>> noise = NEdTNoise(jnp.array([0.048]), band)
+        >>> f"{float(noise.radiance_sigma(jnp.zeros(1))[0]):.4e}"
+        '8.1485e-05'
+    """
+
+    netd_k: Float[Array, " B"]
+    instrument: Instrument
+    t_ref_k: Float[Array, ""]
+    mode: Literal["reference", "scene"] = eqx.field(static=True)
+
+    def __init__(
+        self,
+        netd_k: Real[ArrayLike, " B"],
+        instrument: Instrument,
+        *,
+        t_ref_k: Real[ArrayLike, ""] = 300.0,
+        mode: Literal["reference", "scene"] = "reference",
+    ) -> None:
+        self.netd_k = jnp.asarray(netd_k, dtype=float)
+        self.instrument = instrument
+        self.t_ref_k = jnp.asarray(t_ref_k, dtype=float)
+        self.mode = mode
+        if mode not in ("reference", "scene"):
+            raise ParameterError(
+                f"NEdTNoise: mode must be 'reference' or 'scene', got {mode!r}."
+            )
+        _check_bands("NEdTNoise", netd_k=self.netd_k)
+        if self.t_ref_k.ndim != 0:
+            raise ShapeError(
+                f"NEdTNoise: t_ref_k must be a scalar, got {self.t_ref_k.shape}."
+            )
+        _check_positive("NEdTNoise", netd_k=self.netd_k)
+        _check_positive("NEdTNoise", t_ref_k=self.t_ref_k[None])
+        n_bands = jax.eval_shape(instrument, instrument.nu_cm).shape
+        if n_bands != self.netd_k.shape:
+            raise ShapeError(
+                f"NEdTNoise: netd_k is {self.netd_k.shape} for an instrument "
+                f"with {n_bands} bands."
+            )
+
+    def _slope(self, t_k: Float[Array, "*B"]) -> Float[Array, " B"]:
+        """∂B̄_b/∂T at ``t_k``, a scalar or one per band (B̄_b depends on T_b only)."""
+        _, slope = jax.jvp(
+            lambda t: band_planck_radiance(self.instrument, t),
+            (t_k,),
+            (jnp.ones_like(t_k),),
+        )
+        return slope
+
+    def _temperature(self, y: Float[Array, " B"]) -> Float[Array, "*B"]:
+        if self.mode == "reference":
+            return self.t_ref_k
+        return band_brightness_temperature(self.instrument, y)
+
+    def radiance_sigma(self, y: Float[ArrayLike, " B"]) -> Float[Array, " B"]:
+        """$σ_b = \\mathrm{NEΔT}_b \\, \\partial \\bar B_b / \\partial T$, in the instrument's units.
+
+        Args:
+            y: Band values the noise is evaluated at, ``(B,)``; read only in
+                the ``"scene"`` mode.
+
+        Returns:
+            $σ$, ``(B,)``.
+        """
+        y = _check_y("NEdTNoise", y, self.netd_k)
+        return self.netd_k * self._slope(self._temperature(y))
+
+    def netd_at(self, y: Float[ArrayLike, " B"]) -> Float[Array, " B"]:
+        """The NEΔT this noise amounts to at the scene: $σ_b / \\partial \\bar B_b / \\partial T|_{T_b(y)}$ [K].
+
+        The same radiance noise is a different NEΔT at another scene
+        temperature: in the ``"reference"`` mode it equals ``netd_k`` only at
+        $y = \\bar B(T_\\mathrm{ref})$; in the ``"scene"`` mode it is
+        ``netd_k`` wherever $y > 0$.
+
+        Args:
+            y: Band values, ``(B,)``, each > 0.
+
+        Returns:
+            NEΔT per band [K], ``(B,)``.
+        """
+        y = _check_y("NEdTNoise", y, self.netd_k)
+        t_b = band_brightness_temperature(self.instrument, y)
+        return self.radiance_sigma(y) / self._slope(t_b)
+
+    def covariance(self, y: Float[ArrayLike, " B"]) -> lx.AbstractLinearOperator:
+        """``diag(σ²)`` with $σ$ from `radiance_sigma`, differentiable in the instrument."""
+        return _diagonal_covariance(self.radiance_sigma(y) ** 2)
 
 
 def _diagonal_covariance(variance: Float[Array, " B"]) -> lx.AbstractLinearOperator:
