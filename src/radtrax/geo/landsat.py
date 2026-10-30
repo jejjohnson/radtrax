@@ -40,7 +40,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from functools import cache
-from importlib import resources
 from types import MappingProxyType
 from typing import Any
 
@@ -55,7 +54,7 @@ from radtrax.exceptions import (
     ParameterError,
     ShapeError,
 )
-from radtrax.geo.srf import _projected_srf
+from radtrax.geo.srf import _bundled_rows, _tabulated_srf
 from radtrax.instrument.noise import NEdTNoise
 from radtrax.instrument.spectral import BandInstrument
 from radtrax.instrument.srf import SpectralResponseFunction
@@ -97,11 +96,8 @@ LANDSAT_CALIBRATION_K: Mapping[str, Mapping[str, float]] = MappingProxyType(
 @cache
 def _rsr_table() -> dict[tuple[str, str], tuple[np.ndarray, np.ndarray]]:
     """The bundled RSRs: ``(satellite, band) → (wavelength [nm], response)``."""
-    path = resources.files("radtrax.geo") / "data" / "landsat_oli_rsr.csv"
-    lines = [ln for ln in path.read_text("utf-8").splitlines() if ln[:1] != "#"]
     columns: dict[tuple[str, str], list[tuple[float, float]]] = {}
-    for line in lines[1:]:  # after the column names
-        sat, band, wl, response = line.split(",")
+    for sat, band, wl, response in _bundled_rows("landsat_oli_rsr.csv"):
         columns.setdefault((sat, band), []).append((float(wl), float(response)))
     table = {}
     for key, rows in columns.items():
@@ -176,14 +172,8 @@ def landsat_srf(
         raise MissingKeyError(
             f"landsat_srf: no band(s) {missing} for {satellite}; bundled: {bundled}."
         )
-    lo = min(table[satellite, b][0][0] for b in names)
-    hi = max(table[satellite, b][0][-1] for b in names)
-    grid = np.arange(lo, hi + 1.0)  # the full 1 nm grid
-    full = np.zeros((len(names), grid.size))
-    for i, b in enumerate(names):
-        wl, response = table[satellite, b]  # every 1 nm (OLI) or 50 nm (TIRS)
-        full[i] = np.interp(grid, wl, response, left=0.0, right=0.0)
-    return _projected_srf("landsat_srf", grid, full, names, wavelengths_hr_nm)
+    samples = [table[satellite, b] for b in names]  # every 1 nm (OLI), 50 nm (TIRS)
+    return _tabulated_srf("landsat_srf", samples, names, wavelengths_hr_nm)
 
 
 def landsat_instrument(
@@ -447,15 +437,30 @@ def landsat_geometry(
         [[150.0, 90.0]]
     """
     angles = [np.asarray(x, dtype=float) * scale_deg for x in (sza, saa, vza, vaa)]
-    if len({x.shape for x in angles}) != 1:
+    return _geometry_from_degrees("landsat_geometry", *angles)
+
+
+def _geometry_from_degrees(
+    caller: str,
+    sza: np.ndarray,
+    saa: np.ndarray,
+    vza: np.ndarray,
+    vaa: np.ndarray,
+) -> ViewingGeometry:
+    """A ``ViewingGeometry`` per pixel from four angle grids [deg], ``(H, W)``.
+
+    The relative azimuth is ``arccos(cos(vaa − saa))`` in ``[0°, 180°]``;
+    shared by :func:`landsat_geometry` and
+    :func:`radtrax.geo.ecostress_geometry`.
+    """
+    if len({x.shape for x in (sza, saa, vza, vaa)}) != 1:
         raise ShapeError(
-            "landsat_geometry: the angle bands differ in shape "
-            f"{[x.shape for x in angles]}."
+            f"{caller}: the angle bands differ in shape "
+            f"{[x.shape for x in (sza, saa, vza, vaa)]}."
         )
-    s_zen, s_az, v_zen, v_az = angles
-    raa = np.rad2deg(np.arccos(np.cos(np.deg2rad(v_az - s_az))))
+    raa = np.rad2deg(np.arccos(np.cos(np.deg2rad(vaa - saa))))
     from_angles = eqx.filter_vmap(eqx.filter_vmap(ViewingGeometry.from_angles))
-    return from_angles(s_zen, v_zen, raa)
+    return from_angles(sza, vza, raa)
 
 
 def _n(band: str) -> str:

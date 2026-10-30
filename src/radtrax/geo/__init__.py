@@ -14,6 +14,14 @@
   ``ViewingGeometry`` from the Collection 2 angle bands (radtrax#121); the
   TIRS bands B10 and B11 with band radiance per µm, and their NEΔT as a
   noise model, :func:`landsat_noise` (radtrax#225); no extra needed.
+- :func:`ecostress_bands`, :func:`ecostress_srf`,
+  :func:`ecostress_instrument`, :func:`ecostress_noise`,
+  :func:`ecostress_radiance` and :func:`ecostress_geometry`
+  (:mod:`radtrax.geo.ecostress`): ECOSTRESS's five thermal bands and its
+  three-band mode, from the science team's spectral responses radtrax
+  bundles, band radiance per µm, NEΔT as a noise model, L1B radiance and a
+  per-pixel ``ViewingGeometry`` from the geolocation angles (radtrax#226);
+  no extra needed.
 - :func:`emit_instrument` and :func:`emit_geometry` (:mod:`radtrax.geo.emit`):
   an EMIT L1B image read by georeader's ``EMITImage`` as a ``BandInstrument``
   with Gaussian bands of its FWHM, and a per-pixel ``ViewingGeometry`` from
@@ -36,6 +44,19 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from radtrax.geo.ecostress import (
+    ECOSTRESS_3BAND,
+    ECOSTRESS_3BAND_PERIOD,
+    ECOSTRESS_BAND_CENTRES_UM,
+    ECOSTRESS_BANDS,
+    ECOSTRESS_NETD_K,
+    ecostress_bands,
+    ecostress_geometry,
+    ecostress_instrument,
+    ecostress_noise,
+    ecostress_radiance,
+    ecostress_srf,
+)
 from radtrax.geo.emit import emit_geometry, emit_instrument
 from radtrax.geo.landsat import (
     LANDSAT_CALIBRATION_K,
@@ -121,6 +142,11 @@ if TYPE_CHECKING:
 
 
 __all__ = [
+    "ECOSTRESS_3BAND",
+    "ECOSTRESS_3BAND_PERIOD",
+    "ECOSTRESS_BANDS",
+    "ECOSTRESS_BAND_CENTRES_UM",
+    "ECOSTRESS_NETD_K",
     "LANDSAT_CALIBRATION_K",
     "LANDSAT_NETD_K",
     "MBMP",
@@ -146,6 +172,12 @@ __all__ = [
     "StreamingBackgroundResult",
     "UnitAbsorptionTarget",
     "ValidateMFInputs",
+    "ecostress_bands",
+    "ecostress_geometry",
+    "ecostress_instrument",
+    "ecostress_noise",
+    "ecostress_radiance",
+    "ecostress_srf",
     "emit_geometry",
     "emit_instrument",
     "landsat_geometry",
