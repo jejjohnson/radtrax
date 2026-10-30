@@ -3,6 +3,10 @@
 - :func:`sentinel2_srf` reads the Sentinel-2 SRF table georeader bundles
   into radtrax's SRF (radtrax#28); :func:`sentinel2_band_responses` gives
   its raw B11 and B12 responses on a wavelength grid (radtrax#115).
+- :func:`sentinel2_instrument`, :func:`sentinel2_geometry` and
+  :func:`sentinel2_radiance` (:mod:`radtrax.geo.sentinel2`): a Sentinel-2
+  L1C image read by georeader as a ``BandInstrument``, a per-pixel
+  ``ViewingGeometry`` and TOA radiance (radtrax#120).
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
   the one matched-filter core (radtrax#29), ported from geotoolz.
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
@@ -19,6 +23,11 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
+from radtrax.geo.sentinel2 import (
+    sentinel2_geometry,
+    sentinel2_instrument,
+    sentinel2_radiance,
+)
 from radtrax.geo.srf import sentinel2_band_responses, sentinel2_srf
 
 
@@ -110,5 +119,8 @@ __all__ = [
     "StreamingBackgroundResult",
     "ValidateMFInputs",
     "sentinel2_band_responses",
+    "sentinel2_geometry",
+    "sentinel2_instrument",
+    "sentinel2_radiance",
     "sentinel2_srf",
 ]
