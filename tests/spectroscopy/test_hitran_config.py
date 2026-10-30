@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import sys
+
 import numpy as np
 import pytest
 
+from radtrax.exceptions import MissingExtraError
 from radtrax.spectroscopy.hitran import ATMOSPHERIC_GASES, GasConfig, LUTGridConfig
 
 
@@ -79,3 +82,14 @@ def test_gas_config_repr_is_informative():
         "CH4", molecule_id=6, nu_min=4000.0, nu_max=4500.0, isotopologue_ids=(32, 33)
     )
     assert repr(some) == "GasConfig(CH4, M6, ids 32,33)"
+
+
+def test_resolving_isotopologues_without_hapi_names_the_extra(monkeypatch):
+    # A None entry in sys.modules makes `import hapi` raise ModuleNotFoundError.
+    monkeypatch.setitem(sys.modules, "hapi", None)
+    with pytest.raises(MissingExtraError, match=r"\[hitran\]"):
+        ATMOSPHERIC_GASES["CH4"].resolve_isotopologue_ids()
+    # Explicit ids need no hapi.
+    assert GasConfig(
+        "CH4", 6, 4000.0, 4500.0, isotopologue_ids=(32, 33)
+    ).resolve_isotopologue_ids() == (32, 33)
