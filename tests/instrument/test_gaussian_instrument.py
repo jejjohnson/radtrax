@@ -129,3 +129,19 @@ def test_shapes_and_the_grid_are_checked() -> None:
         GaussianInstrument(NU, centers, widths, shift_cm=jnp.zeros(2))
     with pytest.raises(GridError, match="GaussianInstrument: nu_cm must be strictly"):
         GaussianInstrument(NU[::-1], centers, widths)
+
+
+def test_response_matrix_is_the_response_and_the_jacobian() -> None:
+    gaussian = GaussianInstrument.from_srf(SRF, NU, shift_cm=0.03, shift_nm=0.2)
+    np.testing.assert_array_equal(gaussian.response_matrix(), gaussian.response())
+    # The protocol's default (jax.jacrev of the call) agrees with the override.
+    default = jax.jacrev(gaussian)(jnp.zeros_like(NU))
+    np.testing.assert_allclose(gaussian.response_matrix(), default, rtol=1e-14)
+
+
+def test_gaussian_instrument_is_linear_in_radiance() -> None:
+    gaussian = GaussianInstrument.from_srf(SRF, NU, shift_nm=0.2)
+    other = jnp.cos(NU / 5.0)
+    lhs = gaussian(2.5 * RADIANCE - 0.75 * other)
+    rhs = 2.5 * gaussian(RADIANCE) - 0.75 * gaussian(other)
+    np.testing.assert_allclose(lhs, rhs, rtol=1e-14, atol=1e-14)

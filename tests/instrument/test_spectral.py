@@ -162,3 +162,30 @@ def test_shape_errors(
 ) -> None:
     with pytest.raises(ValueError, match=match):
         BandInstrument(nu, response, shift, names)
+
+
+def _small_band_instrument(shift_cm: float) -> BandInstrument:
+    nu = jnp.linspace(900.0, 910.0, 41)
+    rng = np.random.default_rng(0)
+    response = rng.uniform(size=(3, 41))
+    return BandInstrument(nu, response / response.sum(1, keepdims=True), shift_cm)
+
+
+@pytest.mark.parametrize("shift_cm", [0.0, 0.37])
+def test_response_matrix_is_the_jacobian_of_the_call(shift_cm: float) -> None:
+    instrument = _small_band_instrument(shift_cm)
+    expected = jax.jacfwd(instrument)(jnp.ones(41))
+    np.testing.assert_allclose(instrument.response_matrix(), expected, rtol=1e-14)
+
+
+def test_band_instrument_is_linear_in_radiance() -> None:
+    # The protocol's contract: I(aL₁ + bL₂) = aI(L₁) + bI(L₂).
+    instrument = _small_band_instrument(0.37)
+    rng = np.random.default_rng(1)
+    l1, l2 = (jnp.asarray(rng.uniform(size=41)) for _ in range(2))
+    lhs = instrument(2.5 * l1 - 0.75 * l2)
+    rhs = 2.5 * instrument(l1) - 0.75 * instrument(l2)
+    np.testing.assert_allclose(lhs, rhs, rtol=1e-14, atol=1e-14)
+    np.testing.assert_allclose(
+        instrument.response_matrix() @ l1, instrument(l1), rtol=1e-14
+    )

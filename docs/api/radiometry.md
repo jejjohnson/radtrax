@@ -4,7 +4,9 @@ Radiometric source functions, the lowest layer every emitting or measuring
 stage reaches (#246): the Planck radiance `B(ν̃, T)` per unit wavenumber in
 W m⁻² sr⁻¹ (cm⁻¹)⁻¹, its log, their closed-form derivatives, the radiation
 constants, and the per-µm and per-GHz views. Wavenumber is the one internal
-axis; wavelength and frequency are views.
+axis; wavelength and frequency are views. Brightness temperature inverts Planck: in
+closed form per wavenumber, and per band of an `Instrument` by Newton with
+implicit differentiation.
 
 The Planck function is checked against independent oracles (gate TH12): the
 constants against the SI 2019 exact `h`, `c` and `k`, the Stefan–Boltzmann law
@@ -23,6 +25,13 @@ the NumPy and SciPy versions and SciPy's constants, in
 ## `planck`
 
 ::: radtrax.radiometry.planck
+    options:
+      show_root_heading: false
+      heading_level: 3
+
+## `brightness`
+
+::: radtrax.radiometry.brightness
     options:
       show_root_heading: false
       heading_level: 3
