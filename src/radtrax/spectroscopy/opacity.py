@@ -12,6 +12,8 @@ temperature:
 
 with ``n_l`` the air number density, ``x_{g,l}`` the gas's mixing ratio and
 ``Δz_l`` the thickness (:class:`~radtrax.atmosphere.AtmosphericState`).
+Sources of optical depth add: :class:`SumOpacity` holds several providers on
+one grid and returns ``Σ_k τ^{(k)}`` (radtrax#184).
 
 Ported from the radtrax · 3 design notebook's ``TableOpacity`` and
 generalised to a ``dict`` of per-gas tables mapped with ``jax.tree.map``, so
@@ -25,6 +27,7 @@ from __future__ import annotations
 
 import abc
 import warnings
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import equinox as eqx
@@ -43,7 +46,7 @@ if TYPE_CHECKING:
     import xarray as xr
 
 
-__all__ = ["CrossSectionTable", "OpacityProvider", "TableOpacity"]
+__all__ = ["CrossSectionTable", "OpacityProvider", "SumOpacity", "TableOpacity"]
 
 
 class OpacityProvider(eqx.Module):
@@ -241,6 +244,83 @@ class TableOpacity(OpacityProvider):
         if nu is None:
             raise ParameterError("TableOpacity: need at least one gas table.")
         return cls(jnp.asarray(nu), tables)
+
+
+class SumOpacity(OpacityProvider):
+    """Optical depth from several sources on one wavenumber grid.
+
+    ``τ_l(ν) = Σ_k τ_l^{(k)}(ν)``: lines, continua and collision-induced
+    absorption are separate sources whose temperature and pressure
+    dependences differ, and they add at the optical-depth level (Korkin et
+    al. 2026, §1, §6). Each provider stays a leaf of the module, so a
+    gradient flows through every one, and each stays testable alone.
+
+    Attributes:
+        nu_cm: Wavenumber grid [cm⁻¹], ``(G,)``, the first provider's; every
+            provider must share it.
+        providers: The opacity providers whose optical depths add.
+
+    Raises:
+        ParameterError: With no providers.
+        GridError: If a provider's grid differs from the first's in length, or
+            in value when the grids are concrete (under tracing only the
+            lengths are checked).
+
+    Examples:
+        >>> import jax.numpy as jnp
+        >>> from radtrax.atmosphere import layers_from_levels
+        >>> def table(sigma):
+        ...     return CrossSectionTable(
+        ...         log_p_pa=jnp.log(jnp.array([1e4, 1e5])),
+        ...         t_k=jnp.array([200.0, 300.0]),
+        ...         sigma_cm2=jnp.full((2, 2, 3), sigma),
+        ...     )
+        >>> nu = jnp.array([4300.0, 4300.1, 4300.2])
+        >>> lines = TableOpacity(nu, {"CH4": table(1e-21)})
+        >>> other = TableOpacity(nu, {"H2O": table(2e-23)})
+        >>> atm = layers_from_levels(
+        ...     jnp.array([1e5, 5e4]),
+        ...     jnp.array([288.0, 255.0]),
+        ...     {"CH4": jnp.full(2, 1.9e-6), "H2O": jnp.full(2, 1e-2)},
+        ... )
+        >>> total = SumOpacity((lines, other))
+        >>> bool(jnp.allclose(total(atm), lines(atm) + other(atm)))
+        True
+    """
+
+    nu_cm: Float[Array, " G"]
+    providers: tuple[OpacityProvider, ...]
+
+    def __init__(self, providers: Sequence[OpacityProvider]) -> None:
+        providers = tuple(providers)
+        if not providers:
+            raise ParameterError("SumOpacity: need at least one opacity provider.")
+        nu = jnp.asarray(providers[0].nu_cm)
+        for k, provider in enumerate(providers[1:], start=1):
+            other = jnp.asarray(provider.nu_cm)
+            if jnp.shape(other) != jnp.shape(nu):
+                raise GridError(
+                    f"SumOpacity: provider {k} has {jnp.shape(other)} wavenumbers, "
+                    f"provider 0 has {jnp.shape(nu)}."
+                )
+            try:
+                same = bool(jnp.all(other == nu))
+            except (
+                jax.errors.TracerBoolConversionError,
+                jax.errors.ConcretizationTypeError,
+            ):
+                continue
+            if not same:
+                raise GridError(
+                    f"SumOpacity: provider {k} is on a different wavenumber grid "
+                    "from provider 0."
+                )
+        self.nu_cm = nu
+        self.providers = providers
+
+    def __call__(self, state: AtmosphericState) -> Float[Array, "L G"]:
+        taus = [provider(state) for provider in self.providers]
+        return sum(taus[1:], start=taus[0])
 
 
 def _clamp(x: Float[Array, " L"], grid: Float[Array, " N"]) -> Float[Array, " L"]:
