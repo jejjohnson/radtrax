@@ -67,13 +67,15 @@ app = cyclopts.App(help=__doc__)
 
 
 @app.command
-def build(*, out: Path = OUT, check: bool = False, rtol: float = 1e-14) -> None:
+def build(*, out: Path = OUT, check: bool = False, rtol: float = 1e-12) -> None:
     """Fetch pyradi's ryplanck, evaluate it in isolation, write or check the oracle.
 
     Args:
         out: The ``.npz`` file to write, or to compare with when ``check``.
         check: Compare a fresh evaluation with ``out`` instead of writing it.
-        rtol: Relative tolerance of the comparison.
+        rtol: Relative tolerance of the comparison. 1e-12, not 1e-14: numpy's
+            ``exp`` differs between builds and CPUs by a few ulp (1.35e-14 on a
+            CI runner), and the oracle tests compare at 1e-12 anyway.
     """
     with tempfile.TemporaryDirectory(prefix="pyradi-") as tmp:
         src = Path(tmp) / "src"

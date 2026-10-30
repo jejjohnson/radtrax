@@ -191,6 +191,18 @@ def test_unit_views_round_trip() -> None:
     np.testing.assert_allclose(from_per_ghz(to_per_ghz(b)), b, rtol=1e-15)
 
 
+@pytest.mark.parametrize("wavelength_um", [0.4, 2.2, 10.9, 15.0])
+def test_unit_view_gradients_match_finite_differences(wavelength_um: float) -> None:
+    # x = (radiance, ν̃): the per-µm views depend on both, the per-GHz on the first.
+    x0 = jnp.array(
+        [float(planck_radiance(1e4 / wavelength_um, 300.0)) + 1.0, 1e4 / wavelength_um]
+    )
+    assert_gradients_match(lambda x: to_per_um(x[0], x[1]), x0)
+    assert_gradients_match(lambda x: from_per_um(x[0], x[1]), x0)
+    assert_gradients_match(lambda x: to_per_ghz(x[0]), x0[:1])
+    assert_gradients_match(lambda x: from_per_ghz(x[0]), x0[:1])
+
+
 def test_per_um_view_conserves_band_integrals() -> None:
     # ∫ B dν̃ over 8–12 µm equals ∫ B_λ dλ over the same band, to quadrature
     # error (trapezoid, 2·10⁴ intervals: relative error ~1e-10).
