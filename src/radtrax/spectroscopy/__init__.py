@@ -7,7 +7,8 @@ HITRAN through HAPI (the ``[hitran]`` extra).
 
 ``opacity`` turns them into per-layer optical depth for a layered
 atmosphere: the ``OpacityProvider`` protocol and ``TableOpacity``, bilinear
-in ``(ln p, T)`` (radtrax#33). Line-by-line opacity arrives in v2 of the
+in ``(ln p, T)`` (radtrax#33), and ``SumOpacity``, the sum of several
+providers on one grid (radtrax#184). Line-by-line opacity arrives in v2 of the
 roadmap. ``synthetic`` builds the synthetic methane spectra the docs,
 notebooks and tests use without HITRAN (radtrax#115). ``table_cache``
 locates and loads v0's built tables (radtrax#34).
@@ -19,6 +20,7 @@ from radtrax.spectroscopy import hitran, opacity, synthetic, table_cache, tables
 from radtrax.spectroscopy.opacity import (
     CrossSectionTable,
     OpacityProvider,
+    SumOpacity,
     TableOpacity,
 )
 from radtrax.spectroscopy.table_cache import (
@@ -43,6 +45,7 @@ __all__ = [
     "V0_GRID",
     "CrossSectionTable",
     "OpacityProvider",
+    "SumOpacity",
     "TableGrid",
     "TableOpacity",
     "absorption_coefficient",

@@ -1,6 +1,6 @@
 # Spectroscopy
 
-Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered atmosphere (`opacity`: the `OpacityProvider` protocol and `TableOpacity`), single-slab interpolation and Beer–Lambert transmittance (`tables`), v0's table cache and loader (`table_cache`), the synthetic methane spectra for docs, notebooks and tests (`synthetic`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra; `python -m radtrax.spectroscopy.hitran CH4 H2O CO2 N2O CO` builds v0's tables into the cache). Theory: [HITRAN tables](../../hitran-tables/).
+Cross-section look-up tables σ(ν; T, p): per-layer optical depth for a layered atmosphere (`opacity`: the `OpacityProvider` protocol, `TableOpacity`, and `SumOpacity`, the sum of several providers on one grid), single-slab interpolation and Beer–Lambert transmittance (`tables`), v0's table cache and loader (`table_cache`), the synthetic methane spectra for docs, notebooks and tests (`synthetic`), and the offline HITRAN table builder (`hitran`, the `[hitran]` extra; `python -m radtrax.spectroscopy.hitran CH4 H2O CO2 N2O CO` builds v0's tables into the cache). Theory: [HITRAN tables](../../hitran-tables/).
 
 ::: radtrax.spectroscopy
     options:

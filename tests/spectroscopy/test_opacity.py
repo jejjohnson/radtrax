@@ -11,7 +11,13 @@ import xarray as xr
 from _gradcheck import assert_gradients_match
 
 from radtrax.atmosphere import ATM_TO_PA, AtmosphericState, afgl_us_standard
-from radtrax.spectroscopy import CrossSectionTable, OpacityProvider, TableOpacity
+from radtrax.exceptions import GridError, ParameterError
+from radtrax.spectroscopy import (
+    CrossSectionTable,
+    OpacityProvider,
+    SumOpacity,
+    TableOpacity,
+)
 from radtrax.spectroscopy.synthetic import P_ATM, T_K  # the radtrax · 3 notebook's grid
 
 
@@ -284,3 +290,86 @@ def test_from_datasets_takes_a_variable_per_gas() -> None:
 def test_float32_wavenumbers_warn() -> None:
     with pytest.warns(UserWarning, match="float64"):
         TableOpacity(NU.astype(jnp.float32), {"CH4": _table()})
+
+
+# ── SumOpacity (#184) ────────────────────────────────────────────────────────
+
+
+def test_sum_of_split_gases_equals_one_table_of_all() -> None:
+    tables = {"CH4": _table(0), "H2O": _table(1)}
+    state = _state()
+    total = SumOpacity(
+        [
+            TableOpacity(NU, {"CH4": tables["CH4"]}),
+            TableOpacity(NU, {"H2O": tables["H2O"]}),
+        ]
+    )
+    assert isinstance(total, OpacityProvider)
+    np.testing.assert_array_equal(total.nu_cm, NU)
+    np.testing.assert_allclose(
+        total(state), TableOpacity(NU, tables)(state), rtol=1e-14
+    )
+
+
+def test_sum_runs_under_filter_jit() -> None:
+    total = SumOpacity(
+        (TableOpacity(NU, {"CH4": _table(0)}), TableOpacity(NU, {"H2O": _table(1)}))
+    )
+    state = _state()
+    np.testing.assert_allclose(
+        eqx.filter_jit(SumOpacity.__call__)(total, state), total(state), rtol=1e-14
+    )
+
+
+@pytest.mark.parametrize(
+    "other", [NU + 0.01, jnp.linspace(4300.0, 4300.6, G + 1)], ids=["values", "length"]
+)
+def test_sum_rejects_mismatched_grids(other: jax.Array) -> None:
+    with pytest.raises(GridError, match="provider 1"):
+        SumOpacity(
+            (TableOpacity(NU, {"CH4": _table()}), TableOpacity(other, _table_of(other)))
+        )
+
+
+def test_sum_checks_only_lengths_under_tracing() -> None:
+    @jax.jit
+    def build(nu: jax.Array) -> jax.Array:
+        first = TableOpacity(NU, {"CH4": _table()})
+        return SumOpacity((first, TableOpacity(nu, {"CH4": _table()}))).nu_cm
+
+    np.testing.assert_array_equal(build(NU + 0.01), NU)
+
+
+def test_sum_needs_a_provider() -> None:
+    with pytest.raises(ParameterError, match="at least one"):
+        SumOpacity(())
+
+
+def test_gradients_through_the_sum() -> None:
+    """∂τ/∂x_g through both providers, in ppm (O(1) units for the FD step)."""
+    total = SumOpacity(
+        (TableOpacity(NU, {"CH4": _table(0)}), TableOpacity(NU, {"H2O": _table(1)}))
+    )
+    state = _state(3)
+    x0 = jnp.concatenate([state.vmr["CH4"], state.vmr["H2O"]]) * 1e6
+
+    def tau_of(x_ppm: jax.Array) -> jax.Array:
+        n = state.n_layers
+        moved = state.with_vmr("CH4", x_ppm[:n] * 1e-6).with_vmr(
+            "H2O", x_ppm[n:] * 1e-6
+        )
+        return total(moved).ravel()
+
+    assert_gradients_match(tau_of, x0)
+
+
+def _table_of(nu: jax.Array) -> dict[str, CrossSectionTable]:
+    """A CH₄ table with as many wavenumbers as ``nu``."""
+    sigma = np.full((P_ATM.size, T_K.size, nu.shape[0]), 1e-21)
+    return {
+        "CH4": CrossSectionTable(
+            log_p_pa=jnp.log(jnp.asarray(P_ATM * ATM_TO_PA)),
+            t_k=jnp.asarray(T_K),
+            sigma_cm2=jnp.asarray(sigma),
+        )
+    }
