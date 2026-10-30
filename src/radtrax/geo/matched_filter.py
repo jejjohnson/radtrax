@@ -82,6 +82,7 @@ from radtrax.retrieval.matched_filter.streaming import streaming_background
 from radtrax.retrieval.matched_filter.target import (
     linear_target_from_obs,
     nonlinear_target_from_obs,
+    unit_absorption_target,
 )
 from radtrax.retrieval.var3d.obs_operator import RadianceObservationModel
 
@@ -122,6 +123,11 @@ Pixel = tuple[int, int] | list[int]
 
 if TYPE_CHECKING:
     from georeader.geotensor import GeoTensor
+
+    from radtrax.atmosphere.geometry import ViewingGeometry
+    from radtrax.atmosphere.state import AtmosphericState
+    from radtrax.forward_model import ForwardModel
+    from radtrax.surface.lambertian import Surface
 
     #: A spectral cube: a GeoTensor or a plain array.
     Carrier = GeoTensor | Cube
@@ -1013,6 +1019,109 @@ class NonlinearTargetFromObs(Operator):
 
     def get_config(self) -> dict[str, Any]:
         return _target_config(self) | {"amplitude": self.amplitude}
+
+
+class UnitAbsorptionTarget(Operator):
+    """Target ``(B,)`` from v0's layered :class:`~radtrax.ForwardModel`.
+
+    The scene's unit absorption spectrum
+    ``t = ∂ ln y / ∂ΔX`` at ``ΔX = 0`` [per mol/m²], from
+    :func:`~radtrax.unit_absorption_target` on the background ``atmosphere``,
+    ``surface`` and ``geometry`` (one geometry for the scene, e.g. its mean
+    angles), turned into the target of the cube it is called on:
+
+    - a cube of radiance ``y`` (default): ``μ ⊙ t``, with ``μ`` the cube's
+      background mean (:class:`EstimateMean`, ``mean_method``), since
+      ``∂y/∂ΔX = y t``; the matched filter then scores ``ΔX`` in mol/m²;
+    - a cube of ``ln y`` (``log_cube=True``): ``t`` itself.
+
+    The single-slab :class:`~radtrax.retrieval.var3d.RadianceObservationModel`
+    goes to :class:`LinearTargetFromObs` instead (radtrax#98).
+
+    Args:
+        model: The forward model; its instrument's bands are the cube's bands,
+            in order.
+        atmosphere: The background atmospheric state (``state`` of
+            :func:`~radtrax.unit_absorption_target`; pipekit's operators
+            reserve ``state``).
+        surface: The surface (a Lambertian albedo cancels from ``t``).
+        geometry: Sun and sensor directions, one for the scene.
+        gas: The plume's gas. Default ``"CH4"``.
+        profile: Relative weight of the plume per layer, ``(L,)``; the bottom
+            layer when ``None``.
+        log_cube: Whether the cube holds ``ln y`` rather than ``y``.
+        mean_method: Mean estimator for ``μ``. Default ``"median"``.
+        axis: Position of the band axis. Default ``-3``.
+
+    Raises:
+        ShapeError: (on call) If the model's band count differs from the
+            cube's.
+    """
+
+    forbid_in_yaml: ClassVar[bool] = True
+
+    def __init__(
+        self,
+        *,
+        model: ForwardModel,
+        atmosphere: AtmosphericState,
+        surface: Surface,
+        geometry: ViewingGeometry,
+        gas: str = "CH4",
+        profile: Float[np.ndarray, " L"] | None = None,
+        log_cube: bool = False,
+        mean_method: MeanMethod = "median",
+        axis: int = -3,
+    ) -> None:
+        self.model = model
+        self.atmosphere = atmosphere
+        self.surface = surface
+        self.geometry = geometry
+        self.gas = gas
+        self.profile = None if profile is None else np.asarray(profile, dtype=float)
+        self.log_cube = log_cube
+        self.mean_method = mean_method
+        self.axis = axis
+
+    @_float64
+    def _apply(self, gt: Carrier) -> Spectrum:
+        _check_band_axis(gt, self.axis, type(self).__name__)
+        t = np.asarray(
+            _UNIT_ABSORPTION_TARGET(
+                self.model,
+                self.atmosphere,
+                self.surface,
+                self.geometry,
+                gas=self.gas,
+                profile=None if self.profile is None else jnp.asarray(self.profile),
+            ),
+            dtype=float,
+        )
+        n_bands = np.shape(gt)[self.axis]
+        if t.shape != (n_bands,):
+            raise ShapeError(
+                f"UnitAbsorptionTarget: the model has {t.size} bands, the cube "
+                f"{n_bands} (axis={self.axis})."
+            )
+        if self.log_cube:
+            return t
+        mean = EstimateMean(method=self.mean_method, axis=self.axis)(gt)
+        return np.asarray(mean, dtype=float) * t
+
+    def get_config(self) -> dict[str, Any]:
+        return {
+            "model": callable_name(self.model),
+            "gas": self.gas,
+            "profile": _array_config(self.profile),
+            "log_cube": self.log_cube,
+            "mean_method": self.mean_method,
+            "axis": self.axis,
+        }
+
+
+#: Compiled once per model and scene structure: eagerly, a v0 model's
+#: thousands of wavenumbers × layers dispatch op by op.
+_UNIT_ABSORPTION_TARGET = eqx.filter_jit(unit_absorption_target)
 
 
 class ColumnEnhancement(Operator):

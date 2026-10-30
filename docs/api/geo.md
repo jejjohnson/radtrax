@@ -12,7 +12,9 @@ bands (no extra needed); an EMIT L1B image read by georeader's `EMITImage` as a
 `BandInstrument` with Gaussian bands of its FWHM and a per-pixel
 `ViewingGeometry` from its obs file; and the matched filter as
 pipekit operators on GeoTensors, around the one core in
-[`radtrax.retrieval.matched_filter`](retrieval.md), and `MBMP`, the
+[`radtrax.retrieval.matched_filter`](retrieval.md), with targets from the
+single-slab observation model or, through `UnitAbsorptionTarget`, from v0's
+`ForwardModel`, and `MBMP`, the
 Sentinel-2 multi-band multi-pass signal (geotoolz's former `plume.SBMP`).
 
 ::: radtrax.geo
