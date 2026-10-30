@@ -5,6 +5,7 @@ Ported from plumax 0.1.2 at 28f257e (``src/plumax/hapi_lut/multi.py``); only imp
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from pathlib import Path
 
@@ -12,11 +13,7 @@ import numpy as np
 import xarray as xr
 
 from radtrax.exceptions import GridError, MissingKeyError
-from radtrax.spectroscopy.hitran.config import (
-    ATMOSPHERIC_GASES,
-    GasConfig,
-    LUTGridConfig,
-)
+from radtrax.spectroscopy.hitran.config import ATMOSPHERIC_GASES, LUTGridConfig
 from radtrax.spectroscopy.hitran.generator import (
     build_lut_dataset,
     compute_absorption_lut,
@@ -136,14 +133,7 @@ def create_combined_lut(
     data_vars: dict[str, tuple] = {}
     for gas_name in gases:
         base = ATMOSPHERIC_GASES[gas_name]
-        sub = GasConfig(
-            name=base.name,
-            molecule_id=base.molecule_id,
-            isotopologue_id=base.isotopologue_id,
-            nu_min=nu_min,
-            nu_max=nu_max,
-            description=base.description,
-        )
+        sub = dataclasses.replace(base, nu_min=nu_min, nu_max=nu_max)
         fetch_hitran_data(sub, cache_dir=cache)
         _, sigma_lut, _ = compute_absorption_lut(sub, grid_config, cache_dir=cache)
         data_vars[f"{gas_name}_cross_section"] = (
@@ -153,7 +143,9 @@ def create_combined_lut(
                 "units": "cm^2 / molecule",
                 "long_name": f"{gas_name} absorption cross-section",
                 "molecule_id": base.molecule_id,
-                "isotopologue_id": base.isotopologue_id,
+                "isotopologue_ids": list(sub.resolve_isotopologue_ids()),
+                "line_wing_cm": float(grid_config.wing_cm),
+                "line_wing_halfwidths": float(grid_config.wing_halfwidths),
             },
         )
 

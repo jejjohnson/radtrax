@@ -38,6 +38,7 @@ import xarray as xr
 from _benchmarks import (
     KORKIN2025_CH4_CELL,
     KORKIN2025_O2A_CELL,
+    ONE_LINE_PAR,
     GasCellCase,
     load_case,
     shift_self_like_air,
@@ -53,13 +54,6 @@ from radtrax.spectroscopy.hitran import (
 from radtrax.spectroscopy.hitran.build import LINE_MARGIN_CM
 
 
-#: ``hitran/07_hitdb_one_line.par`` of korkins/aspect_gcell (HITRAN2020): one
-#: ¹⁶O₂ line of the A band, ν = 13000.816219 cm⁻¹. From Korkin et al. (2025).
-ONE_LINE_PAR = (
-    " 7113000.816219 2.708E-27 1.740E-02.04580.047 1814.01040.67-.007400"
-    "       b      1       X      1                R 13Q 14     d54644449"
-    " 5 5 3 1 1    29.0   29.0"
-)
 #: Table 4: peak σ [cm²/molecule] on the 0.01 cm⁻¹ grid at (T [K], p [atm]).
 TABLE_4 = {
     (270.0, 1.0): 7.711446e-27,
@@ -73,12 +67,6 @@ SIGMA_RTOL = 1e-4
 #: τ within 1 % of gcell's where τ > 1e-3; (T f) within 1e-3 of SpectralCalc.
 TAU_RTOL, TAU_FLOOR, TF_ATOL = 1e-2, 1e-3, 1e-3
 
-BEFORE_172 = pytest.mark.xfail(
-    strict=True,
-    reason="radtrax#172: the builder takes isotopologue 1 only and cuts lines "
-    "at 50 half-widths, not ±25 cm⁻¹",
-)
-
 
 def test_single_line_peak_cross_sections_match_table_4(tmp_path: Path) -> None:
     hapi = pytest.importorskip("hapi")
@@ -86,9 +74,7 @@ def test_single_line_peak_cross_sections_match_table_4(tmp_path: Path) -> None:
     (tmp_path / "O2_one_line.par").write_text(ONE_LINE_PAR + "\n")
     hapi.db_begin(str(tmp_path))
     shift_self_like_air("O2_one_line")
-    gas = GasConfig(
-        "O2_one_line", molecule_id=7, isotopologue_id=1, nu_min=12995.0, nu_max=13005.0
-    )
+    gas = GasConfig("O2_one_line", molecule_id=7, nu_min=12995.0, nu_max=13005.0)
     grid = LUTGridConfig(
         T_grid=np.array([270.0, 300.0, 330.0]),
         P_grid=np.array([0.9, 1.0, 1.1]),
@@ -126,13 +112,10 @@ def _builder_cross_section(
         nu_min=float(nu[0]),
         nu_max=float(nu[-1]) + case.dnu_cm / 2,
     )
+    local = {hapi.ISO_ID[i][1] for i in gas.resolve_isotopologue_ids()}  # (M, I, …)
     try:
         write_lines(
-            case,
-            gas.name,
-            db_dir,
-            isotopologues={gas.isotopologue_id},
-            margin_cm=LINE_MARGIN_CM,
+            case, gas.name, db_dir, isotopologues=local, margin_cm=LINE_MARGIN_CM
         )
     except urllib.error.URLError as err:
         pytest.skip(f"{case.name}: line list download failed: {err}")
@@ -153,10 +136,8 @@ def _builder_cross_section(
 @pytest.mark.parametrize(
     "case",
     [
-        pytest.param(KORKIN2025_O2A_CELL, id="o2a", marks=BEFORE_172),
-        pytest.param(
-            KORKIN2025_CH4_CELL, id="ch4", marks=[BEFORE_172, pytest.mark.slow]
-        ),
+        pytest.param(KORKIN2025_O2A_CELL, id="o2a"),
+        pytest.param(KORKIN2025_CH4_CELL, id="ch4", marks=pytest.mark.slow),
     ],
 )
 def test_gas_cell_optical_thickness_matches_gcell(
@@ -179,7 +160,6 @@ def test_gas_cell_optical_thickness_matches_gcell(
 
 @pytest.mark.integration
 @pytest.mark.slow
-@BEFORE_172
 def test_ch4_cell_filter_weighted_transmittance_matches_spectralcalc(
     tmp_path: Path, record_property: pytest.RecordProperty
 ) -> None:

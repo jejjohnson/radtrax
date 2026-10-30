@@ -42,6 +42,14 @@ KORKIN_REPO = "korkins/aspect_gcell"
 KORKIN_COMMIT = "51c9433d39936d9fed1162eeac7e13698facfbdc"
 #: Environment variable that overrides the benchmark cache directory.
 BENCHMARK_DIR_ENV = "RADTRAX_BENCHMARK_DIR"
+#: ``hitran/07_hitdb_one_line.par`` of korkins/aspect_gcell (HITRAN2020): one
+#: ¹⁶O₂ line of the A band, ν = 13000.816219 cm⁻¹, in HITRAN's 160-character
+#: format. From Korkin et al. (2025), §4.6.
+ONE_LINE_PAR = (
+    " 7113000.816219 2.708E-27 1.740E-02.04580.047 1814.01040.67-.007400"
+    "       b      1       X      1                R 13Q 14     d54644449"
+    " 5 5 3 1 1    29.0   29.0"
+)
 #: HITRAN's one-character local isotopologue code, indexed by ``I - 1``.
 _ISO_CHARS = "1234567890AB"
 

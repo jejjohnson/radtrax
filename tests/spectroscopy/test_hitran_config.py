@@ -15,7 +15,33 @@ def test_atmospheric_gases_registry_has_expected_species():
         assert cfg.name == name
         assert cfg.nu_min < cfg.nu_max
         assert cfg.molecule_id >= 1
-        assert cfg.isotopologue_id >= 1
+        # Every isotopologue (radtrax#172): HITRAN intensities carry abundance.
+        assert cfg.isotopologue_ids is None
+        assert cfg.isotopologue_id is None
+
+
+def test_lut_grid_config_cuts_lines_at_25_cm_by_default():
+    grid = LUTGridConfig()
+    assert (grid.wing_cm, grid.wing_halfwidths) == (25.0, 0.0)
+
+
+@pytest.mark.usefixtures("shapes_unchecked")
+def test_gas_config_rejects_the_old_positional_order():
+    # Before radtrax#172: (name, molecule_id, isotopologue_id, nu_min, nu_max).
+    with pytest.raises(ValueError, match="positional order"):
+        GasConfig("CH4", 6, 1, 4000.0, 8000.0)  # type: ignore[arg-type]
+
+
+def test_gas_config_rejects_both_isotopologue_fields():
+    with pytest.raises(ValueError, match="not both"):
+        GasConfig(
+            "CH4",
+            molecule_id=6,
+            nu_min=4000.0,
+            nu_max=4500.0,
+            isotopologue_ids=(32,),
+            isotopologue_id=1,
+        )
 
 
 def test_lut_grid_config_defaults_are_independent_instances():
@@ -47,9 +73,9 @@ def test_explicit_diluent_override_is_returned_verbatim():
 
 
 def test_gas_config_repr_is_informative():
-    cfg = GasConfig(
-        "CH4", molecule_id=6, isotopologue_id=1, nu_min=4000.0, nu_max=4500.0
+    cfg = GasConfig("CH4", molecule_id=6, nu_min=4000.0, nu_max=4500.0)
+    assert repr(cfg) == "GasConfig(CH4, M6, all isotopologues)"
+    some = GasConfig(
+        "CH4", molecule_id=6, nu_min=4000.0, nu_max=4500.0, isotopologue_ids=(32, 33)
     )
-    assert "CH4" in repr(cfg)
-    assert "M6" in repr(cfg)
-    assert "I1" in repr(cfg)
+    assert repr(some) == "GasConfig(CH4, M6, ids 32,33)"

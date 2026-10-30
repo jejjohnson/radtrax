@@ -26,7 +26,7 @@ def stub_hapi(monkeypatch):
     def db_begin(path):
         state["cache"] = Path(path)
 
-    def fetch(name, *args, **kwargs):
+    def fetch_by_ids(name, *args, **kwargs):
         cache = state["cache"]
         (cache / f"{name}.data").write_text("stub\n")
         (cache / f"{name}.header").write_text("stub\n")
@@ -38,6 +38,7 @@ def stub_hapi(monkeypatch):
         Environment,
         Diluent,
         HITRAN_units,
+        **wing,
     ):
         nu = np.asarray(WavenumberGrid, dtype=float)
         T = Environment["T"]
@@ -48,7 +49,13 @@ def stub_hapi(monkeypatch):
         return nu, coef
 
     fake.db_begin = db_begin
-    fake.fetch = fetch
+    fake.fetch_by_ids = fetch_by_ids
+    # The most abundant isotopologue of each gas the tests build (hapi.ISO).
+    fake.ISO = {
+        (1, 1): [1, "H2(16O)"],
+        (2, 1): [7, "(12C)(16O)2"],
+        (6, 1): [32, "(12C)H4"],
+    }
     fake.absorptionCoefficient_Voigt = absorptionCoefficient_Voigt
     monkeypatch.setitem(sys.modules, "hapi", fake)
     return fake

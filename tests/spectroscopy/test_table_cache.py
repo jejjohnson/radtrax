@@ -19,7 +19,7 @@ from radtrax.spectroscopy import (
 from radtrax.spectroscopy.hitran import build_table
 from radtrax.spectroscopy.hitran.build import main
 from radtrax.spectroscopy.synthetic import P_ATM, T_K
-from radtrax.spectroscopy.table_cache import TABLE_DIR_ENV, table_path
+from radtrax.spectroscopy.table_cache import TABLE_DIR_ENV, TABLE_VERSION, table_path
 
 
 # ── the grid and the cache layout ────────────────────────────────────────────
@@ -53,7 +53,7 @@ def test_cache_location(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
     assert table_cache_dir() == tmp_path / "xdg" / "radtrax" / "tables"
     path = table_path("CH4", cache_dir=tmp_path)
-    assert path == tmp_path / f"CH4_{V0_GRID.key()}_HITRAN2020.nc"
+    assert path == tmp_path / f"CH4_{V0_GRID.key()}_HITRAN2020_v{TABLE_VERSION}.nc"
     assert table_path("CH4", hitran_version="HITRAN2024", cache_dir=tmp_path) != path
 
 
