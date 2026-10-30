@@ -251,14 +251,19 @@ agent can read and follow them), and two read-only review checklists in
 |---|---|
 | Add or update a guide page (MyST prose) | `add-guide-page` |
 | Add or update an example notebook | `add-notebook` |
+| Add an opacity provider (`OpacityProvider`) | `add-opacity-provider` |
+| Add a solver (`RTSolver`) | `add-solver` |
+| Add a surface (`Surface`) | `add-surface` |
+| Add an instrument (`Instrument`) | `add-instrument` |
+| Add a noise model (`NoiseModel`) | `add-noise-model` |
 | Verify before a PR | `pre-pr-check` |
 | Review a change | `radtrax-review` (+ the read-only `.claude/agents/reuse-reviewer.md` and `numerics-reviewer.md`) |
 | Write a squash commit message | `squash-commit` |
 | Open or link GitHub issues | `create-gh-issue`, `link-gh-issues` (templates in `.github/ISSUE_TEMPLATE/`; `make gh-labels`, `gh-sub`, `gh-block`, `gh-show`) |
 
-Recipes for radtrax's extension points (a new opacity provider, solver,
-surface, instrument or noise model) are tracked in #118; until then, follow
-the existing implementation behind each protocol.
+The five extension-point recipes each cover one protocol: the abstract base,
+shapes, float64, the gradient check, tests, the API page and the capability
+index, and end in the same checklist.
 
 Downstream users get the package's guidance through `docs/llms.txt`
 (copied to the site root by `ROOT_FILES` in `scripts/build_docs.py`); update

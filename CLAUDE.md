@@ -12,8 +12,9 @@ specific to Claude Code.
   `AGENTS.md` maps the usual hand-rolled code to what already exists.
 - **Skills** in `.claude/skills/` load on their own when a task matches
   their description (or run them as `/<name>`):
-  - building: `add-guide-page`, `add-notebook` (recipes for radtrax's
-    extension points are tracked in #118);
+  - building: `add-guide-page`, `add-notebook`;
+  - extension points, one per protocol: `add-opacity-provider`,
+    `add-solver`, `add-surface`, `add-instrument`, `add-noise-model`;
   - shipping: `pre-pr-check`, `radtrax-review`, `squash-commit`;
   - GitHub housekeeping: `create-gh-issue`, `link-gh-issues`.
 - **Subagents** (`.claude/agents/`), both read-only, both used by
