@@ -149,3 +149,14 @@ Three functions carry the physics:
 - `beers.plume_ratio_spectrum(ds, vmr_bg, vmr_tot, ...)` — the differential form $\tau_{\mathrm{tot}}(\nu) / \tau_{\mathrm{bg}}(\nu)$ used by the enhancement retrieval in [03_beers_law_with_lut.ipynb](https://github.com/jejjohnson/plumax/blob/main/docs/notebooks/hapi_lut/03_beers_law_with_lut.ipynb).
 
 The notebooks walk through building the LUT ([01](../notebooks/hitran_ch4_table.ipynb)), extending to multiple gases ([02](../notebooks/hitran_multigas_tables.ipynb)), and, in plumax because it simulates the plume, using it as the forward model of a plume-enhancement retrieval ([03](https://github.com/jejjohnson/plumax/blob/main/docs/notebooks/hapi_lut/03_beers_law_with_lut.ipynb)).
+
+## 8. Benchmarks against published numbers
+
+The builder is tested against numbers it did not produce, the benchmarks of Korkin et al. [^korkin2025] (`tests/spectroscopy/test_benchmarks_korkin2025.py`, radtrax#171).
+
+- **One line** (their §4.6, Table 4): a single HITRAN2020 O₂ record, whose peak cross-section on a 0.01 cm⁻¹ grid at 270, 300 and 330 K and 0.9, 1.0 and 1.1 atm must match the published seven digits to $10^{-4}$ relative, the accuracy of HAPI's Voigt algorithm. It catches unit, partition-sum and line-shift errors.
+- **Gas cells** (their §5.4.1 and §5.4.2): pure O₂ in the A band and pure CH₄ at 2.3 µm, whose optical thickness $\tau = n\,\sigma$ must be within 1 % of `gcell`'s wherever $\tau > 10^{-3}$, and for CH₄ the filter-weighted transmittance $e^{-\tau} f$ within $10^{-3}$ of SpectralCalc's at every wavenumber.
+
+Three conventions decide whether the cells can pass. The cells are pure gas, so only self-broadening applies, and `gcell` shifts each line by $\delta_{\mathrm{air}}\, p$ whatever the broadener (HITRAN has no self shift, so HAPI would shift a pure gas by nothing). `gcell` sums every isotopologue and cuts each line at $\pm 25$ cm⁻¹. And the cells were computed from HITRAN2020, while HITRANonline now serves a later edition whose CH₄ lines differ by several per cent, so the tests read the authors' own line lists rather than fetching lines.
+
+[^korkin2025]: Korkin, S., Sayer, A. M., Ibrahim, A. & Lyapustin, A. (2025). *A practical guide to coding line-by-line trace gas absorption in Earth's atmosphere*. JQSRT **337**, 109345.
