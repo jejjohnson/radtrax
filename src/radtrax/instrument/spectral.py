@@ -71,6 +71,12 @@ class Instrument(eqx.Module):
     An abstract Equinox module, so ``filter_jit`` compiles each concrete
     instrument and a forward model can hold any of them.
 
+    The contract: an instrument is linear in radiance, ``y = A L`` with
+    ``A`` its response matrix ``(B, G)`` (:meth:`response_matrix`), so
+    ``I(a L₁ + b L₂) = a I(L₁) + b I(L₂)``. Its parameters (a shift, a FWHM)
+    may enter ``A`` non-linearly. Band brightness temperature and NEΔT
+    (:mod:`radtrax.radiometry.brightness`) rely on it.
+
     Attributes:
         nu_cm: The wavenumber grid the instrument reads [cm⁻¹], ``(G,)``.
     """
@@ -80,6 +86,15 @@ class Instrument(eqx.Module):
     @abc.abstractmethod
     def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
         """Band values ``(B,)`` from radiance on :attr:`nu_cm`, ``(G,)``."""
+
+    def response_matrix(self) -> Float[Array, "B G"]:
+        """The response matrix ``A = ∂y/∂L``, ``(B, G)``.
+
+        By default ``jax.jacrev`` of the call at zero radiance (``B``
+        reverse passes, exact for a linear instrument); an instrument that
+        holds ``A`` in closed form overrides it.
+        """
+        return jax.jacrev(self.__call__)(jnp.zeros_like(self.nu_cm))
 
 
 class BandInstrument(Instrument):
@@ -293,6 +308,10 @@ class GaussianInstrument(Instrument):
 
     def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
         return self.response() @ jnp.asarray(radiance)
+
+    def response_matrix(self) -> Float[Array, "B G"]:
+        """The response matrix ``A = ∂y/∂L``, ``(B, G)``: :meth:`response`."""
+        return self.response()
 
     @classmethod
     def from_srf(
