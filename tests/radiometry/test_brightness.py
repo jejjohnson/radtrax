@@ -123,6 +123,16 @@ def test_band_round_trip_per_band_temperatures() -> None:
     assert np.max(np.abs(np.asarray(t_b - t))) <= 1e-10
 
 
+@pytest.mark.parametrize("t_k", [150.0, 200.0, 300.0, 2500.0])
+def test_band_round_trip_over_a_broad_band(t_k: float) -> None:
+    # One flat band over 1–15 µm: the centroid guess is ~463 K, and a Newton
+    # step in T from there lands below 0 K at 150 K; the step in ln T cannot.
+    nu = jnp.linspace(667.0, 10000.0, 501)
+    instrument = BandInstrument(nu, jnp.full((1, 501), 1.0 / 501))
+    t_b = band_brightness_temperature(instrument, band_planck_radiance(instrument, t_k))
+    np.testing.assert_allclose(t_b, t_k, rtol=1e-12)
+
+
 def test_band_round_trip_through_a_band_instrument_with_a_shift() -> None:
     nu = jnp.linspace(800.0, 1000.0, 401)
     rng = np.random.default_rng(0)

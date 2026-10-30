@@ -158,7 +158,9 @@ def band_brightness_temperature(
     diagonal linear solve, from the monochromatic $T_b$ at each band's
     centroid. The residual is taken in log radiance so that the tolerances
     mean the same at 0.4 µm and at 15 µm; it has the same root and the same
-    implicit derivatives as $\\bar B_b - y_b$. Gradients come from the
+    implicit derivatives as $\\bar B_b - y_b$. The unknown is $u = \\ln T_b$,
+    so no Newton step can leave $T_b > 0$: in $T$ a broad band's first step
+    from the centroid guess can overshoot below 0 K. Gradients come from the
     implicit function theorem (`optimistix.ImplicitAdjoint`), in ``y`` and in
     the instrument's parameters alike.
 
@@ -169,9 +171,9 @@ def band_brightness_temperature(
     Args:
         instrument: The bands, any `Instrument` (linear in radiance).
         y: Band values, ``(B,)``, in the instrument's radiance units.
-        rtol: Relative tolerance of the Newton solve in $T$.
-        atol: Absolute tolerance of the Newton solve (in $T$ and in the log
-            residual).
+        rtol: Relative tolerance of the Newton solve in $\\ln T$.
+        atol: Absolute tolerance of the Newton solve (in $\\ln T$ and in the
+            log residual).
         max_steps: The most Newton steps.
         throw: Raise when the solve fails to converge
             (``equinox.EquinoxRuntimeError`` under ``jit``); otherwise
@@ -199,21 +201,21 @@ def band_brightness_temperature(
     t0 = brightness_temperature(centroid, y_safe / row_sum)
 
     def residual(
-        t: Float[Array, " B"],
+        u: Float[Array, " B"],
         args: tuple[Float[Array, "B G"], Float[Array, " G"], Float[Array, " B"]],
     ) -> Float[Array, " B"]:
         a, grid, log_y = args
-        return jnp.log(_band_planck(a, grid, t)) - log_y
+        return jnp.log(_band_planck(a, grid, jnp.exp(u))) - log_y
 
     solver = optx.Newton(rtol=rtol, atol=atol, linear_solver=lx.Diagonal())
     solution = optx.root_find(
         residual,
         solver,
-        t0,
+        jnp.log(t0),
         args=(response, nu, jnp.log(y_safe)),
         max_steps=max_steps,
         throw=throw,
         tags=frozenset({lx.diagonal_tag}),
         adjoint=optx.ImplicitAdjoint(linear_solver=lx.Diagonal()),
     )
-    return jnp.where(positive, solution.value, jnp.nan)
+    return jnp.where(positive, jnp.exp(solution.value), jnp.nan)
