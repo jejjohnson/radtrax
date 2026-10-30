@@ -18,7 +18,9 @@
   with Gaussian bands of its FWHM, and a per-pixel ``ViewingGeometry`` from
   its obs file (radtrax#114).
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
-  the one matched-filter core (radtrax#29), ported from geotoolz.
+  the one matched-filter core (radtrax#29), ported from geotoolz;
+  :class:`UnitAbsorptionTarget` gives them v0's ``ForwardModel`` target
+  (radtrax#98).
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
   multi-pass signal, geotoolz's former ``plume.SBMP`` (radtrax#30), with
   optional per-pass scale factors; :class:`SBMP` and :class:`MBSP` complete
@@ -67,6 +69,7 @@ _OPERATORS = {
     "NonlinearTargetFromObs": "matched_filter",
     "StreamingBackground": "matched_filter",
     "StreamingBackgroundResult": "matched_filter",
+    "UnitAbsorptionTarget": "matched_filter",
     "ValidateMFInputs": "matched_filter",
     "MBMP": "mbmp",
     "MBSP": "mbmp",
@@ -107,6 +110,7 @@ if TYPE_CHECKING:
         NonlinearTargetFromObs,
         StreamingBackground,
         StreamingBackgroundResult,
+        UnitAbsorptionTarget,
         ValidateMFInputs,
     )
     from radtrax.geo.mbmp import MBMP, MBSP, SBMP
@@ -134,6 +138,7 @@ __all__ = [
     "NonlinearTargetFromObs",
     "StreamingBackground",
     "StreamingBackgroundResult",
+    "UnitAbsorptionTarget",
     "ValidateMFInputs",
     "emit_geometry",
     "emit_instrument",
