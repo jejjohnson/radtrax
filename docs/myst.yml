@@ -23,6 +23,15 @@ project:
     - name: J. Emmanuel Johnson
   references:
     api: http://127.0.0.1:8910/
+  # Maths macros of the eman-style-math standard, used by the theory pages.
+  # Each kind has a Latin and a Greek macro because KaTeX cannot bold both
+  # alphabets with one definition.
+  math:
+    '\vect': '\mathbf{#1}'
+    '\mat': '\mathbf{#1}'
+    '\gvect': '\boldsymbol{#1}'
+    '\gmat': '\boldsymbol{#1}'
+    '\op': '\mathrm{#1}'
   toc:
     - file: index.md
     - title: Theory

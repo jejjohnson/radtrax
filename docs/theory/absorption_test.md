@@ -1,5 +1,5 @@
 ---
-title: "The absorption-shape test — does a ratio spectrum have a gas's shape?"
+title: "The absorption-shape test: does a ratio spectrum have a gas's shape?"
 ---
 
 # The absorption-shape test
@@ -12,7 +12,7 @@ A matched filter scores each pixel by one projection of its spectrum onto methan
 
 The test knows nothing of plumes. Which pixels form the two sets, and what to decide from the scores, is the caller's: `plumax.vetting` takes a candidate's strongest pixels as the in-pixels and a background pool around it as the out-pixels.
 
-The test is more selective than the matched filter because it tests the shape of the absorption across a window of bands, where the matched filter tests one projection. That projection is the [matched filter](matched_filter.md)'s $\hat\alpha(x) = (x - \mu)^\top \Sigma^{-1} t \,/\, t^\top \Sigma^{-1} t$. A surface whose spectrum departs from the background mean by $d$ scores $d^\top \Sigma^{-1} t \,/\, t^\top \Sigma^{-1} t$, whatever the shape of $d$, so a carbonate's dip that overlaps methane's band scores positive. Many spectra with different shapes give the same score, because the filter keeps one number from the $B$ bands it sees. The absorption-shape test keeps the shape: it builds the in-pixels' absorption spectrum band by band and asks whether all of it agrees with methane.
+The test is more selective than the matched filter because it tests the shape of the absorption across a window of bands, where the matched filter tests one projection. That projection is the [matched filter](matched_filter.md)'s $\hat\alpha(\vect{y}) = \frac{(\vect{y} - \gvect{\mu}_y)^\top \gmat{\Sigma}_y^{-1} \vect{t}}{\vect{t}^\top \gmat{\Sigma}_y^{-1} \vect{t}}$. A surface whose spectrum departs from the background mean by $\vect{d}$ scores $\frac{\vect{d}^\top \gmat{\Sigma}_y^{-1} \vect{t}}{\vect{t}^\top \gmat{\Sigma}_y^{-1} \vect{t}}$, whatever the shape of $\vect{d}$, so a carbonate's dip that overlaps methane's band scores positive. Many spectra with different shapes give the same score, because the filter keeps one number from the $B$ bands it sees. The absorption-shape test keeps the shape: it builds the in-pixels' absorption spectrum band by band and asks whether all of it agrees with methane.
 
 [^xiang2024]: Xiang, C., et al. (2024). A novel spectroscopic method for vetting methane point sources. AGU Fall Meeting, abstract A21K-1903.
 
@@ -20,39 +20,67 @@ The test is more selective than the matched filter because it tests the shape of
 
 [^pv]: EMIT Science Data System (2025). plume-vetting, revision `47fc6ad`. https://github.com/emit-sds/plume-vetting (Apache-2.0).
 
+**Symbols**
+
+| Symbol | Meaning | Shape | Unit |
+|---|---|---|---|
+| $\lambda$, $\nu$ | wavelength, wavenumber | scalar | nm, cm⁻¹ |
+| $B$ | bands in the fitting window | scalar | - |
+| $L_{\text{in}}(\lambda)$, $L_{\text{out}}(\lambda)$ | radiance of an in-pixel and of an out-pixel | scalar per band | radiance |
+| $\rho$, $\rho'$ | their surface reflectances | scalar per band | - |
+| $F_0$, $\theta_s$ | solar irradiance, solar zenith angle | scalar | irradiance, rad |
+| $\tau_{\text{atm}}(\lambda)$ | vertical optical depth of everything but the enhancement | scalar per band | - |
+| $m$ | two-way air mass | scalar | - |
+| $\Delta X$ | column enhancement | scalar | mol/m² (or ppm·m) |
+| $E(\lambda; \Delta X)$, $E_b(\Delta X)$ | band transmittance of the enhancement along the two-way path | scalar per band | - |
+| $t_b$, $\vect{t}$ | weak-absorption slope $\partial \ln y_b / \partial \Delta X$ at 0, the matched filter's target; negative where the gas absorbs | scalar, $\mathbb{R}^B$ | m²/mol |
+| $\sigma(\nu)$ | the gas's cross-section at the enhancement's layer | scalar | m²/mol |
+| $w_b(\nu)$ | band $b$'s weight over wavenumber | scalar | cm |
+| $N$, $n$ | number of kept pairs, pair index | scalar | - |
+| $R(\lambda)$, $\vect{r}$ | ratio of mean in- to mean out-radiance, and as a vector over the window | scalar per band, $\mathbb{R}^B$ | - |
+| $\eta(\lambda)$ | surface mismatch left in the ratio | scalar per band | - |
+| $P(\lambda; \vect{c})$, $\vect{c}$ | Legendre continuum and its coefficients | scalar per band, $\mathbb{R}^K$ | - |
+| $\gmat{\Phi}$ | Legendre polynomials at the window's bands | $\mathbb{R}^{B \times K}$ | - |
+| $q(\lambda)$ | continuum-normalised ratio, $R / P(\hat{\vect{c}})$ | scalar per band | - |
+| $D_{\text{norm}}$ | the score | scalar | - |
+
 ## 1. The ratio of a pixel pair
 
-Write $L_{\text{in}}(\lambda)$ for the radiance of an in-pixel, under the gas's enhancement, and $L_{\text{out}}(\lambda)$ for an out-pixel, $\rho$ and $\rho'$ for their surface reflectances, $F_0$ for the solar irradiance, $\theta_s$ for the solar zenith angle, $T_{\text{atm}}$ for the vertical one-way transmittance of everything but the enhancement, $m$ for the two-way air mass and $\Delta X$ for the column enhancement in mol/m². Columns are also quoted in ppm·m, as EMIT quotes them: 1 ppm·m is $10^{-6}\, n_{\text{air}} \times 1$ m, with $n_{\text{air}} = p / (k_B T N_A)$ the molar density of air where the enhancement is, which is $4.03 \times 10^{-5}$ mol/m² in the bottom layer of the US standard atmosphere (≈954.8 hPa and 285.0 K, ~500 m), where the windows' presets take it. Other conventions give other constants: $4.23 \times 10^{-5}$ at the surface (1013.25 hPa, 288.15 K) and $4.46 \times 10^{-5}$ at STP (273.15 K). For a Lambertian surface,
+Write $L_{\text{in}}(\lambda)$ for the radiance of an in-pixel, under the gas's enhancement, and $L_{\text{out}}(\lambda)$ for an out-pixel, $\rho$ and $\rho'$ for their surface reflectances, $F_0$ for the solar irradiance, $\theta_s$ for the solar zenith angle, $\tau_{\text{atm}}$ for the vertical optical depth of everything but the enhancement, $m$ for the two-way air mass and $\Delta X$ for the column enhancement in mol/m². Columns are also quoted in ppm·m, as EMIT quotes them: 1 ppm·m is $10^{-6} n_{\text{air}} \times 1$ m, with $n_{\text{air}} = p / (k_B T N_A)$ the molar density of air where the enhancement is, which is $4.03 \times 10^{-5}$ mol/m² in the bottom layer of the US standard atmosphere (≈954.8 hPa and 285.0 K, ~500 m), where the windows' presets take it. Other conventions give other constants: $4.23 \times 10^{-5}$ at the surface (1013.25 hPa, 288.15 K) and $4.46 \times 10^{-5}$ at STP (273.15 K). For a Lambertian surface,
 
 $$
-L_{\text{in}}(\lambda) = \frac{F_0 \cos\theta_s}{\pi} \rho(\lambda) T_{\text{atm}}(\lambda)^{m} E(\lambda; \Delta X) + \epsilon,
-\qquad
-L_{\text{out}}(\lambda) = \frac{F_0 \cos\theta_s}{\pi} \rho'(\lambda) T_{\text{atm}}(\lambda)^{m} + \epsilon',
+L_{\text{in}}(\lambda) = \frac{F_0 \cos\theta_s}{\pi} \rho(\lambda) e^{-m \tau_{\text{atm}}(\lambda)} E(\lambda; \Delta X) + \varepsilon
 $$ (eq-abs-forward)
 
-with $E(\lambda; \Delta X)$ the band transmittance of the enhancement along the two-way path and $\epsilon, \epsilon'$ sensor noise. Averaged over $N$ pairs, the ratio keeps only the enhancement and what the two surfaces do not share:
+$$
+L_{\text{out}}(\lambda) = \frac{F_0 \cos\theta_s}{\pi} \rho'(\lambda) e^{-m \tau_{\text{atm}}(\lambda)} + \varepsilon'
+$$
+
+with $E(\lambda; \Delta X)$ the band transmittance of the enhancement along the two-way path and $\varepsilon, \varepsilon'$ sensor noise. Averaged over $N$ pairs, the ratio keeps only the enhancement and what the two surfaces do not share:
 
 $$
-R(\lambda) = \frac{\frac{1}{N} \sum_n L_{\text{in}, n}(\lambda)}{\frac{1}{N} \sum_n L_{\text{out}, n}(\lambda)} \approx \eta(\lambda) E(\lambda; \Delta X),
-\qquad \eta = \bar\rho / \bar\rho' .
+R(\lambda) = \frac{\frac{1}{N} \sum_n L_{\text{in}, n}(\lambda)}{\frac{1}{N} \sum_n L_{\text{out}, n}(\lambda)} \approx \eta(\lambda) E(\lambda; \Delta X)
 $$ (eq-abs-ratio)
+
+$$
+\eta = \frac{\bar\rho}{\bar\rho'}
+$$
 
 Pairing exists to make $\eta$ smooth: an in-pixel matched to an out-pixel of the same material makes $\eta$ close to one and slowly varying in $\lambda$.
 
 Three assumptions sit inside the $\approx$: the two pixels of a pair share their sun, path and atmosphere; the $E$ in $R$ is an average over the pairs rather than the transmittance of one column; and the noise is small once the pairs are averaged. The derivation below makes each one explicit.
 
 :::{dropdown} Derivation: what survives the ratio
-Write $C_n = F_0 \cos\theta_s\, T_{\text{atm}}^{m} / \pi$ for the factor that pair $n$'s two pixels share. They share it when the out-pixels lie near the in-pixels, so both pixels see the same sun, elevation and water vapour; different pairs need not share it. Leaving out the noise,
+Write $C_n = F_0 \cos\theta_s e^{-m \tau_{\text{atm}}} / \pi$ for the factor that pair $n$'s two pixels share. They share it when the out-pixels lie near the in-pixels, so both pixels see the same sun, elevation and water vapour; different pairs need not share it. Leaving out the noise,
 
 $$
 R = \frac{\sum_n C_n \rho_n E_n}{\sum_n C_n \rho'_n}
   = \underbrace{\frac{\sum_n C_n \rho_n}{\sum_n C_n \rho'_n}}_{\eta}
     \cdot
-    \underbrace{\frac{\sum_n w_n E_n}{\sum_n w_n}}_{\bar E},
-\qquad w_n = C_n \rho_n ,
+    \underbrace{\frac{\sum_n w_n E_n}{\sum_n w_n}}_{\bar E}
 $$ (eq-abs-ratio-exact)
 
-with $E_n = E(\lambda; \Delta X_n)$. This is an identity, not an approximation, and it says three things.
+with $w_n = C_n \rho_n$ and $E_n = E(\lambda; \Delta X_n)$. This is an identity, not an approximation, and it says three things.
 
 **$\eta$ is a ratio of brightness-weighted mean reflectances.** Pairing on bands that methane does not absorb makes $\rho_n \approx \rho'_n$ pair by pair outside methane's band. Pairing cannot see a mismatch that exists only inside methane's band, such as a carbonate's dip at 2.3 μm, so that mismatch stays in $\eta$, and it is the fit and the score that must reject it.
 
@@ -66,27 +94,29 @@ with $E_n = E(\lambda; \Delta X_n)$. This is an identity, not an approximation, 
 The reference implementation [^pv] reads $E$ from MODTRAN tables over solar and view zenith, elevation, water vapour and the enhancement's strength. radtrax computes it for the scene itself: with $y_b$ the band radiance of [`ForwardModel`](xref:api#radtrax.ForwardModel) for unit albedo,
 
 $$
-E_b(\Delta X) = \frac{y_b(x_{\text{atm}} + \Delta X)}{y_b(x_{\text{atm}})},
+E_b(\Delta X) = \frac{y_b(\vect{x}_{\text{atm}} + \Delta X)}{y_b(\vect{x}_{\text{atm}})}
 $$ (eq-abs-table)
 
-on a grid of $\Delta X$, with the enhancement in the bottom layer by default ([`transmittance_table`](xref:api#radtrax.retrieval.absorption.transmittance_table)). The albedo cancels because Beer–Lambert radiance is linear in it. That holds exactly for radtrax's `BeerLambert` solver, which has no path radiance or multiple scattering, and for an albedo that is constant across each band's response. A reflectance that varies inside one band reweights the wavenumbers the band averages over, which is a small effect when the reflectance is smooth over one band's width. The curve of growth is built in: lines saturate, so a strong enhancement absorbs less per molecule than the weak-absorption slope $\varepsilon_b = -\partial \ln y_b / \partial \Delta X$ at 0 predicts, the matched filter's target from [`unit_absorption_target`](xref:api#radtrax.unit_absorption_target). Fitting with a constant coefficient, $E_b \approx \exp(-\varepsilon_b \Delta X)$, biases the column **low**: by 1.4, 2.8 and 7.7 % at 0.05, 0.1 and 0.3 mol/m² on the synthetic spectrum.
+on a grid of $\Delta X$, with the enhancement in the bottom layer by default ([`transmittance_table`](xref:api#radtrax.retrieval.absorption.transmittance_table)). The albedo cancels because Beer–Lambert radiance is linear in it. That holds exactly for radtrax's `BeerLambert` solver, which has no path radiance or multiple scattering, and for an albedo that is constant across each band's response. A reflectance that varies inside one band reweights the wavenumbers the band averages over, which is a small effect when the reflectance is smooth over one band's width. The curve of growth is built in: lines saturate, so a strong enhancement absorbs less per molecule than the weak-absorption slope at 0 predicts. That slope is $t_b = \partial \ln y_b / \partial \Delta X$, the matched filter's target from [`unit_absorption_target`](xref:api#radtrax.unit_absorption_target), negative where the gas absorbs. Fitting with a constant coefficient, $E_b \approx e^{t_b \Delta X}$, biases the column **low**: by 1.4, 2.8 and 7.7 % at 0.05, 0.1 and 0.3 mol/m² on the synthetic spectrum.
 
 :::{dropdown} Derivation: why a constant coefficient biases the column low
-Band $b$ averages the wavenumbers $\nu$ of its response with a weight $w_b(\nu) \ge 0$, normalised so that $\int w_b\, d\nu = 1$, that combines the response, the solar irradiance and the ambient transmittance. With $\sigma(\nu)$ methane's cross-section in m²/mol at the enhancement's layer,
+Band $b$ averages the wavenumbers $\nu$ of its response with a weight $w_b(\nu) \ge 0$, normalised so that $\int w_b(\nu) \mathrm{d}\nu = 1$, that combines the response, the solar irradiance and the ambient transmittance. With $\sigma(\nu)$ methane's cross-section in m²/mol at the enhancement's layer,
 
 $$
-E_b(\Delta X) = \int w_b(\nu)\, e^{-m \sigma(\nu) \Delta X}\, d\nu ,
-\qquad
-\varepsilon_b = -\left.\frac{d \ln E_b}{d \Delta X}\right|_{\Delta X = 0} = m \int w_b(\nu)\, \sigma(\nu)\, d\nu .
+E_b(\Delta X) = \int w_b(\nu) e^{-m \sigma(\nu) \Delta X} \mathrm{d}\nu
 $$ (eq-abs-band-transmittance)
+
+$$
+t_b = \left.\frac{\mathrm{d} \ln E_b}{\mathrm{d} \Delta X}\right\vert_{\Delta X = 0} = -m \int w_b(\nu) \sigma(\nu) \mathrm{d}\nu
+$$
 
 The exponential is convex, so Jensen's inequality gives
 
 $$
-E_b(\Delta X) \ge \exp\left(-m \Delta X \int w_b \sigma\, d\nu\right) = e^{-\varepsilon_b \Delta X},
+E_b(\Delta X) \ge \exp\left(-m \Delta X \int w_b(\nu) \sigma(\nu) \mathrm{d}\nu\right) = e^{t_b \Delta X}
 $$ (eq-abs-jensen)
 
-with equality only if $\sigma$ is constant across the band. Physically, the line cores saturate first: once $e^{-m\sigma\Delta X} \approx 0$ at a line's centre, more methane removes no more light there, and the band darkens only through the line wings. A model $e^{-\varepsilon_b \Delta X}$ predicts more absorption than there is for every $\Delta X > 0$, so it reaches the observed transmittance with a smaller column, and the deficit grows with the enhancement's strength.
+with equality only if $\sigma$ is constant across the band. Physically, the line cores saturate first: once $e^{-m\sigma\Delta X} \approx 0$ at a line's centre, more methane removes no more light there, and the band darkens only through the line wings. A model $e^{t_b \Delta X}$ predicts more absorption than there is for every $\Delta X > 0$, so it reaches the observed transmittance with a smaller column, and the deficit grows with the enhancement's strength.
 
 Taking logarithms does not remove the effect. $\ln E_b(\Delta X)$ is the cumulant generating function of $m\sigma$ under the weight $w_b$, evaluated at $-\Delta X$. That function is convex, and it is linear only when $\sigma$ is constant across the band. A model that is linear in $\Delta X$ in log-radiance, such as the matched filter on $\ln L$, has the same low bias for strong enhancements; this is also why the lognormal matched filter's "uniformly most powerful" property ([Beyond Gaussian clutter](clutter_models.md)) holds per wavenumber but not per band.
 :::
@@ -95,10 +125,10 @@ Taking logarithms does not remove the effect. $\ln E_b(\Delta X)$ is the cumulan
 
 A gas's [`AbsorptionWindow`](xref:api#radtrax.retrieval.absorption.AbsorptionWindow) names the bands the transmittance is fitted on and the bands where the gas absorbs; pairing compares only the bands outside the absorbing ones. EMIT's CH₄ window fits 2100–2440 nm and keeps 1640–1690 and 2100–2440 nm out of pairing; its CO window fits and excludes 2278–2441 nm.
 
-Given the in-pixels $I$ and the out-pixels $O$, as flat indices into the image ([`pair_pixels`](xref:api#radtrax.retrieval.absorption.pair_pixels)), with $s(p)$ pixel $p$'s radiance on the pairing bands, pairing is one to one, minimising the total Euclidean distance, and keeps the best-matched half:
+Given the in-pixels $I$ and the out-pixels $O$, as flat indices into the image ([`pair_pixels`](xref:api#radtrax.retrieval.absorption.pair_pixels)), with $\vect{y}_p$ pixel $p$'s radiance on the pairing bands, pairing is one to one, minimising the total Euclidean distance, and keeps the best-matched half:
 
 $$
-\pi^\star = \arg\min_{\pi: I \to O \text{ injective}} \sum_{i \in I} \left\lVert s(i) - s(\pi(i)) \right\rVert_2 .
+\pi^\star = \op{argmin}_{\pi: I \to O \text{ injective}} \sum_{i \in I} \Vert \vect{y}_i - \vect{y}_{\pi(i)} \Vert_2
 $$ (eq-abs-pairing)
 
 The kept pairs give the ratio {eq}`eq-abs-ratio` ([`ratio_spectrum`](xref:api#radtrax.retrieval.absorption.ratio_spectrum)). These are the reference package's settings, `pv/config/config.yaml`.
@@ -115,16 +145,16 @@ The kept pairs give the ratio {eq}`eq-abs-ratio` ([`ratio_spectrum`](xref:api#ra
 
 ## 4. The fit and the score
 
-The continuum is a Legendre series on the window, $P(\lambda; c) = \sum_{k=0}^{K-1} c_k P_k(x)$ with $x \in [-1, 1]$, the basis of [`PolynomialAlbedo`](xref:api#radtrax.surface.PolynomialAlbedo):
+The continuum is a Legendre series on the window, $P(\lambda; \vect{c}) = \sum_{k=0}^{K-1} c_k P_k(\xi_\lambda)$ with $\xi_\lambda \in [-1, 1]$ the rescaled wavelength, the basis of [`PolynomialAlbedo`](xref:api#radtrax.surface.PolynomialAlbedo):
 
 $$
-(\widehat{\Delta X}, \hat c) = \arg\min_{\Delta X, c} \sum_{\lambda} \left( R(\lambda) - P(\lambda; c) E(\lambda; \Delta X) \right)^2 .
+(\widehat{\Delta X}, \hat{\vect{c}}) = \op{argmin}_{\Delta X, \vect{c}} \sum_{\lambda} \left( R(\lambda) - P(\lambda; \vect{c}) E(\lambda; \Delta X) \right)^2
 $$ (eq-abs-fit)
 
-For fixed $\Delta X$ the model is linear in $c$, so $\hat c(\Delta X)$ is a least-squares solve; profiling over the grid of $\Delta X$ gives $\widehat{\Delta X}$ with no starting point ([`fit_transmittance`](xref:api#radtrax.retrieval.absorption.fit_transmittance)). The score divides out the continuum, $q = R / P(\hat c)$, and compares $q$ with the fitted transmittance relative to $q$'s own spread (Xiang et al.'s eq. 11, [`d_norm`](xref:api#radtrax.retrieval.absorption.d_norm)):
+For fixed $\Delta X$ the model is linear in $\vect{c}$, so $\hat{\vect{c}}(\Delta X)$ is a least-squares solve; profiling over the grid of $\Delta X$ gives $\widehat{\Delta X}$ with no starting point ([`fit_transmittance`](xref:api#radtrax.retrieval.absorption.fit_transmittance)). The score divides out the continuum, $q = R / P(\hat{\vect{c}})$, and compares $q$ with the fitted transmittance relative to $q$'s own spread (Xiang et al.'s eq. 11, [`d_norm`](xref:api#radtrax.retrieval.absorption.d_norm)):
 
 $$
-D_{\text{norm}} = \frac{\operatorname{mean}_\lambda \left| q(\lambda) - E(\lambda; \widehat{\Delta X}) \right|}{\operatorname{mean}_\lambda \left| q(\lambda) - \bar q \right|} .
+D_{\text{norm}} = \frac{\op{mean}_\lambda \left\vert q(\lambda) - E(\lambda; \widehat{\Delta X}) \right\vert}{\op{mean}_\lambda \left\vert q(\lambda) - \bar q \right\vert}
 $$ (eq-abs-dnorm)
 
 A perfect fit gives 0. With no methane, $\widehat{\Delta X} = 0$, $E = 1$ and $\bar q \approx 1$, so numerator and denominator agree and $D_{\text{norm}} \approx 1$.
@@ -132,41 +162,47 @@ A perfect fit gives 0. With no methane, $\widehat{\Delta X} = 0$, $E = 1$ and $\
 $\widehat{\Delta X}$ is the column of the *mean* transmittance over the pairs, not the mean column, since $E$ is convex in $\Delta X$ ({eq}`eq-abs-ratio-exact`); it is a score, not a retrieval of the column.
 
 :::{dropdown} The profile fit, written out
-Let $V \in \mathbb{R}^{B \times K}$ hold the Legendre polynomials at the window's bands, $V_{\lambda k} = P_k(x_\lambda)$ with $x_\lambda = 2(\lambda - \lambda_{\min}) / (\lambda_{\max} - \lambda_{\min}) - 1$. For fixed $\Delta X$, the model in {eq}`eq-abs-fit` is $A(\Delta X)\, c$ with $A(\Delta X) = \operatorname{diag}(E(\Delta X))\, V$, so
+Let $\gmat{\Phi} \in \mathbb{R}^{B \times K}$ hold the Legendre polynomials at the window's bands, $[\gmat{\Phi}]_{\lambda k} = P_k(\xi_\lambda)$ with $\xi_\lambda = 2(\lambda - \lambda_{\min}) / (\lambda_{\max} - \lambda_{\min}) - 1$, and let $\vect{r} \in \mathbb{R}^B$ hold $R(\lambda)$ and $\vect{e}(\Delta X) \in \mathbb{R}^B$ hold $E(\lambda; \Delta X)$ at the same bands. For fixed $\Delta X$, the model in {eq}`eq-abs-fit` is $\mat{A}(\Delta X) \vect{c}$ with $\mat{A}(\Delta X) = \op{diag}(\vect{e}(\Delta X)) \gmat{\Phi} \in \mathbb{R}^{B \times K}$, so
 
 $$
-\hat c(\Delta X) = \left(A^\top A\right)^{-1} A^\top R,
-\qquad
-\mathrm{RSS}(\Delta X) = \left\lVert \left(I - \Pi_{A(\Delta X)}\right) R \right\rVert_2^2 ,
+\hat{\vect{c}}(\Delta X) = \left(\mat{A}^\top \mat{A}\right)^{-1} \mat{A}^\top \vect{r}
 $$ (eq-abs-profile)
 
-with $\Pi_A = A (A^\top A)^{-1} A^\top$ the orthogonal projector onto the columns of $A$. The grid point $k$ of least $\mathrm{RSS}$ needs no starting point: it is the global minimum over the grid. $\widehat{\Delta X}$ then refines it between the nodes: it is the vertex of the parabola through $\mathrm{RSS}$ at three neighbouring nodes around $k$ (the first or last three at a grid end), clipped to their span; $E(\widehat{\Delta X})$ interpolates $\ln E$ linearly between the two rows around it, and $\hat c$ is solved again there. The refined fit replaces the node's only where the parabola is convex and the refit lowers the residual, so a fit exact on a node stays there. If $\mathrm{RSS} \approx a u^2 + b u^3$ near its minimum, with $u$ the distance to it, and the nodes are $h$ apart, the vertex is off by $(b / 2a)(3\delta^2 - h^2)$, with $\delta$ the middle node's distance to the minimum: at most $|b| h^2 / a$, against $h / 2$ for the node alone. That matters for weak enhancements: on a 0.005 mol/m² grid, a noise-free 62 ppm·m (0.0025 mol/m²) ratio would otherwise sit on a node and score $D_{\text{norm}} \approx 0.5$; refined, it scores below $10^{-3}$. The grid starts at 0, which imposes $\Delta X \ge 0$: a ratio whose best fit wants no methane, or less than none, sits on that boundary at $\widehat{\Delta X} = 0$.
+$$
+\mathrm{RSS}(\Delta X) = \Vert (\mat{I} - \Pi_{\mat{A}(\Delta X)}) \vect{r} \Vert_2^2
+$$
+
+with $\Pi_{\mat{A}} = \mat{A} (\mat{A}^\top \mat{A})^{-1} \mat{A}^\top$ the orthogonal projector onto the columns of $\mat{A}$. The grid node $j$ of least $\mathrm{RSS}$ needs no starting point: it is the global minimum over the grid. $\widehat{\Delta X}$ then refines it between the nodes: it is the vertex of the parabola through $\mathrm{RSS}$ at three neighbouring nodes around $j$ (the first or last three at a grid end), clipped to their span; $E(\widehat{\Delta X})$ interpolates $\ln E$ linearly between the two rows around it, and $\hat{\vect{c}}$ is solved again there. The refined fit replaces the node's only where the parabola is convex and the refit lowers the residual, so a fit exact on a node stays there. If $\mathrm{RSS} \approx \kappa_2 u^2 + \kappa_3 u^3$ near its minimum, with $u$ the distance to it, and the nodes are $h$ apart, the vertex is off by $(\kappa_3 / 2\kappa_2)(3u_0^2 - h^2)$, with $u_0$ the middle node's distance to the minimum: at most $\vert \kappa_3 \vert h^2 / \kappa_2$, against $h / 2$ for the node alone. That matters for weak enhancements: on a 0.005 mol/m² grid, a noise-free 62 ppm·m (0.0025 mol/m²) ratio would otherwise sit on a node and score $D_{\text{norm}} \approx 0.5$; refined, it scores below $10^{-3}$. The grid starts at 0, which imposes $\Delta X \ge 0$: a ratio whose best fit wants no methane, or less than none, sits on that boundary at $\widehat{\Delta X} = 0$.
 
 Least squares is the maximum-likelihood fit when the errors in $R$ are independent across bands and have equal variance. Neither holds exactly. The noise in $R$ is larger in bands with less light, and the leftover surface mismatch in $\eta$ is smooth in $\lambda$, so it is correlated across bands.
 :::
 
 :::{dropdown} How much of methane's shape the continuum leaves
-Linearise for a weak enhancement in log space, where the continuum is additive: $\ln R \approx V a - \varepsilon\, \Delta X + n$, treating $\ln P$ as lying in the span of $V$ and taking $n \sim \mathcal{N}(0, \sigma^2 I)$. Profiling out $a$ (the Frisch–Waugh–Lovell theorem) leaves
+Linearise for a weak enhancement in log space, where the continuum is additive: $\ln \vect{r} \approx \gmat{\Phi} \vect{c}_{\ln} + \vect{t} \Delta X + \gvect{\varepsilon}$, treating $\ln P$ as lying in the span of $\gmat{\Phi}$ with coefficients $\vect{c}_{\ln} \in \mathbb{R}^K$, taking $\vect{t} \in \mathbb{R}^B$ as the weak-absorption slopes $t_b$ at the window's bands and $\gvect{\varepsilon} \sim \mathcal{N}(\mathbf{0}, \sigma_\varepsilon^2 \mat{I})$. Profiling out $\vect{c}_{\ln}$ (the Frisch–Waugh–Lovell theorem) leaves
 
 $$
-\widehat{\Delta X} = -\frac{\varepsilon_\perp^\top \ln R}{\varepsilon_\perp^\top \varepsilon_\perp},
-\qquad
-\operatorname{Var}\left(\widehat{\Delta X}\right) = \frac{\sigma^2}{\lVert \varepsilon_\perp \rVert_2^2},
-\qquad
-\varepsilon_\perp = \left(I - \Pi_V\right) \varepsilon .
+\widehat{\Delta X} = \frac{\vect{t}_\perp^\top \ln \vect{r}}{\vect{t}_\perp^\top \vect{t}_\perp}
 $$ (eq-abs-identifiability)
 
-Only the part of methane's band shape that a polynomial of degree $K - 1$ cannot reproduce informs $\widehat{\Delta X}$. Each added degree removes another direction from $\varepsilon_\perp$ and inflates the variance; with $K = B$ the continuum fits anything, and $\Delta X$ is not identifiable. This is the sense in which eleven continuum terms on 46 bands leave little of methane's shape to score ({ref}`sec-abs-departures`).
+$$
+\mathbb{V}[\widehat{\Delta X}] = \frac{\sigma_\varepsilon^2}{\Vert \vect{t}_\perp \Vert_2^2}
+$$
 
-The basis does not change this. Legendre polynomials and monomials of the same degree span the same space, so they give the same $\varepsilon_\perp$ and, in exact arithmetic, the same fit. What the Legendre basis changes is conditioning: monomials of $\lambda$ near 2300 nm are nearly collinear, and the least-squares solve loses digits to that.
+$$
+\vect{t}_\perp = (\mat{I} - \Pi_{\gmat{\Phi}}) \vect{t}
+$$
 
-The same algebra says what the test can reject. A confounder that adds $d$ to $\ln R$ shifts $\widehat{\Delta X}$ by $-\varepsilon_\perp^\top d / \lVert \varepsilon_\perp \rVert^2$ and leaves the rest of $(I - \Pi_V) d$ in the residual. The test rejects a confounder only to the extent that its shape, once the continuum is removed, differs from methane's.
+Only the part of methane's band shape that a polynomial of degree $K - 1$ cannot reproduce informs $\widehat{\Delta X}$. Each added degree removes another direction from $\vect{t}_\perp$ and inflates the variance; with $K = B$ the continuum fits anything, and $\Delta X$ is not identifiable. This is the sense in which eleven continuum terms on 46 bands leave little of methane's shape to score ({ref}`sec-abs-departures`).
+
+The basis does not change this. Legendre polynomials and monomials of the same degree span the same space, so they give the same $\vect{t}_\perp$ and, in exact arithmetic, the same fit. What the Legendre basis changes is conditioning: monomials of $\lambda$ near 2300 nm are nearly collinear, and the least-squares solve loses digits to that.
+
+The same algebra says what the test can reject. A confounder that adds $\vect{d}$ to $\ln \vect{r}$ shifts $\widehat{\Delta X}$ by $\vect{t}_\perp^\top \vect{d} / \Vert \vect{t}_\perp \Vert_2^2$ and leaves the rest of $(\mat{I} - \Pi_{\gmat{\Phi}}) \vect{d}$ in the residual. The test rejects a confounder only to the extent that its shape, once the continuum is removed, differs from methane's.
 :::
 
 :::{dropdown} What $D_{\text{norm}}$ measures
-Write $q = E(\widehat{\Delta X}) + r$, with $r$ the residual. The numerator of {eq}`eq-abs-dnorm` is $\operatorname{mean}_\lambda |r|$, the part of $q$ the fit leaves unexplained. The denominator is $q$'s spread about its own mean, which is the absorption the fit explains plus the residual. $D_{\text{norm}}$ is an L1 analogue of the fraction of variance unexplained, $1 - R^2$.
+Write $q = E(\widehat{\Delta X}) + \hat\varepsilon$, with $\hat\varepsilon(\lambda)$ the residual. The numerator of {eq}`eq-abs-dnorm` is $\op{mean}_\lambda \vert \hat\varepsilon \vert$, the part of $q$ the fit leaves unexplained. The denominator is $q$'s spread about its own mean, which is the absorption the fit explains plus the residual. $D_{\text{norm}}$ is an L1 analogue of the fraction of variance unexplained (one minus the coefficient of determination).
 
-**It is not purely a test of shape.** Let the residual have size $\sigma_q$ per band and the fitted transmittance vary across the window by $\delta$. When $\delta \gg \sigma_q$, $D_{\text{norm}}$ is of order $\sigma_q / \delta$; when $\delta \ll \sigma_q$, numerator and denominator are both about $\sigma_q$ and $D_{\text{norm}}$ tends to 1. A real but weak enhancement therefore scores like none. For $N$ pairs of pixels with signal-to-noise ratio SNR, $\sigma_q \approx \sqrt{2} / (\mathrm{SNR}\sqrt{N})$, so a fixed threshold such as 0.3 also depends on the sensor's noise, on the number of pairs and on the window, besides the continuum's degree.
+**It is not purely a test of shape.** Let the residual have size $\sigma_q$ per band and the fitted transmittance vary across the window by $\Delta_E$. When $\Delta_E \gg \sigma_q$, $D_{\text{norm}}$ is of order $\sigma_q / \Delta_E$; when $\Delta_E \ll \sigma_q$, numerator and denominator are both about $\sigma_q$ and $D_{\text{norm}}$ tends to 1. A real but weak enhancement therefore scores like none. For $N$ pairs of pixels with signal-to-noise ratio SNR, $\sigma_q \approx \sqrt{2} / (\mathrm{SNR}\sqrt{N})$, so a fixed threshold such as 0.3 also depends on the sensor's noise, on the number of pairs and on the window, besides the continuum's degree.
 
 **It can exceed 1**, when the fitted transmittance has structure that $q$ lacks.
 
@@ -176,7 +212,7 @@ Write $q = E(\widehat{\Delta X}) + r$, with $r$ the residual. The numerator of {
 (sec-abs-plumax)=
 ## 5. Plume vetting lives in plumax
 
-Plume vetting runs this test on matched-filter candidates, and that part is about plumes, so it lives in plumax as `plumax.vetting`, which imports radtrax: the in-pixels are a candidate's seeds, its strongest matched-filter pixels; the out-pixels are a background pool around them, outside every candidate, with a small matched-filter score; a null from the same scene (copies of the candidate's mask placed where there is no candidate) calibrates $D_{\text{norm}}$ into a p-value; and the decision on a candidate, with the worked example on a synthetic EMIT scene, is plumax's too. radtrax stays the plume-agnostic half: windows, transmittance, pairing given two pixel sets, the ratio, the fit and $D_{\text{norm}}$.
+Plume vetting runs this test on matched-filter candidates, and that part is about plumes, so it lives in plumax as `plumax.vetting`, which imports radtrax. The in-pixels are a candidate's seeds, its strongest matched-filter pixels; the out-pixels are a background pool around them, outside every candidate, with a small matched-filter score. A null from the same scene (copies of the candidate's mask placed where there is no candidate) calibrates $D_{\text{norm}}$ into a p-value, and the decision on a candidate, with the worked example on a synthetic EMIT scene, is plumax's too. radtrax stays the plume-agnostic half: windows, transmittance, pairing given two pixel sets, the ratio, the fit and $D_{\text{norm}}$.
 
 ## 6. What radtrax computes
 
