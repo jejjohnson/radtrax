@@ -18,6 +18,10 @@ The derivation borrows notation from Funk et al. [^funk2001], Theiler & Foy [^th
 
 [^gvl2013]: Golub, G. H. & Van Loan, C. F. (2013). *Matrix Computations* (4th ed.). Johns Hopkins.
 
+[^theiler2021]: Theiler, J. (2021). Absorptive weak plume detection on Gaussian and non-Gaussian background clutter. *IEEE JSTARS*, 14, 6842–6854. doi:10.1109/JSTARS.2021.3093820
+
+[^schaum2021]: Schaum, A. (2021). A uniformly most powerful detector of gas plumes against a cluttered background. *Remote Sensing of Environment*, 260, 112443. doi:10.1016/j.rse.2021.112443
+
 ## 1. The signal model
 
 We observe a per-pixel radiance spectrum $x \in \mathbb{R}^B$ (one vector per pixel of the scene, with $B$ spectral bands). The model is
@@ -47,6 +51,10 @@ $$ (eq-mf)
 
 This is the **matched filter**. It is unbiased ($\mathbb{E}[\hat\alpha] = \alpha$), has the minimum variance among all unbiased linear estimators (Gauss–Markov), and maximises SNR in the Neyman–Pearson sense for detecting the alternative $\alpha > 0$ against the null $\alpha = 0$.
 
+:::{note} The additive model is an approximation
+All of this holds for the model {eq}`eq-signal-model`, in which the plume *adds* a fixed vector. A gas absorbs instead: Beer–Lambert multiplies each band of the plume-free spectrum by $e^{\alpha t_b}$, so the plume's footprint depends on the pixel it lands on. Theiler [^theiler2021] shows that the optimal detector of that multiplicative model is quadratic even in the weak-plume limit, and that the matched filter is a good detector because it approximates the GLRT, provided the target is the mean pixel's plume direction, $\mu \odot t$ ({ref}`sec-mf-targets`). The derivation, with the change of variables, the GLRT and its built-in albedo correction, is on [Absorptive plume detection](absorptive_detection.md); non-Gaussian clutter, ACE and the log-space matched filter of Schaum [^schaum2021] are on [Beyond Gaussian clutter](clutter_models.md).
+:::
+
 ### 1.1 The SNR and detection threshold
 
 Under the null ($\alpha = 0$) the score $\hat\alpha(x)$ is $\mathcal{N}(0, 1/(t^\top \Sigma^{-1} t))$. Under an alternative with amplitude $\alpha$ it is $\mathcal{N}(\alpha, 1/(t^\top \Sigma^{-1} t))$. So the **detection SNR** is
@@ -63,9 +71,11 @@ $$ (eq-threshold)
 
 Both are implemented in [`matched_filter.core`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/matched_filter/core.py) as `matched_filter_snr` and `detection_threshold`.
 
+The score's standard deviation under the null, $\alpha_0 = 1/\sqrt{t^\top \Sigma^{-1} t}$, is what Theiler [^theiler2021] calls the **characteristic plume strength**: a plume of strength $n \alpha_0$ is an $n$-sigma detection, $\mathrm{SNR}(\alpha) = \alpha / \alpha_0$. It also shows how much whitening buys. At $\alpha_0$ the radiance itself changes by a fraction $\alpha_0 \lVert t \rVert / \lVert \mu \rVert$, which is below $10^{-3}$ on Theiler's AVIRIS-NG and OMI scenes and about $2 \times 10^{-4}$ on the synthetic EMIT-like scene of [Absorptive plume detection](absorptive_detection.md): plumes invisible in the raw spectra are clear in the matched-filter map.
+
 ## 2. Practical decomposition: precompute once, apply per pixel
 
-Equation (5) is deceptively cheap. Per pixel, it's a dot product of length $B$ — except $\Sigma^{-1}$ appears. Done naively, you invert a $B \times B$ matrix once, but that discards the chance to exploit any structure in $\Sigma$.
+Equation {eq}`eq-mf` is deceptively cheap. Per pixel, it's a dot product of length $B$ — except $\Sigma^{-1}$ appears. Done naively, you invert a $B \times B$ matrix once, but that discards the chance to exploit any structure in $\Sigma$.
 
 The right decomposition is
 
@@ -94,7 +104,7 @@ The key move is `gx.solve(cov_op, target)`. Because `cov_op` is an abstract `lin
 
 ## 3. Four flavours of $\Sigma$
 
-The four reference files in `jej_vc_snippets/methane_retrieval/` originally wrote out four separate implementations of equation (5), one per covariance model. In the operator-based view they collapse into four *estimation* routines that all return the same type — a `lineax.AbstractLinearOperator`.
+The four reference files in `jej_vc_snippets/methane_retrieval/` originally wrote out four separate implementations of {eq}`eq-mf`, one per covariance model. In the operator-based view they collapse into four *estimation* routines that all return the same type — a `lineax.AbstractLinearOperator`.
 
 :::{list-table} Covariance estimators and the operators they produce.
 :header-rows: 1
@@ -149,7 +159,7 @@ $$ (eq-psas)
 
 **The MF is exactly the PSAS analysis with a flat (infinite-variance) prior and identity state-space coupling.**
 
-Take $B = \sigma_B^2 I$ with $\sigma_B \to \infty$, $R = \Sigma$, and $H' \delta x = \alpha t$ (the tangent-linear sees a unit plume amplitude as the target signature). Then equation (13) becomes
+Take $B = \sigma_B^2 I$ with $\sigma_B \to \infty$, $R = \Sigma$, and $H' \delta x = \alpha t$ (the tangent-linear sees a unit plume amplitude as the target signature). Then {eq}`eq-psas` becomes
 
 $$
 (\sigma_B^2 t t^\top + \Sigma)\, \lambda = d \;\;\Rightarrow\;\; \lambda = \Sigma^{-1} d - \frac{\Sigma^{-1} t t^\top \Sigma^{-1}}{\sigma_B^{-2} + t^\top \Sigma^{-1} t}\, d.
@@ -180,7 +190,35 @@ t = linear_target_from_obs(obs, vmr_background, pattern="uniform")
 #   internally: jax.jvp(obs.forward, (vmr_background,), (ones,))
 ```
 
-This guarantees the target is exactly consistent with whatever forward model (PSF, GSD, SRF) the retrieval uses — no drift between "target generator" and "forward model" implementations. For strong plumes where Beer–Lambert saturation matters, `nonlinear_target_from_obs(obs, x_b, amplitude=α)` computes the exact finite-amplitude response $L(x_b + \alpha\,\delta x) - L(x_b)$ instead.
+This guarantees the target is exactly consistent with whatever forward model (PSF, GSD, SRF) the retrieval uses — no drift between "target generator" and "forward model" implementations. For strong plumes where Beer–Lambert saturation matters, `nonlinear_target_from_obs(obs, x_b, amplitude=α)` computes the exact finite-amplitude response $L(x_b + \alpha\,\delta x) - L(x_b)$ instead. That turns the filter into the additive approximation of the *clairvoyant* detector at $\alpha$, the optimal detector when the strength is known ([Absorptive plume detection](absorptive_detection.md), Step 4): best near the chosen amplitude, not uniformly.
+
+(sec-mf-targets)=
+### 5.1 Three targets for one gas
+
+On the layered [`ForwardModel`](xref:api#radtrax.ForwardModel), [`unit_absorption_target`](xref:api#radtrax.unit_absorption_target) returns the gas's unit absorption in log radiance, $t_{\ln} = \partial \ln y / \partial \Delta X$, which is negative where the gas absorbs. Because Beer–Lambert is multiplicative, the additive target built from it depends on what the filter is applied to, and Theiler [^theiler2021] and Schaum [^schaum2021] compare three:
+
+:::{list-table} Matched-filter targets for an absorbing gas.
+:header-rows: 1
+
+* - Target
+  - Applied to
+  - Assumes
+  - radtrax
+* - $t_{\ln}$ on radiance ("t")
+  - $x$
+  - a spectrally flat background
+  - `apply_image(cube, mean, cov, t)`; not recommended
+* - $\mu \odot t_{\ln}$ ("Tμ")
+  - $x$
+  - every pixel's plume direction is the mean pixel's
+  - `apply_image(cube, mean, cov, mean * t)`
+* - $t_{\ln}$ on log radiance
+  - $\ln x$
+  - lognormal clutter, so the plume is a shift in log space
+  - `apply_image(np.log(cube), mean_ln, cov_ln, t)`, with `mean_ln`, `cov_ln` estimated on `np.log(cube)`
+:::
+
+The Tμ target beat the flat one on every scene in both papers, and the Beer–Lambert target $-L_0\, a$ above is of the Tμ kind. The log-space filter is uniformly most powerful when the clutter is lognormal, but band integration and additive sensor noise break that model; on Theiler's real scenes its fattened variants (log-ACE, log-EC) did well, while on the synthetic EMIT-like scene the plain Tμ filter beat it. [Beyond Gaussian clutter](clutter_models.md) has the details.
 
 ## 6. Summary
 
@@ -192,7 +230,7 @@ The pieces of [`radtrax.retrieval.matched_filter`](https://github.com/jejjohnson
 * - Module
   - Role
 * - [`core.py`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/matched_filter/core.py)
-  - `apply_pixel`, `apply_image`, `matched_filter_snr`, `detection_threshold` — equation (5) + equations (6)–(7). Dispatches on `cov_op` structure via `gaussx.solve`.
+  - `apply_pixel`, `apply_image`, `matched_filter_snr`, `detection_threshold` — {eq}`eq-mf` + {eq}`eq-snr`–{eq}`eq-threshold`. Dispatches on `cov_op` structure via `gaussx.solve`.
 * - [`target.py`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/matched_filter/target.py)
   - `linear_target_from_obs` (JVP) and `nonlinear_target_from_obs` (finite-amplitude).
 * - [`background.py`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/matched_filter/background.py)
