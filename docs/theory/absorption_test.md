@@ -88,7 +88,7 @@ $$ (eq-abs-jensen)
 
 with equality only if $\sigma$ is constant across the band. Physically, the line cores saturate first: once $e^{-m\sigma\Delta X} \approx 0$ at a line's centre, more methane removes no more light there, and the band darkens only through the line wings. A model $e^{-\varepsilon_b \Delta X}$ predicts more absorption than there is for every $\Delta X > 0$, so it reaches the observed transmittance with a smaller column, and the deficit grows with the enhancement's strength.
 
-Taking logarithms does not remove the effect. $\ln E_b(\Delta X)$ is the cumulant generating function of $m\sigma$ under the weight $w_b$, evaluated at $-\Delta X$. That function is convex, and it is linear only when $\sigma$ is constant across the band. A model that is linear in $\Delta X$ in log-radiance, such as the matched filter on $\ln L$, has the same low bias for strong enhancements.
+Taking logarithms does not remove the effect. $\ln E_b(\Delta X)$ is the cumulant generating function of $m\sigma$ under the weight $w_b$, evaluated at $-\Delta X$. That function is convex, and it is linear only when $\sigma$ is constant across the band. A model that is linear in $\Delta X$ in log-radiance, such as the matched filter on $\ln L$, has the same low bias for strong enhancements; this is also why the lognormal matched filter's "uniformly most powerful" property ([Beyond Gaussian clutter](clutter_models.md)) holds per wavenumber but not per band.
 :::
 
 ## 3. Windows, pairs and the ratio

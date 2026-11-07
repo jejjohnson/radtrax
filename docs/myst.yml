@@ -30,6 +30,8 @@ project:
         - file: theory/absorption_test.md
         - file: theory/hitran_tables.md
         - file: theory/matched_filter.md
+        - file: theory/absorptive_detection.md
+        - file: theory/clutter_models.md
         - file: theory/var3d.md
     - title: Examples
       children:
