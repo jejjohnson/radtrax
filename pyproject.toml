@@ -1,6 +1,6 @@
 [project]
 name = "radtrax"
-version = "0.1.0"
+version = "0.2.0"
 description = "Differentiable radiative transfer in JAX and Equinox for methane and multi-gas remote sensing."
 authors = [
     {name="J. Emmanuel Johnson", email="jemanjohnson34@gmail.com"},
