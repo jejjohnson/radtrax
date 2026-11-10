@@ -12,8 +12,9 @@ Modules
   or whitened space (``ξ``). Reverse-mode AD handles the obs-term adjoint.
 - :mod:`.solve`       — three solver paths: primal LBFGS, Gauss-Newton with
   a custom :mod:`lineax` linear solver, and the dual / PSAS reformulation.
-- :mod:`.diagnostics` — reduced χ², degrees-of-freedom-for-signal, posterior
-  covariance proxy via CG on the Hessian.
+- :mod:`.diagnostics` — reduced χ², the Gauss–Newton posterior, averaging
+  kernel, degrees of freedom for signal and posterior covariance proxy, with
+  the curvature and trace estimates from argminax.
 
 The math derivation lives in
 ``notebooks/assimilation/00_3dvar_derivation.md`` and the end-to-end demo in
@@ -60,6 +61,8 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "run_gauss_newton": ("solve", "run_gauss_newton"),
     "run_dual_psas": ("solve", "run_dual_psas"),
     # diagnostics
+    "averaging_kernel": ("diagnostics", "averaging_kernel"),
+    "gauss_newton_posterior": ("diagnostics", "gauss_newton_posterior"),
     "reduced_chi_squared": ("diagnostics", "reduced_chi_squared"),
     "degrees_of_freedom_for_signal": ("diagnostics", "degrees_of_freedom_for_signal"),
     "posterior_covariance_proxy": ("diagnostics", "posterior_covariance_proxy"),
@@ -100,7 +103,9 @@ if TYPE_CHECKING:  # static type checkers see eagerly-imported symbols
         finite_difference_grad,
     )
     from radtrax.retrieval.var3d.diagnostics import (
+        averaging_kernel,
         degrees_of_freedom_for_signal,
+        gauss_newton_posterior,
         posterior_covariance_proxy,
         reduced_chi_squared,
     )

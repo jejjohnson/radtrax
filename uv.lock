@@ -38,6 +38,20 @@ wheels = [
 ]
 
 [[package]]
+name = "argminax"
+version = "0.0.4"
+source = { git = "https://github.com/jejjohnson/argminax?rev=v0.0.4#5992322c0c8ed06744254e7d331a83549fb69b21" }
+dependencies = [
+    { name = "equinox" },
+    { name = "gaussx" },
+    { name = "jax" },
+    { name = "jaxlib" },
+    { name = "jaxtyping" },
+    { name = "lineax" },
+    { name = "optimistix" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -131,7 +145,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -650,8 +664,8 @@ wheels = [
 
 [[package]]
 name = "gaussx"
-version = "0.6.5"
-source = { git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5#12ff91a68da2886478e9b3a1d0d4c0745d74ca41" }
+version = "0.6.12"
+source = { git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12#1adbf077f6fdf8b19a3f8484c9dc8781b515ee1d" }
 dependencies = [
     { name = "einx" },
     { name = "equinox" },
@@ -1969,7 +1983,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -2443,9 +2457,10 @@ wheels = [
 
 [[package]]
 name = "radtrax"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "argminax" },
     { name = "equinox" },
     { name = "gaussx" },
     { name = "geonnax" },
@@ -2504,8 +2519,9 @@ typecheck = [
 
 [package.metadata]
 requires-dist = [
+    { name = "argminax", git = "https://github.com/jejjohnson/argminax?rev=v0.0.4" },
     { name = "equinox", specifier = ">=0.13" },
-    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?tag=v0.6.5" },
+    { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax?tag=v0.0.9" },
     { name = "georeader-spaceml", marker = "extra == 'geo'", specifier = ">=2.4.1" },
     { name = "geotoolz-ops", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz-ops&rev=278b8afbc675b9e082ac75488200a4729da38097" },

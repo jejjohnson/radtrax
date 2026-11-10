@@ -37,7 +37,9 @@ dependencies = [
     "jaxtyping>=0.3",
     "lineax>=0.1",
     "optimistix>=0.1",
-    "gaussx>=0.6.5",
+    "gaussx>=0.6.12",
+    # the curvature and retrieval diagnostics (argminax.curvature, argminax.diagnose).
+    "argminax>=0.0.4",
     # Legendre polynomials for the spectral albedo (geonnax.basis).
     "geonnax>=0.0.9",
     "numpy>=2.0",
@@ -73,13 +75,17 @@ bayes = []
 Repository = "https://github.com/jejjohnson/radtrax"
 Documentation = "https://jejjohnson.github.io/radtrax"
 
-# gaussx and geotoolz-ops are not on PyPI yet: resolve them from git, as plumax
-# does. geotoolz-ops is geotoolz's operator package, renamed from `geotoolz`
-# in geotoolz#489; pinned to its merge commit on main until a geotoolz-ops tag
-# exists. A plain `pip install` reads only the PyPI-style
-# requirements above, so radtrax installs with uv until both are on PyPI (#25).
+# gaussx, argminax and geotoolz-ops are not on PyPI yet: resolve them from git,
+# as plumax does. geotoolz-ops is geotoolz's operator package, renamed from
+# `geotoolz` in geotoolz#489; pinned to its merge commit on main until a
+# geotoolz-ops tag exists. argminax requires gaussx as
+# `git+https://github.com/jejjohnson/gaussx@v0.6.12`, and uv reads a `tag =`
+# source as a different URL from that, so both pin their tag with `rev =`.
+# A plain `pip install` reads only the PyPI-style
+# requirements above, so radtrax installs with uv until all are on PyPI (#25).
 [tool.uv.sources]
-gaussx = { git = "https://github.com/jejjohnson/gaussx", tag = "v0.6.5" }
+argminax = { git = "https://github.com/jejjohnson/argminax", rev = "v0.0.4" }
+gaussx = { git = "https://github.com/jejjohnson/gaussx", rev = "v0.6.12" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
 geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "278b8afbc675b9e082ac75488200a4729da38097", subdirectory = "packages/geotoolz-ops" }
 
