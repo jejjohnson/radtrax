@@ -205,7 +205,11 @@ When the forward map is itself an iterative procedure (e.g. a chemistry solver i
 | Gauss–Newton with a custom inner solver | `optimistix.GaussNewton(...)` with `lineax.CG(...)` for $\mat{J}_r^\top \mat{J}_r$, $r$ the `residual_fn` |
 | Dual (PSAS) solve | `lineax.linear_solve(dual_op, d, solver=lineax.CG(...))` |
 | Adjoint *through* the converged solve | `optimistix.ImplicitAdjoint(linear_solver=lineax.CG(...))` |
-| $\chi^2_\text{red}$, DFS, posterior covariance | [`reduced_chi_squared`, `degrees_of_freedom_for_signal`, `posterior_covariance_proxy`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py) |
+| $\chi^2_\text{red}$ | [`reduced_chi_squared`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py) |
+| $\gmat{\Lambda}_{x \mid y} \approx \mat{J}_r^\top \mat{J}_r$ (Gauss–Newton, whitened residuals) and its inverse | `argminax.curvature.gauss_newton(...)` through [`gauss_newton_posterior`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py), then `Laplace.covariance()` |
+| Averaging kernel $\mat{A} = \mat{I} - \gmat{\Lambda}_{x \mid y}^{-1} \gmat{\Sigma}_x^{-1}$ | `argminax.diagnose.averaging_kernel(posterior, background_op)`, or [`averaging_kernel`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py) from a `Cost.hvp` |
+| DFS $d_s = \mathrm{tr}\, \mat{A}$, Rademacher probes from a JAX key | `argminax.diagnose.degrees_of_freedom(kernel, key=key)`, through [`degrees_of_freedom_for_signal`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py) |
+| $\gmat{\Lambda}_{x \mid y}^{-1} \vect{v}$ from a `Cost.hvp` | [`posterior_covariance_proxy`](https://github.com/jejjohnson/radtrax/blob/main/src/radtrax/retrieval/var3d/diagnostics.py) (`argminax.curvature.Laplace.covariance()` with a CG solve) |
 
 ## 6. Worked example
 
