@@ -1,4 +1,4 @@
-"""The multi-pass operators on GeoTensors (behind the ``[geo]`` extra).
+"""The multi-pass operators on GeoArrays (behind the ``[geo]`` extra).
 
 :class:`MBMP` is ported from geotoolz's ``plume.SBMP`` (radtrax#30),
 renamed after *radtrax · 2*: with a reference scene it computes the
@@ -15,7 +15,7 @@ functions in :mod:`radtrax.retrieval.mbmp` when a plume is large.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import jax
 import numpy as np
@@ -41,7 +41,7 @@ try:
         resolve_bands,
         wrap_filled,
     )
-    from pipekit import Operator
+    from pipekit_ops import Operator
 except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
     raise MissingExtraError(
         "radtrax.geo.mbmp needs the [geo] extra: pip install 'radtrax[geo]'"
@@ -53,12 +53,12 @@ Cube = Float[np.ndarray, "*time B H W"]
 Plane = Float[np.ndarray, "*time H W"]
 
 if TYPE_CHECKING:
-    from georeader.geotensor import GeoTensor
+    from geoarray import GeoArray
 
-    #: A Sentinel-2 cube: a GeoTensor or a plain array.
-    Carrier = GeoTensor | Cube
+    #: A Sentinel-2 cube: a GeoArray or a plain array.
+    Carrier = GeoArray | Cube
     #: The single-band signal: ``(H, W)``, or ``(T, 1, H, W)`` for a stack.
-    ScoreMap = GeoTensor | Plane
+    ScoreMap = GeoArray | Plane
 else:
     Carrier = Any
     ScoreMap = Any
@@ -94,11 +94,11 @@ class MBMP(Operator):
     ``descriptions``, ``bands``); only a plain array with exactly 12 bands
     falls back to the Sentinel-2 L2A order (``B1``–``B8``, ``B8A``, ``B9``,
     ``B11``, ``B12``), so ``"B11"`` never picks B10 on a 13-band L1C stack.
-    A GeoTensor reference resolves its own names; a plain one shares the
+    A GeoArray reference resolves its own names; a plain one shares the
     scene's band positions.
 
     The output is single-band (``(T, 1, H, W)`` for a stack), ``NaN`` where
-    either scene has a nodata pixel, with ``fill_value_default=NaN``. The
+    either scene has a nodata pixel, with ``fill_value=NaN``. The
     band arithmetic runs in float64.
 
     Args:
@@ -111,6 +111,8 @@ class MBMP(Operator):
         scale_factors: Fit and remove each pass's scale factor (radtrax#111).
             Default ``False``, the signal as before.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -162,7 +164,7 @@ class MBMP(Operator):
                         dtype=float,
                     )
         return wrap_filled(
-            gt, keep_band_axis(out, gt), fill_value_default=np.nan, valid=~invalid
+            gt, keep_band_axis(out, gt), fill_value=np.nan, valid=~invalid
         )
 
     def _bands(self, values: Carrier, names_from: Carrier) -> tuple[Plane, Plane]:
@@ -192,6 +194,8 @@ class SBMP(Operator):
         eps: Guard against log of zero. Default ``1e-10``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(
         self, *, swir2: BandRef = "B12", axis: int = -3, eps: float = 1e-10
     ) -> None:
@@ -218,7 +222,7 @@ class SBMP(Operator):
                 ~invalid,
             )
         return wrap_filled(
-            gt, keep_band_axis(out, gt), fill_value_default=np.nan, valid=~invalid
+            gt, keep_band_axis(out, gt), fill_value=np.nan, valid=~invalid
         )
 
 
@@ -242,6 +246,8 @@ class MBSP(Operator):
         axis: Band axis. Default ``-3``.
         eps: Guard against log of zero. Default ``1e-10``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -267,7 +273,7 @@ class MBSP(Operator):
                 ~invalid,
             )
         return wrap_filled(
-            gt, keep_band_axis(out, gt), fill_value_default=np.nan, valid=~invalid
+            gt, keep_band_axis(out, gt), fill_value=np.nan, valid=~invalid
         )
 
 

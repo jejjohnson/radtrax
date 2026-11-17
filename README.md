@@ -142,14 +142,14 @@ is a protocol (`OpacityProvider`, `RTSolver`, `Surface`, `Instrument`,
 | Instrument | `BandInstrument` (any SRF matrix, shift on the grid), `GaussianInstrument` (analytic shift in cm⁻¹ or nm) |
 | Noise | `DiagonalNoise`, `SNRNoise`, as lineax operators with `log_prob` through gaussx |
 | Retrieval | the matched filter (backgrounds, clusters, streaming, a target from autodiff), the multi-pass family (`mbmp_signal`, `sbmp_signal`, `mbsp_signal`), `BandTable`, 3D-Var, the absorption-shape test (`radtrax.retrieval.absorption`: `pair_pixels`, `fit_transmittance`, `d_norm`) |
-| `[geo]` | the same retrievals as pipekit operators on georeader `GeoTensor`s, with Sentinel-2 SRFs |
+| `[geo]` | the same retrievals as pipekit operators on geotoolz `GeoArray`s, with Sentinel-2 SRFs |
 
 ## Status
 
 | Stage | What lands | State |
 |---|---|---|
 | Port | plumax's band-integrated Beer–Lambert models, HITRAN tables, matched filter and 3D-Var, ported with their tests | done |
-| One of each | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators behind `radtrax[geo]` | done |
+| One of each | one matched filter, one SRF integration, one air-mass factor; GeoArray operators behind `radtrax[geo]` | done |
 | v0 | the layered forward model and matched-filter targets from autodiff | done; gate V2 against HITRAN runs in CI next ([#116](https://github.com/jejjohnson/radtrax/issues/116)) |
 | v1 | spherical air mass, kernel BRDF, spectral albedo, analytic instrument, noise models, multi-pass family, band tables | on `main` |
 | v1 | optimal estimation on vardax; sensors and real-scene gates on EMIT, Sentinel-2 and Landsat 8/9 | in progress: [Wave 4](https://github.com/jejjohnson/radtrax/issues/100) |
@@ -180,7 +180,7 @@ filter's backgrounds. The extras add the rest:
 | Extra | Adds | For |
 |---|---|---|
 | `[hitran]` | HAPI | building the cross-section tables offline |
-| `[geo]` | georeader, geotoolz, pipekit | operators on `GeoTensor`s, Sentinel-2 SRFs |
+| `[geo]` | georeader, geotoolz, pipekit-ops | operators on `GeoArray`s, Sentinel-2 SRFs |
 | `[bayes]` | reserved: NumPyro and optax as those retrievals land | Bayesian and L-BFGS retrievals |
 
 ## Develop

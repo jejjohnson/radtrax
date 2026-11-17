@@ -1,11 +1,11 @@
-"""GeoTensor operators for the matched filter (behind the ``[geo]`` extra).
+"""GeoArray operators for the matched filter (behind the ``[geo]`` extra).
 
 pipekit ``Operator`` wrappers around the one matched-filter core,
 :mod:`radtrax.retrieval.matched_filter` — ported from geotoolz's
 ``matched_filter`` operators (radtrax#29), which now delegate here. They keep
-geotoolz's carrier contract: a ``GeoTensor`` in gives a ``GeoTensor`` out on
+geotoolz's carrier contract: a ``GeoArray`` in gives a ``GeoArray`` out on
 the same grid (a plain array gives a plain array), score maps are a new
-quantity holding ``NaN`` at nodata pixels with ``fill_value_default=NaN``,
+quantity holding ``NaN`` at nodata pixels with ``fill_value=NaN``,
 and estimators return non-carrier results (vectors, covariance operators,
 backgrounds).
 
@@ -16,7 +16,7 @@ once over the pixels of every frame and score maps come back
 ``(T, 1, H, W)``.
 
 Nodata: a pixel that is non-finite or equals the carrier's
-``fill_value_default`` in any band is left out of every statistic.
+``fill_value`` in any band is left out of every statistic.
 
 Precision: the core is JAX; the operators run it in float64
 (``jax.enable_x64`` for the call only), matching geotoolz's NumPy results
@@ -100,7 +100,7 @@ try:
         restore_fill,
         wrap_like,
     )
-    from pipekit import Operator
+    from pipekit_ops import Operator
 except ModuleNotFoundError as err:  # pragma: no cover - the base-install gate
     raise MissingExtraError(
         "radtrax.geo.matched_filter needs the [geo] extra: pip install 'radtrax[geo]'"
@@ -122,17 +122,17 @@ SpectrumLike = Spectrum | Sequence[float]
 Pixel = tuple[int, int] | list[int]
 
 if TYPE_CHECKING:
-    from georeader.geotensor import GeoTensor
+    from geoarray import GeoArray
 
     from radtrax.atmosphere.geometry import ViewingGeometry
     from radtrax.atmosphere.state import AtmosphericState
     from radtrax.forward_model import ForwardModel
     from radtrax.surface.lambertian import Surface
 
-    #: A spectral cube: a GeoTensor or a plain array.
-    Carrier = GeoTensor | Cube
+    #: A spectral cube: a GeoArray or a plain array.
+    Carrier = GeoArray | Cube
     #: A score map on the input's carrier: ``(H, W)``, or ``(T, 1, H, W)``.
-    ScoreMap = GeoTensor | ScoreArray
+    ScoreMap = GeoArray | ScoreArray
 else:
     Carrier = Any
     ScoreMap = Any
@@ -249,6 +249,8 @@ class MatchedFilter(Operator):
         mean_: Fitted mean, or ``None``.
         cov_op_: Fitted covariance operator, or ``None``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -372,6 +374,8 @@ class MatchedFilterPixel(Operator):
         target: Target signature ``(B,)``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     _terminal: ClassVar[bool] = True
 
     def __init__(
@@ -413,6 +417,8 @@ class MatchedFilterSNR(Operator):
         target: Target signature ``(B,)``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     _terminal: ClassVar[bool] = True
 
     def __init__(
@@ -450,6 +456,8 @@ class DetectionThreshold(Operator):
         target: Target signature ``(B,)``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     _terminal: ClassVar[bool] = True
 
     def __init__(
@@ -486,6 +494,8 @@ class ValidateMFInputs(Operator):
         target: Target signature ``(B,)``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(self, *, cov_op: CovLike, target: SpectrumLike) -> None:
         self.cov_op = _as_cov(cov_op)
         self.target = np.asarray(target, dtype=float)
@@ -515,6 +525,8 @@ class EstimateMean(Operator):
         huber_c: Huber threshold in MAD units for ``"huber"``.
         axis: Position of the band axis. Default ``-3``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -551,6 +563,8 @@ class EstimateCovEmpirical(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(
         self, *, mean: SpectrumLike | None = None, ridge: float = 0.0, axis: int = -3
     ) -> None:
@@ -580,6 +594,8 @@ class EstimateCovShrunk(Operator):
         method: ``"ledoit_wolf"`` (default) or ``"oas"``.
         axis: Position of the band axis. Default ``-3``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -617,6 +633,8 @@ class EstimateCovLowRank(Operator):
         n_oversamples: Extra random directions beyond ``rank``.
         axis: Position of the band axis. Default ``-3``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -674,6 +692,8 @@ class GMMClusterBackground(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(
         self,
         *,
@@ -716,6 +736,8 @@ class ApplyClusterMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(self, *, target: SpectrumLike, axis: int = -3) -> None:
         self.target = np.asarray(target, dtype=float)
         self.axis = axis
@@ -752,6 +774,8 @@ class AdaptiveWindowBackground(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(
         self, *, window: int = 7, guard_window: int = 0, axis: int = -3
     ) -> None:
@@ -784,6 +808,8 @@ class ApplyAdaptiveMF(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     def __init__(
         self, *, target: SpectrumLike, ridge: float = 0.0, axis: int = -3
     ) -> None:
@@ -815,7 +841,7 @@ class ApplyAdaptiveMF(Operator):
 class StreamingBackground(Operator):
     """Mean and covariance accumulated over an iterable of cubes.
 
-    Streams the valid pixels of every cube (``GeoTensor`` or array) through
+    Streams the valid pixels of every cube (``GeoArray`` or array) through
     :func:`radtrax.retrieval.matched_filter.streaming_background`; the
     cubes arrive at call time, so the config stays YAML-safe.
 
@@ -825,6 +851,8 @@ class StreamingBackground(Operator):
         ridge: Diagonal ridge added to the covariance. Default ``1e-8``.
         axis: Position of the band axis in each cube. Default ``-3``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -893,6 +921,8 @@ class LinearTargetFromObs(Operator):
         fd_step: Absolute central-difference step for a callable that JAX
             cannot trace; see above.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     forbid_in_yaml: ClassVar[bool] = True
 
@@ -978,6 +1008,8 @@ class NonlinearTargetFromObs(Operator):
         axis: Position of the band axis. Default ``-3``.
     """
 
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
+
     forbid_in_yaml: ClassVar[bool] = True
 
     def __init__(
@@ -1057,6 +1089,8 @@ class UnitAbsorptionTarget(Operator):
         ShapeError: (on call) If the model's band count differs from the
             cube's.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     forbid_in_yaml: ClassVar[bool] = True
 
@@ -1149,6 +1183,8 @@ class ColumnEnhancement(Operator):
         tikhonov: Floor for ``"lowrank"`` (default ``1e-3`` when ``None``).
         axis: Position of the band axis. Default ``-3``.
     """
+
+    backends: ClassVar[tuple[str, ...] | None] = ("numpy",)
 
     def __init__(
         self,
@@ -1338,7 +1374,7 @@ def _band_last(gt: Carrier, axis: int, name: str) -> Float[np.ndarray, "H W B"]:
 def _score_map(gt: Carrier, scores: ScoreArray, valid: ValidMap | None) -> ScoreMap:
     """A score map on ``gt``'s carrier, ``NaN`` at nodata pixels."""
     out = scores if valid is None else restore_fill(scores, valid, np.nan)
-    return wrap_like(gt, keep_band_axis(out, gt), fill_value_default=np.nan)
+    return wrap_like(gt, keep_band_axis(out, gt), fill_value=np.nan)
 
 
 def _spatial_shape(gt: Carrier, axis: int) -> tuple[int, ...]:

@@ -14,13 +14,13 @@ import pytest
 
 
 pytestmark = pytest.mark.integration
-GeoTensor = pytest.importorskip("georeader.geotensor").GeoTensor
+GeoArray = pytest.importorskip("geoarray").GeoArray
 rasterio = pytest.importorskip("rasterio")
 
-from geoops.carrier import SENTINEL2_L2A_BANDS
-from pipekit import Operator
+from geoops.carrier import SENTINEL2_L2A_BANDS, affine_of
+from pipekit_ops import Operator
 
-from geo._carriers import TRANSFORM
+from geo._carriers import DIMS, TRANSFORM
 from radtrax.geo import MBMP, MBSP, SBMP
 
 
@@ -29,9 +29,20 @@ TRUTH = np.linspace(0.0, 0.2, 25).reshape(5, 5)
 ATOL = 1e-9
 
 
-def _gt(values: np.ndarray, *, fill: float = -9999.0) -> GeoTensor:
-    return GeoTensor(
-        values, transform=TRANSFORM, crs="EPSG:32629", fill_value_default=fill
+def _gt(
+    values: np.ndarray,
+    *,
+    fill: float = -9999.0,
+    band_names: list[str] | None = None,
+) -> GeoArray:
+    values = np.asarray(values)
+    return GeoArray(
+        values,
+        transform=TRANSFORM,
+        crs="EPSG:32629",
+        fill_value=fill,
+        attrs={} if band_names is None else {"band_names": band_names},
+        dims=DIMS[values.ndim],
     )
 
 
@@ -41,9 +52,9 @@ def test_reference_scene_recovers_the_injected_signal() -> None:
     scene = np.stack([np.exp(TRUTH), np.ones_like(TRUTH)])
     with jax.enable_x64(False):
         out = MBMP(swir1=0, swir2=1)(_gt(scene), _gt(reference))
-    assert isinstance(out, GeoTensor) and out.transform == TRANSFORM
+    assert isinstance(out, GeoArray) and affine_of(out) == TRANSFORM
     np.testing.assert_allclose(np.asarray(out), TRUTH, atol=ATOL)
-    assert np.isnan(out.fill_value_default)
+    assert np.isnan(out.fill_value)
 
 
 def test_default_sentinel2_band_names_on_a_plain_l2a_array() -> None:
@@ -57,14 +68,12 @@ def test_default_sentinel2_band_names_on_a_plain_l2a_array() -> None:
 
 
 def test_band_names_resolve_from_carrier_attrs() -> None:
-    """A GeoTensor names its own bands: a 13-band L1C stack picks the real B11."""
+    """A GeoArray names its own bands: a 13-band L1C stack picks the real B11."""
     l1c = [*SENTINEL2_L2A_BANDS[:10], "B10", *SENTINEL2_L2A_BANDS[10:]]
     reference = np.ones((13, 5, 5))
     scene = reference.copy()
     scene[l1c.index("B11")] = np.exp(TRUTH)
-    scene_gt, ref_gt = _gt(scene), _gt(reference)
-    scene_gt.attrs["band_names"] = l1c
-    ref_gt.attrs["band_names"] = l1c
+    scene_gt, ref_gt = _gt(scene, band_names=l1c), _gt(reference, band_names=l1c)
     np.testing.assert_allclose(np.asarray(MBMP()(scene_gt, ref_gt)), TRUTH, atol=ATOL)
 
 
@@ -107,11 +116,12 @@ def test_non_positive_bands_are_unscoreable_with_a_reference() -> None:
 
 
 def test_reference_on_another_grid_is_rejected() -> None:
-    shifted = GeoTensor(
+    shifted = GeoArray(
         np.ones((2, 5, 5)),
         transform=TRANSFORM * rasterio.Affine.translation(1, 0),
         crs="EPSG:32629",
-        fill_value_default=-9999.0,
+        fill_value=-9999.0,
+        dims=("band", "y", "x"),
     )
     with pytest.raises(ValueError, match="reference_scene"):
         MBMP(swir1=0, swir2=1)(_gt(np.ones((2, 5, 5))), shifted)
@@ -139,10 +149,8 @@ def test_keeps_the_carrier_contract() -> None:
 
     values = np.random.default_rng(1).uniform(0.1, 1.0, size=(2, 4, 4))
     values[:, 0, 0] = -9999.0
-    gt = _gt(values)
-    gt.attrs = {"band_names": ["B11", "B12"]}
-    reference = _gt(np.full((2, 4, 4), 0.5))
-    reference.attrs = {"band_names": ["B11", "B12"]}
+    gt = _gt(values, band_names=["B11", "B12"])
+    reference = _gt(np.full((2, 4, 4), 0.5), band_names=["B11", "B12"])
     check_operator(MBMP(), gt)
     check_operator(MBMP(), gt, reference)
 
@@ -228,10 +236,11 @@ def test_new_operators_keep_the_carrier_contract() -> None:
 
     values = np.random.default_rng(1).uniform(0.1, 1.0, size=(2, 4, 4))
     values[:, 0, 0] = -9999.0
-    gt = _gt(values)
-    gt.attrs = {"band_names": ["B11", "B12"]}
-    reference = _gt(np.random.default_rng(2).uniform(0.1, 1.0, size=(2, 4, 4)))
-    reference.attrs = {"band_names": ["B11", "B12"]}
+    gt = _gt(values, band_names=["B11", "B12"])
+    reference = _gt(
+        np.random.default_rng(2).uniform(0.1, 1.0, size=(2, 4, 4)),
+        band_names=["B11", "B12"],
+    )
     check_operator(MBSP(), gt)
     check_operator(SBMP(), gt, reference)
     check_operator(MBMP(scale_factors=True), gt, reference)
