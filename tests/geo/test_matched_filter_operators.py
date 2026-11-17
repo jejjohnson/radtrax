@@ -448,13 +448,13 @@ def test_sensitivity_map_is_the_brightness_of_a_scaled_mean() -> None:
     mean = np.array([5.0, 6.0, 7.0])
     unit_absorption = np.array([-0.2, -1.0, 0.0])
     brightness = np.array([[1.0, 2.0], [0.5, 1.5]])
-    gt = toy_geotensor(mean[:, None, None] * brightness)
+    gt = toy_geoarray(mean[:, None, None] * brightness)
     op = rg.MatchedFilterSensitivity(
         unit_absorption=unit_absorption, mean=mean, cov_op=np.diag([1.0, 2.0, 3.0])
     )
     out = op(gt)
-    assert isinstance(out, GeoTensor) and out.shape == (2, 2)
-    assert out.transform == gt.transform and np.isnan(out.fill_value_default)
+    assert isinstance(out, GeoArray) and out.shape == (2, 2)
+    assert affine_of(out) == affine_of(gt) and np.isnan(out.fill_value)
     np.testing.assert_allclose(np.asarray(out), brightness, rtol=1e-12)
 
 
@@ -481,7 +481,7 @@ def test_sensitivity_map_keeps_the_carrier_contract() -> None:
     from geoops.testing import check_operator
 
     gt, _, _ = _fill_cube(-9999.0)
-    gt.attrs = {"band_names": ["b1", "b2", "b3"]}
+    gt = gt.replace(attrs={"band_names": ["b1", "b2", "b3"]})
     op = rg.MatchedFilterSensitivity(unit_absorption=np.array([-0.5, -1.0, -0.1]))
     check_operator(op, gt)
 
