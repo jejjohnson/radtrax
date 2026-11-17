@@ -753,7 +753,7 @@ def architecture(theme: str) -> str:
     h1 = side(
         20,
         "radtrax[geo]",
-        "pipekit operators on GeoTensors",
+        "pipekit operators on GeoArrays",
         ["MatchedFilter", "ColumnEnhancement", "MBMP · SBMP · MBSP", "sentinel2_srf"],
     )
     b.append(

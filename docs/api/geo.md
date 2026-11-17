@@ -1,6 +1,6 @@
 # Geo
 
-Sensor data and GeoTensor operators, behind the `[geo]` extra
+Sensor data and GeoArray operators, behind the `[geo]` extra
 (`pip install "radtrax[geo]"`). Today: Sentinel-2 SRFs from the agency table
 georeader bundles, integrated by radtrax's
 [`SpectralResponseFunction`](instrument.md); a Sentinel-2 L1C image read by
@@ -11,7 +11,7 @@ numbers and the MTL rescaling and a per-pixel `ViewingGeometry` from the
 Collection 2 angle bands (no extra needed); an EMIT L1B image read by georeader's `EMITImage` as a
 `BandInstrument` with Gaussian bands of its FWHM and a per-pixel
 `ViewingGeometry` from its obs file; and the matched filter as
-pipekit operators on GeoTensors, around the one core in
+pipekit operators on GeoArrays, around the one core in
 [`radtrax.retrieval.matched_filter`](retrieval.md), with targets from the
 single-slab observation model or, through `UnitAbsorptionTarget`, from v0's
 `ForwardModel`, and `MBMP`, the
