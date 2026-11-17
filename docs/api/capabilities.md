@@ -128,7 +128,7 @@ current).
 | `landsat_radiance` | function | TOA radiance from Level-1 digital numbers, per band and pixel. |
 | `landsat_srf` | function | Build a Landsat 8/9 SRF from the bundled USGS band-average RSRs. |
 
-### GeoTensor operators for the matched filter (behind the ``[geo]`` extra). (`radtrax.geo.matched_filter`)
+### GeoArray operators for the matched filter (behind the ``[geo]`` extra). (`radtrax.geo.matched_filter`)
 
 | Name | Kind | What it does |
 |---|---|---|
@@ -154,7 +154,7 @@ current).
 | `UnitAbsorptionTarget` | class | Target ``(B,)`` from v0's layered :class:`~radtrax.ForwardModel`. |
 | `ValidateMFInputs` | class | Pass-through guard: fail early on a zero target or a singular covariance. |
 
-### The multi-pass operators on GeoTensors (behind the ``[geo]`` extra). (`radtrax.geo.mbmp`)
+### The multi-pass operators on GeoArrays (behind the ``[geo]`` extra). (`radtrax.geo.mbmp`)
 
 | Name | Kind | What it does |
 |---|---|---|

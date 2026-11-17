@@ -1,4 +1,4 @@
-"""Sensor data and GeoTensor operators, behind the ``[geo]`` extra.
+"""Sensor data and GeoArray operators, behind the ``[geo]`` extra.
 
 - :func:`sentinel2_srf` reads the Sentinel-2 SRF table georeader bundles
   into radtrax's SRF (radtrax#28); :func:`sentinel2_band_responses` gives
@@ -26,7 +26,7 @@
   an EMIT L1B image read by georeader's ``EMITImage`` as a ``BandInstrument``
   with Gaussian bands of its FWHM, and a per-pixel ``ViewingGeometry`` from
   its obs file (radtrax#114).
-- :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoTensors around
+- :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoArrays around
   the one matched-filter core (radtrax#29), ported from geotoolz;
   :class:`UnitAbsorptionTarget` gives them v0's ``ForwardModel`` target
   (radtrax#98), and :class:`MatchedFilterSensitivity` the score's per-pixel

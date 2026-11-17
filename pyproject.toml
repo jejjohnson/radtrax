@@ -58,15 +58,15 @@ dependencies = [
 [project.optional-dependencies]
 # HITRAN cross-section tables through HAPI (offline table building).
 hitran = ["hitran-api"]
-# Sensor tables and GeoTensor operators (radtrax.geo). georeader 2.4.1 imports
+# Sensor tables and GeoArray operators (radtrax.geo). georeader 2.4.1 imports
 # typing_extensions and tqdm without declaring them, and its read_srf needs
 # openpyxl for the bundled Sentinel-2 workbook. The operators are pipekit
-# Operators built with geoops's public carrier helpers.
+# Operators (pipekit_ops) built with geoops's public carrier helpers.
 geo = [
     "georeader-spaceml>=2.4.1",
-    "geotoolz-ops>=0.10.3",
+    "geotoolz-ops>=0.18.1",
     "openpyxl>=3.1",
-    "pipekit>=0.0.2",
+    "pipekit-ops>=0.2.1",
     "tqdm>=4",
     "typing-extensions>=4",
 ]
@@ -77,10 +77,13 @@ bayes = []
 Repository = "https://github.com/jejjohnson/radtrax"
 Documentation = "https://jejjohnson.github.io/radtrax"
 
-# gaussx, argminax and geotoolz-ops are not on PyPI yet: resolve them from git,
-# as plumax does. geotoolz-ops is geotoolz's operator package, renamed from
-# `geotoolz` in geotoolz#489; pinned to its merge commit on main until a
-# geotoolz-ops tag exists. argminax requires gaussx as
+# gaussx, argminax, geotoolz-ops and pipekit-ops are not on PyPI yet: resolve
+# them from git, as plumax does. geotoolz-ops and geotoolz-array (geoops on the
+# GeoArray carrier) are pinned to one geotoolz commit on main, df8c228, as in
+# plumax, until geotoolz tags them; functax is geoarray's own git dependency,
+# at the tag geotoolz pins. Every pipekit package is pinned to the one tag
+# pipekit-ops-v0.2.1: per-package tags make uv report conflicting URLs for
+# pipekit-ops, which they all reference. argminax requires gaussx as
 # `git+https://github.com/jejjohnson/gaussx@v0.6.12`, and uv reads a `tag =`
 # source as a different URL from that, so both pin their tag with `rev =`.
 # A plain `pip install` reads only the PyPI-style
@@ -89,7 +92,11 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 argminax = { git = "https://github.com/jejjohnson/argminax", rev = "v0.0.4" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", rev = "v0.6.12" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
-geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "278b8afbc675b9e082ac75488200a4729da38097", subdirectory = "packages/geotoolz-ops" }
+geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-ops" }
+geotoolz-array = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-array" }
+functax = { git = "https://github.com/jejjohnson/functax", tag = "v0.0.6" }
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-ops-v0.2.1" }
+pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-ops-v0.2.1" }
 
 [dependency-groups]
 dev = [
