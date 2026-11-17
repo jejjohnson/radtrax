@@ -1,4 +1,4 @@
-"""GeoTensor matched-filter operators on the one core (radtrax#29).
+"""GeoArray matched-filter operators on the one core (radtrax#29).
 
 Ported from geotoolz's operator-level ``tests/test_matched_filter.py``. The
 expected values follow radtrax's conventions where they differ: covariances
@@ -20,14 +20,15 @@ import pytest
 
 
 pytestmark = pytest.mark.integration
-GeoTensor = pytest.importorskip("georeader.geotensor").GeoTensor
+GeoArray = pytest.importorskip("geoarray").GeoArray
 rasterio = pytest.importorskip("rasterio")
 
 from _typecheck import shapes_unchecked
-from pipekit import Operator
+from geoops.carrier import affine_of
+from pipekit_ops import Operator
 
 import radtrax.geo as rg
-from geo._carriers import fill_pixel_mask, toy_geotensor
+from geo._carriers import fill_pixel_mask, toy_geoarray
 from radtrax.retrieval.matched_filter import (
     apply_image,
     apply_pixel,
@@ -48,12 +49,12 @@ def test_matched_filter_recovers_known_amplitude_and_preserves_metadata() -> Non
     mean = np.array([10.0, 20.0, 30.0])
     target = np.array([1.0, 2.0, -1.0])
     amplitudes = np.array([[0.0, 1.0], [2.0, -0.5]])
-    gt = toy_geotensor(mean[:, None, None] + target[:, None, None] * amplitudes)
+    gt = toy_geoarray(mean[:, None, None] + target[:, None, None] * amplitudes)
     out = rg.MatchedFilter(mean=mean, cov_op=np.eye(3), target=target)(gt)
     np.testing.assert_allclose(np.asarray(out), amplitudes, atol=1e-12)
-    assert out.transform == gt.transform
+    assert affine_of(out) == affine_of(gt)
     assert str(out.crs) == "EPSG:32629"
-    assert np.isnan(out.fill_value_default)
+    assert np.isnan(out.fill_value)
 
 
 def test_scores_are_float64_whatever_the_jax_setting() -> None:
@@ -98,7 +99,7 @@ def test_null_false_alarm_rate_matches_threshold() -> None:
     cube = rng.normal(size=(n, bands)).T.reshape(bands, n, 1)
     scores = np.asarray(
         rg.MatchedFilter(mean=np.zeros(bands), cov_op=np.eye(bands), target=target)(
-            toy_geotensor(cube)
+            toy_geoarray(cube)
         )
     ).ravel()
     for far in (0.05, 0.01):
@@ -117,7 +118,7 @@ def test_first_call_fit_populates_reusable_state() -> None:
     target = np.array([0.5, 1.0])
     first, second = rng.normal(size=(2, 4, 4)), rng.normal(loc=5.0, size=(2, 4, 4))
     op = rg.MatchedFilter(target=target, cov_method="empirical")
-    assert np.asarray(op(toy_geotensor(first))).shape == (4, 4)
+    assert np.asarray(op(toy_geoarray(first))).shape == (4, 4)
     fitted_mean, fitted_cov = op.mean_, op.cov_op_
     assert fitted_mean is not None and fitted_cov is not None
     reused = np.asarray(op(second))
@@ -143,7 +144,7 @@ def test_fit_on_call_false_preserves_explicit_mean() -> None:
     op = rg.MatchedFilter(
         mean=fixed_mean, target=np.array([1.0, 0.0]), cov_method="empirical"
     )
-    op(toy_geotensor(cube))
+    op(toy_geoarray(cube))
     np.testing.assert_allclose(op.mean_, fixed_mean)
     assert op.cov_op_ is not None
     assert op.cov_op is None
@@ -173,7 +174,7 @@ def test_fit_transform_and_config() -> None:
 
 
 def test_matched_filter_satisfies_fittable_transformer() -> None:
-    from pipekit.protocols import FittableTransformer
+    from pipekit_ops.protocols import FittableTransformer
 
     assert isinstance(rg.MatchedFilter(), FittableTransformer)
 
@@ -182,7 +183,7 @@ def test_first_call_fits_once_under_thread_map() -> None:
     import threading
     import time
 
-    from pipekit.parallel import ThreadMap
+    from pipekit_ops.parallel import ThreadMap
 
     rng = np.random.default_rng(4)
     scenes = [rng.normal(loc=i, size=(2, 5, 5)) for i in range(8)]
@@ -217,7 +218,7 @@ def test_every_cov_method_scores(cov_method: str) -> None:
 
 def test_estimators_return_expected_backgrounds() -> None:
     cube = np.array([[[1.0, 2.0], [3.0, 100.0]], [[10.0, 20.0], [30.0, 1000.0]]])
-    gt = toy_geotensor(cube)
+    gt = toy_geoarray(cube)
     np.testing.assert_allclose(rg.EstimateMean(method="median")(gt), [2.5, 25.0])
     cov = rg.EstimateCovEmpirical(mean=np.zeros(2), ridge=1e-6)(gt)
     assert isinstance(cov, lx.AbstractLinearOperator)
@@ -231,7 +232,7 @@ def test_estimators_return_expected_backgrounds() -> None:
 
 def test_estimator_ops_accept_plain_ndarray_input() -> None:
     cube = _ndarray_cube()
-    gt = toy_geotensor(cube)
+    gt = toy_geoarray(cube)
     np.testing.assert_allclose(
         rg.EstimateMean(method="median")(cube), rg.EstimateMean(method="median")(gt)
     )
@@ -250,7 +251,7 @@ def test_streaming_background_matches_batch_estimators() -> None:
     cube_a, cube_b = rng.normal(size=(2, 3, 4, 5))
     stacked = np.concatenate([cube_a.reshape(3, -1), cube_b.reshape(3, -1)], axis=1).T
     empirical = rg.StreamingBackground(cov_kind="empirical", ridge=0.0)(
-        [toy_geotensor(cube_a), cube_b]
+        [toy_geoarray(cube_a), cube_b]
     )
     np.testing.assert_allclose(empirical.mean, stacked.mean(axis=0), rtol=1e-12)
     np.testing.assert_allclose(
@@ -289,7 +290,7 @@ def _ndarray_cube() -> np.ndarray:
 
 def test_cluster_background_and_dispatch_are_reproducible() -> None:
     target = np.array([0.5, 1.0, -0.5])
-    gt = toy_geotensor(_ndarray_cube())
+    gt = toy_geoarray(_ndarray_cube())
     bg1 = rg.GMMClusterBackground(n_clusters=2, seed=4)(gt)
     bg2 = rg.GMMClusterBackground(n_clusters=2, seed=4)(gt)
     np.testing.assert_array_equal(np.asarray(bg1.labels), np.asarray(bg2.labels))
@@ -311,7 +312,7 @@ def test_cluster_background_and_dispatch_are_reproducible() -> None:
         ]
     ).reshape(4, 4)
     np.testing.assert_allclose(np.asarray(out), expected, rtol=1e-12)
-    assert out.transform == gt.transform
+    assert affine_of(out) == affine_of(gt)
     with pytest.raises(ValueError, match="labels shape"):
         rg.ApplyClusterMF(target=target)(_ndarray_cube()[:, :2], bg1)
 
@@ -340,11 +341,11 @@ def test_apply_adaptive_mf_matches_brute_force() -> None:
     cube = rng.normal(loc=[[[1.0]], [[2.0]], [[3.0]]], size=(3, 9, 7))
     target = np.array([0.5, 1.0, -0.5])
     cube[:, 4, 3] += target
-    gt = toy_geotensor(cube)
+    gt = toy_geoarray(cube)
     bg = rg.AdaptiveWindowBackground(window=5)(gt)
     for ridge in (0.0, 0.3):
         out = rg.ApplyAdaptiveMF(target=target, ridge=ridge)(gt, bg)
-        assert isinstance(out, GeoTensor) and out.shape == (9, 7)
+        assert isinstance(out, GeoArray) and out.shape == (9, 7)
         np.testing.assert_allclose(
             np.asarray(out),
             _brute_force_adaptive_mf(cube, target, window=5, ridge=ridge),
@@ -382,7 +383,7 @@ def test_linear_target_from_a_callable_matches_finite_difference() -> None:
         return (x * a[:, None, None]).sum(axis=(1, 2))
 
     target = rg.LinearTargetFromObs(obs_model=obs_model)(
-        toy_geotensor(np.zeros((3, 2, 3)))
+        toy_geoarray(np.zeros((3, 2, 3)))
     )
     # A linear model: the finite difference is exact up to round-off.
     np.testing.assert_allclose(target, a * 2 * 3, rtol=1e-9)
@@ -464,7 +465,7 @@ def test_nonlinear_target_from_obs_amplitude_difference() -> None:
         return (x**2).mean(axis=(1, 2))
 
     target = rg.NonlinearTargetFromObs(obs_model=obs_model, amplitude=0.5)(
-        toy_geotensor(np.full((2, 3, 3), 1.0))
+        toy_geoarray(np.full((2, 3, 3), 1.0))
     )
     # y(1) = 1, y(1.5) = 2.25: the difference is 1.25 per band, exactly.
     np.testing.assert_allclose(target, np.full(2, 1.25), rtol=1e-15)
@@ -474,13 +475,16 @@ def test_nonlinear_target_from_obs_amplitude_difference() -> None:
     ("pattern", "pixel", "total"),
     [("impulse", None, 3.0), ("impulse", (1, 2), 3.0), ("uniform", None, 48.0)],
 )
-def test_target_pattern_on_geotensor_returns_plain_array(
+def test_target_pattern_on_a_carriers_values_returns_plain_array(
     pattern: str, pixel: tuple[int, int] | None, total: float
 ) -> None:
     from radtrax.geo.matched_filter import _target_pattern
 
     out = _target_pattern(
-        toy_geotensor(np.ones((3, 4, 4))), pattern=pattern, pixel=pixel, axis=-3
+        np.asarray(toy_geoarray(np.ones((3, 4, 4)))),
+        pattern=pattern,
+        pixel=pixel,
+        axis=-3,
     )
     assert type(out) is np.ndarray
     assert out.shape == (3, 4, 4) and out.sum() == total
@@ -500,14 +504,14 @@ def test_target_pattern_on_geotensor_returns_plain_array(
 def test_column_enhancement_end_to_end() -> None:
     rng = np.random.default_rng(0)
     bg_mean = np.array([10.0, 11.0, 12.0, 13.0])
-    gt = toy_geotensor(bg_mean[:, None, None] + rng.normal(size=(4, 5, 6)) * 0.01)
+    gt = toy_geoarray(bg_mean[:, None, None] + rng.normal(size=(4, 5, 6)) * 0.01)
     out = rg.ColumnEnhancement()(gt)
     assert np.asarray(out).shape == (5, 6)
     # A unit target on noise of std 0.01 in 4 bands scores with std
     # σ = 1/√(tᵀΣ⁻¹t) = 0.005; centring on the median adds an offset of the
     # same order, so six standard errors σ/√30 bound the mean score.
     assert abs(float(np.asarray(out).mean())) < 6 * 0.005 / np.sqrt(30)
-    assert out.transform == gt.transform
+    assert affine_of(out) == affine_of(gt)
     lowrank = rg.ColumnEnhancement(cov_method="lowrank", rank=2)(gt)
     assert np.isfinite(lowrank).all()
 
@@ -545,17 +549,17 @@ def _run_column_enhancement(cube):
 )
 def test_score_map_ops_support_plain_ndarray_carrier(run_op) -> None:
     cube = _ndarray_cube()
-    out_arr, out_gt = run_op(cube), run_op(toy_geotensor(cube))
+    out_arr, out_gt = run_op(cube), run_op(toy_geoarray(cube))
     assert type(out_arr) is np.ndarray
-    assert isinstance(out_gt, GeoTensor)
+    assert isinstance(out_gt, GeoArray)
     np.testing.assert_allclose(out_arr, np.asarray(out_gt))
 
 
-def _fill_cube(fill: float) -> tuple[GeoTensor, np.ndarray, np.ndarray]:
+def _fill_cube(fill: float) -> tuple[GeoArray, np.ndarray, np.ndarray]:
     """``(3, 4, 4)`` cube with two fill pixels, its valid mask, the valid-only cube."""
     rng = np.random.default_rng(3)
     values = rng.normal(loc=[[[1.0]], [[2.0]], [[3.0]]], size=(3, 4, 4))
-    gt = toy_geotensor(values, fill_value_default=fill, with_fill_pixels=True)
+    gt = toy_geoarray(values, fill_value=fill, with_fill_pixels=True)
     valid = ~fill_pixel_mask(values.shape)
     return gt, valid, values[:, valid][:, :, None]
 
@@ -579,8 +583,8 @@ def test_fill_pixels_are_excluded(case: str, fill: float) -> None:
     gt, valid, clean = _fill_cube(fill)
     target = np.array([1.0, 0.5, -1.0])
 
-    def assert_fill(out: GeoTensor) -> None:
-        assert np.isnan(out.fill_value_default)
+    def assert_fill(out: GeoArray) -> None:
+        assert np.isnan(out.fill_value)
         values = np.asarray(out)
         assert np.isnan(values[~valid]).all()
         assert np.isfinite(values[valid]).all()
@@ -640,14 +644,14 @@ def test_fill_pixels_are_excluded(case: str, fill: float) -> None:
 def test_4d_time_stack() -> None:
     """One background over every frame; score maps come back ``(T, 1, H, W)``."""
     rng = np.random.default_rng(5)
-    stack = toy_geotensor(rng.normal(size=(2, 3, 6, 6)))
+    stack = toy_geoarray(rng.normal(size=(2, 3, 6, 6)))
     samples = np.moveaxis(np.asarray(stack), 1, -1).reshape(-1, 3)
     np.testing.assert_allclose(
         rg.EstimateMean(method="mean")(stack), samples.mean(axis=0)
     )
     op = rg.MatchedFilter(target=np.ones(3))
     scores = op(stack)
-    assert isinstance(scores, GeoTensor) and scores.shape == (2, 1, 6, 6)
+    assert isinstance(scores, GeoArray) and scores.shape == (2, 1, 6, 6)
     # One background for the stack; each frame scores as on its own.
     for t in range(2):
         np.testing.assert_allclose(
@@ -661,7 +665,7 @@ def test_4d_time_stack() -> None:
     assert np.isnan(holed_scores[1, 0, 2, 3])
     assert np.isfinite(holed_scores).sum() == 71
     with pytest.raises(ValueError, match="MatchedFilter: spectral axis -3"):
-        rg.MatchedFilter(target=np.ones(3))(toy_geotensor(np.ones((6, 6))))
+        rg.MatchedFilter(target=np.ones(3))(toy_geoarray(np.ones((6, 6))))
     with pytest.raises(ValueError, match="AdaptiveWindowBackground"):
         rg.AdaptiveWindowBackground(window=3)(stack)
 
@@ -730,7 +734,8 @@ def test_column_enhancement_obs_model_refuses_reload() -> None:
 
     op = rg.ColumnEnhancement(obs_model=obs_model)
     assert op.get_config()["obs_model"] == {"callable": "obs_model"}
-    with pytest.raises(RuntimeError, match="non-primitive"):
+    # pipekit-ops hands the summary back to the constructor, which refuses it
+    with pytest.raises(TypeError, match="config summary"):
         Operator.from_state(json.loads(json.dumps(op.state)))
     with pytest.raises(TypeError, match="config summary"):
         rg.ColumnEnhancement(obs_model={"callable": "obs_model"})
@@ -748,7 +753,7 @@ def test_matched_filter_keeps_the_carrier_contract() -> None:
     from geoops.testing import check_operator
 
     gt, _, _ = _fill_cube(-9999.0)
-    gt.attrs = {"band_names": ["b1", "b2", "b3"]}
+    gt = gt.replace(attrs={"band_names": ["b1", "b2", "b3"]})
     check_operator(rg.MatchedFilter(target=np.array([1.0, 0.5, -1.0])), gt)
 
 

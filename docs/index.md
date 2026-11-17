@@ -17,7 +17,7 @@ the first release is pending:
 | Stage | What lands | State |
 |---|---|---|
 | Port | plumax's band-integrated Beer–Lambert models, HITRAN look-up tables, matched filter and 3D-Var retrieval, ported with their tests | on `main` |
-| One of each | one matched filter, one SRF integration, one air-mass factor; GeoTensor operators (from geotoolz) behind `radtrax[geo]` | on `main` |
+| One of each | one matched filter, one SRF integration, one air-mass factor; GeoArray operators (from geotoolz) behind `radtrax[geo]` | on `main` |
 | v0 | the layered forward model (atmosphere → opacity → Beer–Lambert → instrument) and matched-filter targets from autodiff | on `main`; gate V2 against HITRAN pending ([#89](https://github.com/jejjohnson/radtrax/issues/89)) |
 | v1 | a spherical air mass, kernel BRDFs and spectral albedo, a calibrated instrument and noise model, and optimal estimation on vardax, gated on EMIT, Sentinel-2 and Landsat 8/9 | planned: [Wave 4](https://github.com/jejjohnson/radtrax/issues/100) |
 
@@ -32,7 +32,7 @@ changes.
 
 ```bash
 pip install radtrax            # JAX, Equinox, lineax, optimistix, gaussx
-pip install "radtrax[geo]"     # + geotoolz and georeader (GeoTensor operators)
+pip install "radtrax[geo]"     # + geotoolz and georeader (GeoArray operators)
 pip install "radtrax[hitran]"  # + HAPI, to build cross-section tables
 ```
 

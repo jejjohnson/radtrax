@@ -1,8 +1,8 @@
-"""The GeoTensor matched filter with v0's ForwardModel target (radtrax#98).
+"""The GeoArray matched filter with v0's ForwardModel target (radtrax#98).
 
 The model is radtrax · 3's v0 slice on the synthetic tables (``tests/_v0.py``):
 CH₄ and a stand-in H₂O, Beer–Lambert, EMIT-like bands. Scenes are radiance
-cubes ``(B, H, W)`` from that model on a GeoTensor grid, the albedo varying
+cubes ``(B, H, W)`` from that model on a GeoArray grid, the albedo varying
 from pixel to pixel and a CH₄ plume added to a block of pixels.
 """
 
@@ -17,13 +17,14 @@ import xarray as xr
 
 
 pytestmark = pytest.mark.integration
-pytest.importorskip("georeader.geotensor")
-pytest.importorskip("pipekit")
+pytest.importorskip("geoarray")
+pytest.importorskip("pipekit_ops")
 
 from _v0 import GEOMETRY, SURFACE, v0_atmosphere, v0_model
+from geoops.carrier import affine_of
 
 import radtrax.geo as rg
-from geo._carriers import toy_geotensor
+from geo._carriers import toy_geoarray
 from radtrax import ForwardModel, ShapeError, unit_absorption_target
 from radtrax.atmosphere import AtmosphericState
 from radtrax.retrieval.matched_filter import matched_filter_snr
@@ -78,7 +79,7 @@ def _scene(
 def test_target_is_the_mean_times_the_unit_absorption_spectrum(
     model: ForwardModel, atm: AtmosphericState
 ) -> None:
-    gt = toy_geotensor(_scene(model, atm, np.zeros((4, 5)), seed=1, log=False))
+    gt = toy_geoarray(_scene(model, atm, np.zeros((4, 5)), seed=1, log=False))
     t = np.asarray(unit_absorption_target(model, atm, SURFACE, GEOMETRY))
     op = rg.UnitAbsorptionTarget(
         model=model, atmosphere=atm, surface=SURFACE, geometry=GEOMETRY
@@ -108,9 +109,9 @@ def test_a_geotensor_pipeline_retrieves_the_plume_column(
     delta = np.zeros((H, W))
     delta[4:7, 4:7] = PLUME
     plume = delta > 0
-    background = toy_geotensor(_scene(model, atm, np.zeros((H, W)), 2, log=log))
-    scene = toy_geotensor(_scene(model, atm, delta, 3, log=log))
-    noiseless = toy_geotensor(_scene(model, atm, delta, 3, log=log, noise=0.0))
+    background = toy_geoarray(_scene(model, atm, np.zeros((H, W)), 2, log=log))
+    scene = toy_geoarray(_scene(model, atm, delta, 3, log=log))
+    noiseless = toy_geoarray(_scene(model, atm, delta, 3, log=log, noise=0.0))
 
     target = rg.UnitAbsorptionTarget(
         model=model, atmosphere=atm, surface=SURFACE, geometry=GEOMETRY, log_cube=log
@@ -121,9 +122,9 @@ def test_a_geotensor_pipeline_retrieves_the_plume_column(
     cov = rg.EstimateCovEmpirical(mean=mean)(background)
     mf = rg.MatchedFilter(mean=mean, cov_op=cov, target=target)
     scores = mf(scene)
-    assert isinstance(scores, type(scene)) and scores.transform == scene.transform
-    values = np.asarray(scores.values).reshape(H, W)
-    expected = np.asarray(mf(noiseless).values).reshape(H, W)[plume].mean()
+    assert isinstance(scores, type(scene)) and affine_of(scores) == affine_of(scene)
+    values = np.asarray(scores).reshape(H, W)
+    expected = np.asarray(mf(noiseless)).reshape(H, W)[plume].mean()
     se = 1.0 / float(matched_filter_snr(1.0, cov, jnp.asarray(target)))
     assert se < PLUME / 20  # the plume stands well above the noise
 
@@ -145,7 +146,7 @@ def test_band_count_must_match_the_cube(
     )
     n_bands = model.instrument.response.shape[0]
     with pytest.raises(ShapeError, match="bands"):
-        op(toy_geotensor(np.ones((n_bands + 1, 2, 2))))
+        op(toy_geoarray(np.ones((n_bands + 1, 2, 2))))
 
 
 def test_config_and_yaml(model: ForwardModel, atm: AtmosphericState) -> None:
