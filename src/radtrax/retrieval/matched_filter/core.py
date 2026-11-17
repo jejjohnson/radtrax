@@ -30,7 +30,12 @@ import jax.numpy as jnp
 import lineax as lx
 from jaxtyping import Array, ArrayLike, Float
 
-from radtrax.exceptions import DegenerateInputError, ParameterError
+from radtrax._src.retrieval.filter_direction import (
+    _check_target_energy,
+    _precompute_filter,
+)
+from radtrax._src.retrieval.score_noise import score_std
+from radtrax.exceptions import ParameterError
 
 
 __all__ = [
@@ -46,52 +51,6 @@ if TYPE_CHECKING:
     LinearOperator = lx.AbstractLinearOperator
 else:
     LinearOperator = object
-
-
-def _precompute_filter(
-    cov_op: LinearOperator, target: Float[ArrayLike, " B"]
-) -> tuple[Float[Array, " B"], Float[Array, ""]]:
-    """Return ``(w, tᵀw)`` with ``w = Σ⁻¹ t``.
-
-    Caller precomputes these once; every pixel then costs a single dot
-    product against ``w``. Validates the target energy ``tᵀ Σ⁻¹ t`` so
-    callers get a clear :class:`ValueError` instead of silent NaNs/infs
-    when the target is zero or the covariance is singular/indefinite
-    along the target direction. The check is a no-op under
-    :func:`jax.jit` tracing; users who want the same fail-fast behaviour
-    inside a jit-compiled pipeline should call
-    :func:`validate_mf_inputs` explicitly before jitting.
-    """
-    w = gx.solve(cov_op, target)
-    target_norm_sq = jnp.dot(target, w)
-    _check_target_energy(target, target_norm_sq)
-    return w, target_norm_sq
-
-
-def _check_target_energy(
-    target: Float[ArrayLike, " B"], target_norm_sq: Float[Array, ""]
-) -> None:
-    """Fail-fast validation — eager only; silently returns under jit tracing."""
-    try:
-        t_max = float(jnp.max(jnp.abs(target)))
-        tnorm_sq_val = float(target_norm_sq)
-    except (
-        jax.errors.TracerArrayConversionError,
-        jax.errors.ConcretizationTypeError,
-    ):
-        return  # traced call: no concrete values to inspect.
-    if t_max == 0.0:
-        raise DegenerateInputError(
-            "matched_filter: target signature is all zero — the score "
-            "(x−μ)ᵀΣ⁻¹t / (tᵀΣ⁻¹t) is undefined."
-        )
-    if not tnorm_sq_val > 0.0:
-        raise DegenerateInputError(
-            f"matched_filter: target energy tᵀΣ⁻¹t = {tnorm_sq_val!r} is not "
-            "strictly positive. The covariance operator is singular or "
-            "indefinite along the target direction. Add a Tikhonov ridge or "
-            "use a PD estimator such as estimate_cov_shrunk (Ledoit–Wolf)."
-        )
 
 
 def validate_mf_inputs(cov_op: LinearOperator, target: Float[ArrayLike, " B"]) -> None:
@@ -202,12 +161,10 @@ def matched_filter_snr(
     Returns
     -------
     Float[Array, ""]
-        Scalar SNR (dimensionless).
+        Scalar SNR (dimensionless), ``α / σ_α`` with ``σ_α`` from
+        :func:`~radtrax.retrieval.matched_filter.score_std`.
     """
-    w = gx.solve(cov_op, target)
-    target_norm_sq = jnp.dot(target, w)
-    _check_target_energy(target, target_norm_sq)
-    return jnp.asarray(amplitude) * jnp.sqrt(target_norm_sq)
+    return jnp.asarray(amplitude) / score_std(cov_op, target)
 
 
 def detection_threshold(
@@ -235,7 +192,8 @@ def detection_threshold(
     -------
     Float[Array, ""]
         Threshold in score units (same units as ``amplitude`` in
-        :func:`matched_filter_snr`).
+        :func:`matched_filter_snr`), ``Φ⁻¹(1 − FAR) σ_α`` with ``σ_α`` from
+        :func:`~radtrax.retrieval.matched_filter.score_std`.
     """
     if not 0.0 < false_alarm_rate < 1.0:
         raise ParameterError(
@@ -244,7 +202,4 @@ def detection_threshold(
         )
     # ndtri is the inverse Gaussian CDF (aka Φ⁻¹ / probit).
     z = jax.scipy.special.ndtri(1.0 - false_alarm_rate)
-    w = gx.solve(cov_op, target)
-    target_norm_sq = jnp.dot(target, w)
-    _check_target_energy(target, target_norm_sq)
-    return z / jnp.sqrt(target_norm_sq)
+    return z * score_std(cov_op, target)

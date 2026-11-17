@@ -24,6 +24,9 @@ SUBMODULES = [
 # The layout of radtrax · 3. Each subpackage owns one stage of the forward
 # model; adding or removing one is a design change, so it fails here first.
 SUBPACKAGES = [
+    # Private implementations (#208), re-exported from their public homes.
+    "_src",
+    "_src.retrieval",
     "atmosphere",
     "geo",
     "instrument",

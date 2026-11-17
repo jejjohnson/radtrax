@@ -7,7 +7,9 @@ geotoolz's carrier contract: a ``GeoTensor`` in gives a ``GeoTensor`` out on
 the same grid (a plain array gives a plain array), score maps are a new
 quantity holding ``NaN`` at nodata pixels with ``fill_value_default=NaN``,
 and estimators return non-carrier results (vectors, covariance operators,
-backgrounds).
+backgrounds). With ``return_std=True`` the scoring operators return two bands,
+``score`` and ``std`` (the score's standard deviation under the background),
+on one grid with one validity mask.
 
 Layout: the band axis is ``-3`` (georeader's ``(C, H, W)`` /
 ``(T, C, H, W)``), so these operators move it to the core's band-last
@@ -50,6 +52,11 @@ import lineax as lx
 import numpy as np
 from jaxtyping import Bool, Float
 
+from radtrax._src.retrieval.score_noise import (
+    adaptive_score_std,
+    cluster_score_std,
+    score_std,
+)
 from radtrax.exceptions import (
     ArgumentTypeError,
     DegenerateInputError,
@@ -131,7 +138,8 @@ if TYPE_CHECKING:
 
     #: A spectral cube: a GeoTensor or a plain array.
     Carrier = GeoTensor | Cube
-    #: A score map on the input's carrier: ``(H, W)``, or ``(T, 1, H, W)``.
+    #: A score map on the input's carrier: ``(H, W)``, or ``(T, 1, H, W)``;
+    #: with its standard deviation, ``(2, H, W)`` or ``(T, 2, H, W)``.
     ScoreMap = GeoTensor | ScoreArray
 else:
     Carrier = Any
@@ -176,6 +184,9 @@ TARGET_FINITE_DIFFERENCE_EPSILON = 1e-4
 #: ``"lowrank"`` method of ``MatchedFilter`` / ``ColumnEnhancement``).
 LOWRANK_RANK = 10
 LOWRANK_TIKHONOV = 1e-3
+
+#: Band names of a score map with ``return_std=True``.
+SCORE_STD_BANDS = ("score", "std")
 
 
 class AdaptiveBackground(NamedTuple):
@@ -230,7 +241,9 @@ class MatchedFilter(Operator):
     with that background; calling the operator fits the missing statistics
     once, on the first call, or — with ``fit_on_call=True`` — estimates them
     from every cube without storing anything. Fitted arrays never reach
-    ``get_config()``.
+    ``get_config()``. With ``return_std=True`` the map has a second band,
+    ``std``, the score's standard deviation σ_α = (tᵀ Σ⁻¹ t)^(−1/2) from
+    :func:`radtrax.retrieval.matched_filter.score_std`.
 
     Args:
         mean: Background mean spectrum ``(B,)``; fitted when ``None``.
@@ -244,6 +257,8 @@ class MatchedFilter(Operator):
         cov_method: ``"empirical"`` (with a ``1e-8`` ridge),
             ``"ledoit_wolf"`` (default), ``"oas"`` or ``"lowrank"``.
         axis: Position of the band axis. Default ``-3``.
+        return_std: Return the bands ``score`` and ``std`` instead of the
+            score alone. Default ``False``.
 
     Attributes:
         mean_: Fitted mean, or ``None``.
@@ -260,6 +275,7 @@ class MatchedFilter(Operator):
         mean_method: MeanMethod = "median",
         cov_method: CovMethod = "ledoit_wolf",
         axis: int = -3,
+        return_std: bool = False,
     ) -> None:
         self.mean = None if mean is None else np.asarray(mean, dtype=float)
         self.cov_op = _as_cov(cov_op)
@@ -268,6 +284,7 @@ class MatchedFilter(Operator):
         self.mean_method = mean_method
         self.cov_method = cov_method
         self.axis = axis
+        self.return_std = return_std
         self.mean_: Spectrum | None = None
         self.cov_op_: CovLike | None = None
 
@@ -330,13 +347,14 @@ class MatchedFilter(Operator):
             if prepared is None
             else prepared
         )
-        scores = apply_image(
-            jnp.asarray(samples),
-            jnp.asarray(mean),
-            _operator(cov_op),
-            jnp.asarray(self.target),
-        )
-        return _score_map(gt, np.asarray(scores).reshape(shape), valid)
+        target = jnp.asarray(self.target)
+        operator = _operator(cov_op)
+        scores = apply_image(jnp.asarray(samples), jnp.asarray(mean), operator, target)
+        scores = np.asarray(scores).reshape(shape)
+        if self.return_std:
+            std = np.asarray(score_std(operator, target))
+            return _score_std_map(gt, scores, std, valid)
+        return _score_map(gt, scores, valid)
 
     @_float64
     def _apply(self, gt: Carrier) -> ScoreMap:
@@ -359,6 +377,7 @@ class MatchedFilter(Operator):
             "mean_method": self.mean_method,
             "cov_method": self.cov_method,
             "axis": self.axis,
+            "return_std": self.return_std,
         }
 
 
@@ -709,16 +728,24 @@ class ApplyClusterMF(Operator):
 
     The background arrives at call time, so the config (``target``,
     ``axis``) stays YAML-safe: ``ApplyClusterMF(target=t)(gt, background)``
-    with the background from :class:`GMMClusterBackground`.
+    with the background from :class:`GMMClusterBackground`. With
+    ``return_std=True`` the map has a second band, ``std``, each pixel's
+    cluster noise from
+    :func:`radtrax.retrieval.matched_filter.cluster_score_std`.
 
     Args:
         target: Target signature ``(B,)``.
         axis: Position of the band axis. Default ``-3``.
+        return_std: Return the bands ``score`` and ``std`` instead of the
+            score alone. Default ``False``.
     """
 
-    def __init__(self, *, target: SpectrumLike, axis: int = -3) -> None:
+    def __init__(
+        self, *, target: SpectrumLike, axis: int = -3, return_std: bool = False
+    ) -> None:
         self.target = np.asarray(target, dtype=float)
         self.axis = axis
+        self.return_std = return_std
 
     @_float64
     def _apply(self, gt: Carrier, cluster: ClusterBackground) -> ScoreMap:
@@ -730,11 +757,20 @@ class ApplyClusterMF(Operator):
                 f"cube's spatial shape {shape}"
             )
         flat = eqx.tree_at(lambda b: b.labels, cluster, labels.reshape(-1, 1))
-        scores = apply_cluster_mf(jnp.asarray(samples), flat, jnp.asarray(self.target))
-        return _score_map(gt, np.asarray(scores).reshape(shape), valid)
+        target = jnp.asarray(self.target)
+        scores = apply_cluster_mf(jnp.asarray(samples), flat, target)
+        scores = np.asarray(scores).reshape(shape)
+        if self.return_std:
+            std = np.asarray(cluster_score_std(cluster, target))
+            return _score_std_map(gt, scores, std, valid)
+        return _score_map(gt, scores, valid)
 
     def get_config(self) -> dict[str, Any]:
-        return {"target": _array_config(self.target), "axis": self.axis}
+        return {
+            "target": _array_config(self.target),
+            "axis": self.axis,
+            "return_std": self.return_std,
+        }
 
 
 class AdaptiveWindowBackground(Operator):
@@ -776,20 +812,30 @@ class ApplyAdaptiveMF(Operator):
 
     ``α = tᵀ Λ⁻¹ (x − μ) / (tᵀ Λ⁻¹ t)`` with ``Λ = diag(σ² + ridge)`` from
     :class:`AdaptiveWindowBackground`, passed at call time:
-    ``ApplyAdaptiveMF(target=t)(gt, background)``.
+    ``ApplyAdaptiveMF(target=t)(gt, background)``. With ``return_std=True``
+    the map has a second band, ``std``, each pixel's local noise from
+    :func:`radtrax.retrieval.matched_filter.adaptive_score_std`.
 
     Args:
         target: Target signature ``(B,)``.
         ridge: Non-negative variance floor. Default ``0``.
         axis: Position of the band axis. Default ``-3``.
+        return_std: Return the bands ``score`` and ``std`` instead of the
+            score alone. Default ``False``.
     """
 
     def __init__(
-        self, *, target: SpectrumLike, ridge: float = 0.0, axis: int = -3
+        self,
+        *,
+        target: SpectrumLike,
+        ridge: float = 0.0,
+        axis: int = -3,
+        return_std: bool = False,
     ) -> None:
         self.target = np.asarray(target, dtype=float)
         self.ridge = ridge
         self.axis = axis
+        self.return_std = return_std
 
     @_float64
     def _apply(self, gt: Carrier, background: AdaptiveBackground) -> ScoreMap:
@@ -799,16 +845,21 @@ class ApplyAdaptiveMF(Operator):
         cube = np.moveaxis(masked, self.axis, -1)
         mean = np.moveaxis(np.asarray(background.mean, dtype=float), self.axis, -1)
         var = np.moveaxis(np.asarray(background.variance, dtype=float), self.axis, -1)
-        scores = apply_adaptive_mf(
-            cube, mean, var, jnp.asarray(self.target), ridge=self.ridge
+        target = jnp.asarray(self.target)
+        scores = np.asarray(
+            apply_adaptive_mf(cube, mean, var, target, ridge=self.ridge)
         )
-        return _score_map(gt, np.asarray(scores), valid)
+        if self.return_std:
+            std = np.asarray(adaptive_score_std(var, target, ridge=self.ridge))
+            return _score_std_map(gt, scores, std, valid)
+        return _score_map(gt, scores, valid)
 
     def get_config(self) -> dict[str, Any]:
         return {
             "target": _array_config(self.target),
             "ridge": self.ridge,
             "axis": self.axis,
+            "return_std": self.return_std,
         }
 
 
@@ -1339,6 +1390,24 @@ def _score_map(gt: Carrier, scores: ScoreArray, valid: ValidMap | None) -> Score
     """A score map on ``gt``'s carrier, ``NaN`` at nodata pixels."""
     out = scores if valid is None else restore_fill(scores, valid, np.nan)
     return wrap_like(gt, keep_band_axis(out, gt), fill_value_default=np.nan)
+
+
+def _score_std_map(
+    gt: Carrier,
+    scores: ScoreArray,
+    std: Float[np.ndarray, "*#shape"],
+    valid: ValidMap | None,
+) -> ScoreMap:
+    """Bands ``score`` and ``std`` on ``gt``'s carrier, both NaN where the score is.
+
+    ``std`` broadcasts against ``scores`` (a scalar for one global
+    background); the bands stack at ``-3``, so ``(H, W)`` maps give
+    ``(2, H, W)`` and ``(T, H, W)`` maps ``(T, 2, H, W)``.
+    """
+    std = np.where(np.isnan(scores), np.nan, std)
+    out = np.stack([scores, std], axis=max(-3, -scores.ndim - 1))
+    out = out if valid is None else restore_fill(out, valid, np.nan)
+    return wrap_like(gt, out, fill_value_default=np.nan, band_names=SCORE_STD_BANDS)
 
 
 def _spatial_shape(gt: Carrier, axis: int) -> tuple[int, ...]:

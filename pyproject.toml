@@ -51,6 +51,8 @@ dependencies = [
     "scikit-learn>=1.3",
     # the absorption-shape test's one-to-one pairing (linear_sum_assignment, cdist).
     "scipy>=1.11",
+    # named-axis contractions and broadcasts in radtrax._src (#208).
+    "einx>=0.4",
 ]
 
 [project.optional-dependencies]
@@ -99,6 +101,8 @@ dev = [
     "radtrax[geo]",
     # jaxtyping's pytest hook checks every radtrax shape at run time (#81).
     "beartype>=0.23.1",
+    # property tests of the matched-filter score noise and sensitivity.
+    "hypothesis>=6",
 ]
 lint = [
     "import-linter>=2.1",
