@@ -15,6 +15,15 @@ The package resolves its public names lazily (PEP 562), so they are documented h
       show_root_heading: false
       heading_level: 3
 
+## Score noise
+
+The standard deviation of the score under the global, cluster and adaptive-window backgrounds, exported from `radtrax.retrieval.matched_filter`.
+
+::: radtrax._src.retrieval.score_noise
+    options:
+      show_root_heading: false
+      heading_level: 3
+
 ## `background`
 
 ::: radtrax.retrieval.matched_filter.background

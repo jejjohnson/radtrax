@@ -24,16 +24,19 @@ GeoArray = pytest.importorskip("geoarray").GeoArray
 rasterio = pytest.importorskip("rasterio")
 
 from _typecheck import shapes_unchecked
-from geoops.carrier import affine_of
+from geoops.carrier import affine_of, band_names
 from pipekit_ops import Operator
 
 import radtrax.geo as rg
 from geo._carriers import fill_pixel_mask, toy_geoarray
 from radtrax.retrieval.matched_filter import (
+    adaptive_score_std,
     apply_image,
     apply_pixel,
+    cluster_score_std,
     linear_target_from_obs,
     nonlinear_target_from_obs,
+    score_std,
 )
 from radtrax.retrieval.var3d import RadianceObservationModel
 
@@ -364,6 +367,81 @@ def test_apply_adaptive_mf_matches_brute_force() -> None:
     ).all()
 
 
+def _assert_score_and_std(
+    with_std: GeoArray | np.ndarray,
+    score: GeoArray | np.ndarray,
+    std: np.ndarray,
+) -> None:
+    """Band ``score`` is the plain map, band ``std`` the noise, one fill pattern."""
+    values = np.asarray(with_std)
+    np.testing.assert_array_equal(values[..., 0, :, :], np.asarray(score))
+    np.testing.assert_array_equal(
+        np.isnan(values[..., 1, :, :]), np.isnan(np.asarray(score))
+    )
+    finite = np.isfinite(values[..., 1, :, :])
+    expected = np.broadcast_to(std, finite.shape)
+    np.testing.assert_allclose(
+        values[..., 1, :, :][finite], expected[finite], rtol=1e-12
+    )
+
+
+@pytest.mark.parametrize("operator", ["matched_filter", "cluster", "adaptive"])
+def test_return_std_adds_a_std_band(operator: str) -> None:
+    """``return_std=True``: bands ``score`` and ``std`` on the input's grid (#312)."""
+    gt = toy_geoarray(_ndarray_cube(), with_fill_pixels=True)
+    valid = ~fill_pixel_mask(gt.shape)
+    target = np.array([0.5, 1.0, -0.5])
+    if operator == "matched_filter":
+        mean, cov = np.array([5.0, 6.0, 7.0]), np.diag([1.0, 2.0, 4.0])
+        plain = rg.MatchedFilter(mean=mean, cov_op=cov, target=target)(gt)
+        op = rg.MatchedFilter(mean=mean, cov_op=cov, target=target, return_std=True)
+        out = op(gt)
+        std = np.asarray(score_std(lx.MatrixLinearOperator(jnp.asarray(cov)), target))
+    elif operator == "cluster":
+        cluster = rg.GMMClusterBackground(n_clusters=2, seed=4)(gt)
+        plain = rg.ApplyClusterMF(target=target)(gt, cluster)
+        out = rg.ApplyClusterMF(target=target, return_std=True)(gt, cluster)
+        std = np.asarray(cluster_score_std(cluster, jnp.asarray(target)))
+        assert len(np.unique(std[valid])) == 2  # one noise per cluster
+    else:
+        background = rg.AdaptiveWindowBackground(window=3)(gt)
+        plain = rg.ApplyAdaptiveMF(target=target, ridge=1e-4)(gt, background)
+        out = rg.ApplyAdaptiveMF(target=target, ridge=1e-4, return_std=True)(
+            gt, background
+        )
+        variance = np.moveaxis(background.variance, 0, -1)
+        std = np.asarray(adaptive_score_std(variance, target, ridge=1e-4))
+    assert isinstance(out, GeoArray) and out.shape == (2, 4, 4)
+    assert band_names(out) == ["score", "std"]
+    assert affine_of(out) == affine_of(gt) and np.isnan(out.fill_value)
+    assert np.isnan(np.asarray(out)[:, ~valid]).all()
+    _assert_score_and_std(out, plain, std)
+
+
+def test_return_std_on_a_time_stack_and_a_plain_array() -> None:
+    rng = np.random.default_rng(5)
+    stack = rng.normal(size=(2, 3, 6, 6))
+    op = rg.MatchedFilter(target=np.ones(3), return_std=True)
+    out = op(toy_geoarray(stack))
+    assert out.shape == (2, 2, 6, 6)
+    plain = rg.MatchedFilter(mean=op.mean_, cov_op=op.cov_op_, target=np.ones(3))
+    std = score_std(
+        lx.MatrixLinearOperator(jnp.asarray(_matrix(op.cov_op_))), np.ones(3)
+    )
+    _assert_score_and_std(out, plain(stack)[:, 0], np.asarray(std))
+    array_out = op.transform(stack[0])
+    assert isinstance(array_out, np.ndarray) and array_out.shape == (2, 6, 6)
+
+
+def test_return_std_keeps_the_carrier_contract() -> None:
+    from geoops.testing import check_operator
+
+    gt, _, _ = _fill_cube(-9999.0)
+    gt = gt.replace(attrs={"band_names": ["b1", "b2", "b3"]})
+    op = rg.MatchedFilter(target=np.array([1.0, 0.5, -1.0]), return_std=True)
+    check_operator(op, gt)
+
+
 def test_adaptive_guard_window_excludes_the_pixel_itself() -> None:
     rng = np.random.default_rng(12)
     cube = rng.normal(size=(2, 7, 7))
@@ -678,6 +756,7 @@ def _configurable_ops() -> list[Operator]:
     return [
         rg.MatchedFilter(target=target, cov_op=cov, mean=mean),
         rg.MatchedFilter(target=target),
+        rg.MatchedFilter(target=target, return_std=True),
         rg.MatchedFilterPixel(mean=mean, cov_op=cov, target=target),
         rg.MatchedFilterSNR(amplitude=1.0, cov_op=cov, target=target),
         rg.DetectionThreshold(false_alarm_rate=0.05, cov_op=cov, target=target),
@@ -689,7 +768,9 @@ def _configurable_ops() -> list[Operator]:
         rg.GMMClusterBackground(n_clusters=3, bayesian=True),
         rg.AdaptiveWindowBackground(window=5, guard_window=1),
         rg.ApplyClusterMF(target=target),
+        rg.ApplyClusterMF(target=target, return_std=True),
         rg.ApplyAdaptiveMF(target=target, ridge=0.1),
+        rg.ApplyAdaptiveMF(target=target, ridge=0.1, return_std=True),
         rg.StreamingBackground(cov_kind="oas"),
         rg.ColumnEnhancement(cov_method="lowrank", rank=4),
     ]

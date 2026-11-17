@@ -50,6 +50,10 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "matched_filter_snr": ("core", "matched_filter_snr"),
     "detection_threshold": ("core", "detection_threshold"),
     "validate_mf_inputs": ("core", "validate_mf_inputs"),
+    # score noise (radtrax._src, #312)
+    "adaptive_score_std": ("radtrax._src.retrieval.score_noise", "adaptive_score_std"),
+    "cluster_score_std": ("radtrax._src.retrieval.score_noise", "cluster_score_std"),
+    "score_std": ("radtrax._src.retrieval.score_noise", "score_std"),
     # target
     "linear_target_from_obs": ("target", "linear_target_from_obs"),
     "nonlinear_target_from_obs": ("target", "nonlinear_target_from_obs"),
@@ -82,7 +86,11 @@ def __getattr__(name: str):  # PEP 562 — lazy module attribute access
         raise AttributeError(
             f"module 'radtrax.retrieval.matched_filter' has no attribute {name!r}"
         ) from None
-    module = importlib.import_module(f"radtrax.retrieval.matched_filter.{submodule}")
+    # A dotted entry is a module path (the logic under radtrax._src); a bare
+    # one is a submodule of this package.
+    if "." not in submodule:
+        submodule = f"radtrax.retrieval.matched_filter.{submodule}"
+    module = importlib.import_module(submodule)
     value = getattr(module, attr)
     globals()[name] = value
     return value
@@ -93,6 +101,11 @@ def __dir__() -> list[str]:
 
 
 if TYPE_CHECKING:  # static type checkers see eagerly-imported symbols
+    from radtrax._src.retrieval.score_noise import (
+        adaptive_score_std,
+        cluster_score_std,
+        score_std,
+    )
     from radtrax.retrieval.matched_filter.background import (
         estimate_cov_empirical,
         estimate_cov_lowrank,
