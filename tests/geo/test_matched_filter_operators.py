@@ -35,6 +35,7 @@ from radtrax.retrieval.matched_filter import (
     cluster_score_std,
     linear_target_from_obs,
     nonlinear_target_from_obs,
+    score_sensitivity,
     score_std,
 )
 from radtrax.retrieval.var3d import RadianceObservationModel
@@ -441,6 +442,49 @@ def test_return_std_keeps_the_carrier_contract() -> None:
     check_operator(op, gt)
 
 
+def test_sensitivity_map_is_the_brightness_of_a_scaled_mean() -> None:
+    """With t = μ ⊙ k (the default), a pixel ρ μ has sensitivity ρ (#311)."""
+    mean = np.array([5.0, 6.0, 7.0])
+    unit_absorption = np.array([-0.2, -1.0, 0.0])
+    brightness = np.array([[1.0, 2.0], [0.5, 1.5]])
+    gt = toy_geotensor(mean[:, None, None] * brightness)
+    op = rg.MatchedFilterSensitivity(
+        unit_absorption=unit_absorption, mean=mean, cov_op=np.diag([1.0, 2.0, 3.0])
+    )
+    out = op(gt)
+    assert isinstance(out, GeoTensor) and out.shape == (2, 2)
+    assert out.transform == gt.transform and np.isnan(out.fill_value_default)
+    np.testing.assert_allclose(np.asarray(out), brightness, rtol=1e-12)
+
+
+def test_sensitivity_map_fits_the_background_once_and_skips_fill_pixels() -> None:
+    gt, valid, _ = _fill_cube(-9999.0)
+    unit_absorption = np.array([-0.5, -1.0, -0.1])
+    target = np.array([1.0, 0.5, -1.0])
+    op = rg.MatchedFilterSensitivity(unit_absorption=unit_absorption, target=target)
+    out = np.asarray(op(gt))
+    assert op.mean_ is not None and op.cov_op_ is not None
+    assert np.isnan(out[~valid]).all() and np.isfinite(out[valid]).all()
+    radiance = np.moveaxis(np.asarray(gt), 0, -1)[valid]
+    expected = score_sensitivity(
+        jnp.asarray(radiance),
+        lx.MatrixLinearOperator(jnp.asarray(_matrix(op.cov_op_))),
+        jnp.asarray(target),
+        jnp.asarray(unit_absorption),
+    )
+    np.testing.assert_allclose(out[valid], expected, rtol=1e-10)
+    assert "mean_" not in op.get_config()
+
+
+def test_sensitivity_map_keeps_the_carrier_contract() -> None:
+    from geoops.testing import check_operator
+
+    gt, _, _ = _fill_cube(-9999.0)
+    gt.attrs = {"band_names": ["b1", "b2", "b3"]}
+    op = rg.MatchedFilterSensitivity(unit_absorption=np.array([-0.5, -1.0, -0.1]))
+    check_operator(op, gt)
+
+
 def test_adaptive_guard_window_excludes_the_pixel_itself() -> None:
     rng = np.random.default_rng(12)
     cube = rng.normal(size=(2, 7, 7))
@@ -753,6 +797,10 @@ def _configurable_ops() -> list[Operator]:
         rg.MatchedFilter(target=target, cov_op=cov, mean=mean),
         rg.MatchedFilter(target=target),
         rg.MatchedFilter(target=target, return_std=True),
+        rg.MatchedFilterSensitivity(unit_absorption=target),
+        rg.MatchedFilterSensitivity(
+            unit_absorption=target, target=target, mean=mean, cov_op=cov
+        ),
         rg.MatchedFilterPixel(mean=mean, cov_op=cov, target=target),
         rg.MatchedFilterSNR(amplitude=1.0, cov_op=cov, target=target),
         rg.DetectionThreshold(false_alarm_rate=0.05, cov_op=cov, target=target),

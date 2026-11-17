@@ -94,6 +94,24 @@ The score's standard deviation under the null, $\alpha_0 = 1 / \sqrt{\mat{J}_h^\
 
 The same standard deviation becomes a map once the background varies, and a plume fit needs it to weight each pixel's score by its own noise. `score_std` returns $\alpha_0$ for one global background, `cluster_score_std` gives each pixel the $\alpha_0$ of its cluster's covariance, and `adaptive_score_std` gives each pixel $(\sum_b J_{h,b}^2 / (\sigma_b^2 + \lambda))^{-1/2}$ from its window's band variances and the ridge $\lambda$; the geo operators return the map as a second band, `std`, with `return_std=True`, and `matched_filter_snr` and `detection_threshold` are $\alpha / \alpha_0$ and $\Phi^{-1}(1 - \mathrm{FAR}) \, \alpha_0$. All of these assume the true $\gmat{\Sigma}_y$. With the sample covariance of $N$ pixels in $B$ bands, the expected output SNR is lower by the factor $(N + 2 - B) / (N + 1)$ (Reed, Mallett and Brennan, 1974), so the plug-in $\alpha_0$ is too small by roughly the inverse square root of that factor: 0.3 % for 60 bands on $10^4$ pixels, and 19 % for 60 bands on a 200-pixel cluster. A shrunk or low-rank covariance has no closed form for the factor, and the functions return the plug-in value.
 
+### 1.2 What the score recovers
+
+The filter is unbiased only for a pixel whose spectrum responds like the target. The score is linear in the spectrum, so adding an enhancement $\alpha$ to pixel $n$ shifts its score by exactly $\alpha A_n(\alpha)$ for a fixed background, where the **sensitivity** is
+
+$$
+A_n(\alpha) = \frac{\vect{w}^\top \gvect{\delta}_n(\alpha)}{\alpha \, \vect{w}^\top \mat{J}_h}
+$$ (eq-sensitivity)
+
+with $\vect{w} = \gmat{\Sigma}_y^{-1} \mat{J}_h$ and $\gvect{\delta}_n(\alpha)$ the radiance change of the pixel. With $\vect{k} = \partial \ln \vect{y} / \partial \Delta X$ the unit absorption spectrum, Beer–Lambert gives $\gvect{\delta}_n(\alpha) = \vect{y}_n \odot (\exp(\alpha \vect{k}) - 1)$, and as $\alpha \to 0$ the sensitivity tends to $A_n = \vect{w}^\top (\vect{y}_n \odot \vect{k}) / \vect{w}^\top \mat{J}_h$.
+
+Two effects follow. The first is the albedo effect: with the radiance target $\mat{J}_h = \gvect{\mu}_y \odot \vect{k}$ and a pixel that is the mean scaled by a brightness $\rho_n$, $\vect{y}_n = \rho_n \gvect{\mu}_y$, the sensitivity is $A_n = \rho_n$, so a pixel twice as bright as the scene reports twice the enhancement. The second is saturation: expanding the exponential,
+
+$$
+A_n(\alpha) = \frac{\vect{w}^\top (\vect{y}_n \odot \vect{k})}{\vect{w}^\top \mat{J}_h} + \frac{\alpha}{2} \frac{\vect{w}^\top (\vect{y}_n \odot \vect{k} \odot \vect{k})}{\vect{w}^\top \mat{J}_h} + \mathcal{O}(\alpha^2)
+$$ (eq-sensitivity-saturation)
+
+and the second term is negative for an absorbing gas when the filter weights follow the absorption, so the sensitivity falls as the plume strengthens. A plume fit compares $A_n$ times its modelled enhancement with the score, $\hat\alpha_n = A_n \alpha_n + \varepsilon_n$. `score_sensitivity` computes {eq}`eq-sensitivity` in the Beer–Lambert form (with `enhancement=` for the saturated value), `response_sensitivity` takes any $\gvect{\delta}_n / \alpha$ from a forward model, `cluster_score_sensitivity` uses each pixel's cluster covariance, and the geo operator `MatchedFilterSensitivity` returns the map on the input's carrier. With the log-radiance form of the filter (a cube of $\ln \vect{y}$ and target $\vect{k}$) the response is $\alpha \vect{k}$ for every pixel and $A_n = 1$, so the map matters only for the radiance form. The definition holds $\gvect{\mu}_y$ and $\gmat{\Sigma}_y$ fixed; a plume that covers much of the scene also enters the background statistics, which $A_n$ does not see.
+
 ## 2. Practical decomposition: precompute once, apply per pixel
 
 Equation {eq}`eq-mf` is deceptively cheap. Per pixel it is a dot product of length $B$, except that $\gmat{\Sigma}_y^{-1}$ appears. Done naively we would invert a $B \times B$ matrix once, but that throws away the chance to exploit any structure in $\gmat{\Sigma}_y$. The right decomposition precomputes the filter and its energy once per scene, so we will have:
