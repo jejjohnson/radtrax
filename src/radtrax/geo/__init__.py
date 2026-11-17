@@ -29,7 +29,8 @@
 - :mod:`radtrax.geo.matched_filter`: pipekit operators on GeoArrays around
   the one matched-filter core (radtrax#29), ported from geotoolz;
   :class:`UnitAbsorptionTarget` gives them v0's ``ForwardModel`` target
-  (radtrax#98).
+  (radtrax#98), and :class:`MatchedFilterSensitivity` the score's per-pixel
+  sensitivity (radtrax#311).
 - :class:`MBMP` (:mod:`radtrax.geo.mbmp`): the Sentinel-2 multi-band
   multi-pass signal, geotoolz's former ``plume.SBMP`` (radtrax#30), with
   optional per-pass scale factors; :class:`SBMP` and :class:`MBSP` complete
@@ -91,6 +92,7 @@ _OPERATORS = {
     "MatchedFilter": "matched_filter",
     "MatchedFilterPixel": "matched_filter",
     "MatchedFilterSNR": "matched_filter",
+    "MatchedFilterSensitivity": "matched_filter",
     "NonlinearTargetFromObs": "matched_filter",
     "StreamingBackground": "matched_filter",
     "StreamingBackgroundResult": "matched_filter",
@@ -131,6 +133,7 @@ if TYPE_CHECKING:
         LinearTargetFromObs,
         MatchedFilter,
         MatchedFilterPixel,
+        MatchedFilterSensitivity,
         MatchedFilterSNR,
         NonlinearTargetFromObs,
         StreamingBackground,
@@ -167,6 +170,7 @@ __all__ = [
     "MatchedFilter",
     "MatchedFilterPixel",
     "MatchedFilterSNR",
+    "MatchedFilterSensitivity",
     "NonlinearTargetFromObs",
     "StreamingBackground",
     "StreamingBackgroundResult",

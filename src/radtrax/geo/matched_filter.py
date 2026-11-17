@@ -57,6 +57,7 @@ from radtrax._src.retrieval.score_noise import (
     cluster_score_std,
     score_std,
 )
+from radtrax._src.retrieval.score_sensitivity import score_sensitivity
 from radtrax.exceptions import (
     ArgumentTypeError,
     DegenerateInputError,
@@ -162,6 +163,7 @@ __all__ = [
     "MatchedFilter",
     "MatchedFilterPixel",
     "MatchedFilterSNR",
+    "MatchedFilterSensitivity",
     "NonlinearTargetFromObs",
     "StreamingBackground",
     "StreamingBackgroundResult",
@@ -380,6 +382,81 @@ class MatchedFilter(Operator):
             "cov_method": self.cov_method,
             "axis": self.axis,
             "return_std": self.return_std,
+        }
+
+
+class MatchedFilterSensitivity(MatchedFilter):
+    """Per-pixel sensitivity map on the input's carrier.
+
+    Fits μ_y and Σ_y as :class:`MatchedFilter` does (the median mean, once,
+    on the first call, unless supplied), then applies
+    :func:`radtrax.retrieval.matched_filter.score_sensitivity`:
+    Aₙ = gᵀ (yₙ ⊙ k) / (gᵀ t) with g = Σ_y⁻¹ t, the matched-filter score
+    recovered per unit of true enhancement at each pixel (the small-enhancement
+    limit). The map is a single band, ``NaN`` at nodata pixels; fitted arrays
+    never reach ``get_config()``.
+
+    Args:
+        unit_absorption: Unit absorption spectrum k ``(B,)``.
+        target: Target t ``(B,)``; defaults to μ_y ⊙ k.
+        mean: Background mean μ_y ``(B,)``; fitted when ``None``.
+        cov_op: Background covariance Σ_y, a lineax operator or a ``(B, B)``
+            matrix; fitted when ``None``.
+        cov_method: Covariance estimator when fitting, as for
+            :class:`MatchedFilter`. Default ``"ledoit_wolf"``.
+        axis: Position of the band axis. Default ``-3``.
+
+    Attributes:
+        mean_: Fitted mean, or ``None``.
+        cov_op_: Fitted covariance operator, or ``None``.
+    """
+
+    def __init__(
+        self,
+        *,
+        unit_absorption: SpectrumLike,
+        target: SpectrumLike | None = None,
+        mean: SpectrumLike | None = None,
+        cov_op: CovLike | None = None,
+        cov_method: CovMethod = "ledoit_wolf",
+        axis: int = -3,
+    ) -> None:
+        super().__init__(
+            mean=mean, cov_op=cov_op, target=target, cov_method=cov_method, axis=axis
+        )
+        self.unit_absorption = np.asarray(unit_absorption, dtype=float)
+
+    def _score(
+        self,
+        gt: Carrier,
+        mean: Spectrum,
+        cov_op: CovLike,
+        prepared: tuple[Samples, tuple[int, ...], ValidMap | None] | None = None,
+    ) -> ScoreMap:
+        samples, shape, valid = (
+            _samples(gt, self.axis, type(self).__name__)
+            if prepared is None
+            else prepared
+        )
+        unit_absorption = jnp.asarray(self.unit_absorption)
+        target = (
+            jnp.asarray(mean) * unit_absorption
+            if self.target is None
+            else jnp.asarray(self.target)
+        )
+        sensitivity = score_sensitivity(
+            jnp.asarray(samples), _operator(cov_op), target, unit_absorption
+        )
+        return _score_map(gt, np.asarray(sensitivity).reshape(shape), valid)
+
+    def get_config(self) -> dict[str, Any]:
+        return {
+            "unit_absorption": _array_config(self.unit_absorption),
+            "target": _array_config(self.target),
+            "mean": _array_config(self.mean),
+            "cov_op": _cov_config(self.cov_op),
+            "cov_method": self.cov_method,
+            "axis": self.axis,
         }
 
 

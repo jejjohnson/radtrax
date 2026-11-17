@@ -54,6 +54,19 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "adaptive_score_std": ("radtrax._src.retrieval.score_noise", "adaptive_score_std"),
     "cluster_score_std": ("radtrax._src.retrieval.score_noise", "cluster_score_std"),
     "score_std": ("radtrax._src.retrieval.score_noise", "score_std"),
+    # score sensitivity (radtrax._src, #311)
+    "cluster_score_sensitivity": (
+        "radtrax._src.retrieval.score_sensitivity",
+        "cluster_score_sensitivity",
+    ),
+    "response_sensitivity": (
+        "radtrax._src.retrieval.score_sensitivity",
+        "response_sensitivity",
+    ),
+    "score_sensitivity": (
+        "radtrax._src.retrieval.score_sensitivity",
+        "score_sensitivity",
+    ),
     # target
     "linear_target_from_obs": ("target", "linear_target_from_obs"),
     "nonlinear_target_from_obs": ("target", "nonlinear_target_from_obs"),
@@ -105,6 +118,11 @@ if TYPE_CHECKING:  # static type checkers see eagerly-imported symbols
         adaptive_score_std,
         cluster_score_std,
         score_std,
+    )
+    from radtrax._src.retrieval.score_sensitivity import (
+        cluster_score_sensitivity,
+        response_sensitivity,
+        score_sensitivity,
     )
     from radtrax.retrieval.matched_filter.background import (
         estimate_cov_empirical,

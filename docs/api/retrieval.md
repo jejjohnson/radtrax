@@ -24,6 +24,15 @@ The standard deviation of the score under the global, cluster and adaptive-windo
       show_root_heading: false
       heading_level: 3
 
+## Score sensitivity
+
+The score recovered per unit of true enhancement at each pixel, with the albedo and Beer–Lambert saturation terms, exported from `radtrax.retrieval.matched_filter`.
+
+::: radtrax._src.retrieval.score_sensitivity
+    options:
+      show_root_heading: false
+      heading_level: 3
+
 ## `background`
 
 ::: radtrax.retrieval.matched_filter.background
