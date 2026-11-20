@@ -35,14 +35,10 @@ from __future__ import annotations
 import equinox as eqx
 import jax
 import jax.numpy as jnp
+from geophysix.constants import STANDARD
 from jaxtyping import Array, ArrayLike, Float, Real
 
-from radtrax.atmosphere.gas import (
-    AVOGADRO_PER_MOL,
-    BOLTZMANN_J_PER_K,
-    DRY_AIR_MOLAR_MASS_KG_PER_MOL,
-    STANDARD_GRAVITY_M_PER_S2,
-)
+from radtrax.atmosphere.gas import STANDARD_GRAVITY_M_PER_S2
 from radtrax.atmosphere.state import AtmosphericState
 from radtrax.exceptions import GridError, ShapeError
 
@@ -121,8 +117,8 @@ def layers_from_levels(
         (p_bot - p_top) / safe_log,
     )
     t_mean = 0.5 * (t[:-1] + t[1:])
-    m_air = DRY_AIR_MOLAR_MASS_KG_PER_MOL / AVOGADRO_PER_MOL
-    dz = BOLTZMANN_J_PER_K * t_mean / (m_air * STANDARD_GRAVITY_M_PER_S2) * log_ratio
+    # Δz = R_d T̄ ln(p_k / p_{k+1}) / g
+    dz = STANDARD.dry_air_gas_constant * t_mean / STANDARD_GRAVITY_M_PER_S2 * log_ratio
     z_bottom = z_surface_m + jnp.concatenate(
         [jnp.zeros(1, dz.dtype), jnp.cumsum(dz)[:-1]]
     )

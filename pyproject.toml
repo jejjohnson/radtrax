@@ -42,6 +42,8 @@ dependencies = [
     "argminax>=0.0.4",
     # Legendre polynomials for the spectral albedo (geonnax.basis).
     "geonnax>=0.0.9",
+    # physical constants and the ideal-gas law.
+    "geophysix>=0.0.2",
     "numpy>=2.0",
     "xarray",
     # backs the compressed-NetCDF round-trip of the cross-section tables.
@@ -92,6 +94,7 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 argminax = { git = "https://github.com/jejjohnson/argminax", rev = "v0.0.4" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", rev = "v0.6.12" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
+geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.2" }
 geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-ops" }
 geotoolz-array = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-array" }
 functax = { git = "https://github.com/jejjohnson/functax", tag = "v0.0.6" }
