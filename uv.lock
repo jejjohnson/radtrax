@@ -715,6 +715,14 @@ wheels = [
 ]
 
 [[package]]
+name = "geophysix"
+version = "0.0.2"
+source = { git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.2#b6b0ba2e73ce4533595b07f2877e6948e47c6f01" }
+dependencies = [
+    { name = "numpy" },
+]
+
+[[package]]
 name = "georeader-spaceml"
 version = "2.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2537,6 +2545,7 @@ dependencies = [
     { name = "equinox" },
     { name = "gaussx" },
     { name = "geonnax" },
+    { name = "geophysix" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "jaxtyping" },
@@ -2598,6 +2607,7 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax?tag=v0.0.9" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.2" },
     { name = "georeader-spaceml", marker = "extra == 'geo'", specifier = ">=2.4.1" },
     { name = "geotoolz-ops", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz-ops&rev=df8c228090b675365abd3fe272890f6a055434c6" },
     { name = "hitran-api", marker = "extra == 'hitran'" },

@@ -54,6 +54,7 @@ import math
 
 import jax
 import jax.numpy as jnp
+from geophysix.constants import STANDARD
 from jaxtyping import Array, ArrayLike, Float
 
 from radtrax.atmosphere.gas import BOLTZMANN_J_PER_K
@@ -73,8 +74,8 @@ __all__ = [
     "to_per_um",
 ]
 
-PLANCK_J_S: float = 6.62607015e-34  # [J s], exact (SI 2019)
-SPEED_OF_LIGHT_M_PER_S: float = 299792458.0  # [m/s], exact (SI 2019)
+PLANCK_J_S: float = STANDARD.planck  # [J s], exact (SI 2019)
+SPEED_OF_LIGHT_M_PER_S: float = STANDARD.speed_of_light  # [m/s], exact (SI 2019)
 
 #: c₁ = 2hc² [W m⁻² sr⁻¹ cm⁴] (1 m⁴ = 10⁸ cm⁴).
 C1_W_M2_SR_CM4: float = 2.0 * PLANCK_J_S * SPEED_OF_LIGHT_M_PER_S**2 * 1e8
