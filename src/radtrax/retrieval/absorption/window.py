@@ -12,9 +12,9 @@ import dataclasses
 import math
 
 import numpy as np
+from geophysix.columns import convert
 from jaxtyping import ArrayLike, Bool, Float
 
-from radtrax.atmosphere.gas import AVOGADRO_PER_MOL, BOLTZMANN_J_PER_K
 from radtrax.exceptions import ParameterError
 
 
@@ -24,12 +24,18 @@ __all__ = ["AbsorptionWindow"]
 # [Pa] and temperature [K] as that profile gives them.
 _BOTTOM_LAYER_P_PA = 95476.19736570618
 _BOTTOM_LAYER_T_K = 284.95
-# 1 ppm·m in mol/m²: 10⁻⁶ p / (k_B T N_A) × 1 m in that layer, ≈ 4.030e-5.
+# 1 ppm·m in mol/m²: 10⁻⁶ p / (R T) × 1 m in that layer, ≈ 4.030e-5.
 # Other conventions differ: 4.23e-5 at the surface (1013.25 hPa, 288.15 K),
 # 4.46e-5 at STP (273.15 K).
-_MOL_M2_PER_PPM_M = (
-    1e-6 * _BOTTOM_LAYER_P_PA / (BOLTZMANN_J_PER_K * _BOTTOM_LAYER_T_K)
-) / AVOGADRO_PER_MOL
+_MOL_M2_PER_PPM_M = float(
+    convert(
+        1.0,
+        "ppm_m",
+        "mol_m2",
+        pressure=_BOTTOM_LAYER_P_PA,
+        temperature=_BOTTOM_LAYER_T_K,
+    )
+)
 
 Ranges = tuple[tuple[float, float], ...]
 

@@ -9,7 +9,7 @@ import pytest
 import xarray as xr
 from _gradcheck import assert_gradients_match
 from _v0 import GEOMETRY, SURFACE, v0_atmosphere, v0_model
-from geonnax.geo import EARTH_MEAN_RADIUS_M
+from geophysix.earth import SPHERE
 from scipy.integrate import quad
 
 from radtrax import ParameterError, ShapeError
@@ -35,7 +35,7 @@ def test_thin_shells_are_plane_parallel(sza: float) -> None:
 def test_it_is_the_slant_path_through_each_shell(sza: float) -> None:
     """Against quadrature of ds/dz = (1 − (R/(R+z))² sin²θ)^(−½) over each layer."""
     sin2 = np.sin(np.deg2rad(sza)) ** 2
-    r = EARTH_MEAN_RADIUS_M
+    r = SPHERE.semi_major
 
     def ds_dz(z: float) -> float:
         return (1.0 - (r / (r + z)) ** 2 * sin2) ** -0.5
