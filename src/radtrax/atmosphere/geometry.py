@@ -35,7 +35,7 @@ from __future__ import annotations
 import equinox as eqx
 import jax.numpy as jnp
 import numpy as np
-from geonnax.geo import EARTH_MEAN_RADIUS_M
+from geophysix.earth import SPHERE
 from jaxtyping import Array, ArrayLike, Float, Real
 
 
@@ -135,7 +135,7 @@ class ViewingGeometry(eqx.Module):
         z_m: Float[ArrayLike, " L"],
         dz_m: Float[ArrayLike, " L"],
         *,
-        earth_radius_m: float = EARTH_MEAN_RADIUS_M,
+        earth_radius_m: float = SPHERE.semi_major,
     ) -> Float[Array, " L"]:
         """Spherical-shell two-way air mass of each layer, ``m(θ₀) + m(θ)``.
 
@@ -144,7 +144,7 @@ class ViewingGeometry(eqx.Module):
             dz_m: Thickness of each layer [m], ``(L,)``.
             earth_radius_m: Radius of the sphere through the surface [m]; the
                 default is the IUGG mean Earth radius
-                (``geonnax.geo.EARTH_MEAN_RADIUS_M``).
+                (``geophysix.earth.SPHERE``).
 
         Returns:
             The layer air masses, ``(L,)``; each tends to :meth:`air_mass`
