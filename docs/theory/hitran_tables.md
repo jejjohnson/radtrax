@@ -56,7 +56,7 @@ $$
 \mathrm{AMF}(\mathrm{SZA}, \mathrm{VZA}) = \frac{1}{\cos \mathrm{SZA}} + \frac{1}{\cos \mathrm{VZA}}
 $$
 
-converts the vertical path through the layer into the slant path the photons actually travel. It is valid for zenith angles below about 75° and gives $\mathrm{AMF} = 2$ at nadir ($\mathrm{SZA} = \mathrm{VZA} = 0$). In radtrax it is [`air_mass_factor`](xref:api#radtrax.atmosphere.air_mass_factor).
+converts the vertical path through the layer into the slant path the photons actually travel. It is valid for zenith angles below about 75° and gives $\mathrm{AMF} = 2$ at nadir ($\mathrm{SZA} = \mathrm{VZA} = 0$). It is radiomax's `radiomax.geometry.air_mass_factor`.
 
 ## 2. Line-by-line absorption cross-section
 

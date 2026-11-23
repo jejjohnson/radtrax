@@ -39,16 +39,6 @@ def test_number_density_matches_loschmidt_at_stp():
     assert n == pytest.approx(2.6867811e19, rel=5e-4)
 
 
-def test_amf_nadir_is_two():
-    assert beers.air_mass_factor(sza_deg=0.0, vza_deg=0.0) == pytest.approx(2.0)
-
-
-def test_amf_grows_with_zenith_angle():
-    a = beers.air_mass_factor(sza_deg=60.0, vza_deg=0.0)
-    b = beers.air_mass_factor(sza_deg=60.0, vza_deg=60.0)
-    assert a > 2.0 and b > a
-
-
 def test_interpolate_cross_section_hits_bilinear_midpoint():
     ds = _toy_lut_dataset()
     sigma = beers.interpolate_cross_section(ds, T_K=250.0, p_atm=0.6)

@@ -1,12 +1,9 @@
-"""Viewing geometry: the air-mass factor and the geometry a solver sees.
+"""Viewing geometry: the Sun and sensor directions a surface and a solver see.
 
-One home for the air-mass factor that plumax defined twice, in
-``hapi_lut.beers.air_mass_factor`` and ``radtran.config.ObservationGeometry``
-(radtrax#27). ``radtrax.spectroscopy.tables.air_mass_factor`` re-exports it,
-and ``ObservationGeometry.air_mass_factor`` calls it. It is NumPy, in
-degrees, for the single-slab models.
+The air-mass factor of two zenith angles, for the single-slab models, is
+`radiomax.geometry.air_mass_factor`'s.
 
-:class:`ViewingGeometry` is the same geometry for the layered forward model
+:class:`ViewingGeometry` is the geometry of the layered forward model
 (radtrax#35): JAX leaves (cosines and the relative azimuth), so a retrieval
 differentiates through them, and :meth:`ViewingGeometry.air_mass` is the
 air-mass factor on the gradient path. Surfaces and solvers take one
@@ -25,7 +22,8 @@ m(\\theta) = \\frac{\\sqrt{(R + z_t)^2 - R^2\\sin^2\\theta}
     + \\sqrt{R^2\\mu^2 + 2Rz_b + z_b^2}},
 $$
 
-written in the second form, which does not cancel. It tends to ``1/μ`` as
+written in the second form, which does not cancel
+(`radiomax.geometry.shell_air_mass`). It tends to ``1/μ`` as
 ``z/R → 0`` and stays finite at θ = 90° for a layer above the surface. It
 ignores refraction.
 """
@@ -34,47 +32,16 @@ from __future__ import annotations
 
 import equinox as eqx
 import jax.numpy as jnp
-import numpy as np
 from geophysix.earth import SPHERE
 from jaxtyping import Array, ArrayLike, Float, Real
+from radiomax.geometry import shell_air_mass
 
 
-__all__ = ["ViewingGeometry", "air_mass_factor"]
+__all__ = ["ViewingGeometry"]
 
 #: How far past 1 a cosine may round (cosines computed from unit vectors
 #: reach 1 + 4.4e-16); the plane-parallel formulas are smooth there.
 _COSINE_SLACK = 1e-9
-
-
-def air_mass_factor(
-    sza_deg: Real[ArrayLike, "*#shape"], vza_deg: Real[ArrayLike, "*#shape"]
-) -> Float[ArrayLike, "*#shape"]:
-    """Plane-parallel two-way air-mass factor, sun → surface → sensor.
-
-    $$
-    m = \\frac{1}{\\cos\\theta_0} + \\frac{1}{\\cos\\theta}
-    $$
-
-    with $\\theta_0$ the solar and $\\theta$ the viewing zenith angle. The
-    plane-parallel form breaks down past about 75°, where a spherical
-    (Chapman) correction is needed; that arrives with v1 of the roadmap.
-
-    Args:
-        sza_deg: Solar zenith angle [degrees].
-        vza_deg: Viewing zenith angle [degrees].
-
-    Returns:
-        The two-way air-mass factor (dimensionless).
-
-    Examples:
-        >>> air_mass_factor(0.0, 0.0)
-        np.float64(2.0)
-        >>> round(float(air_mass_factor(60.0, 0.0)), 12)
-        3.0
-    """
-    sza = np.deg2rad(sza_deg)
-    vza = np.deg2rad(vza_deg)
-    return 1.0 / np.cos(sza) + 1.0 / np.cos(vza)
 
 
 class ViewingGeometry(eqx.Module):
@@ -84,7 +51,7 @@ class ViewingGeometry(eqx.Module):
     geometry. The cosines are checked on construction, also under ``jit``
     (``eqx.error_if`` raises ``equinox.EquinoxRuntimeError``): each must be
     in ``(0, 1]`` (up to rounding), and NaN fails. The plane-parallel
-    geometry breaks down past about 75° (see :func:`air_mass_factor`).
+    geometry breaks down past about 75°.
 
     Attributes:
         mu0: Cosine of the solar zenith angle.
@@ -159,24 +126,9 @@ class ViewingGeometry(eqx.Module):
         """
         z, dz = jnp.asarray(z_m, dtype=float), jnp.asarray(dz_m, dtype=float)
         z_b, z_t = z - dz / 2, z + dz / 2
-        return _shell_air_mass(self.mu0, z_b, z_t, earth_radius_m) + _shell_air_mass(
-            self.mu, z_b, z_t, earth_radius_m
-        )
-
-
-def _shell_air_mass(
-    mu: Float[Array, ""],
-    z_b: Float[Array, " L"],
-    z_t: Float[Array, " L"],
-    radius: float,
-) -> Float[Array, " L"]:
-    """One-way slant path through each shell over its thickness (module docstring)."""
-
-    def root(z: Float[Array, " L"]) -> Float[Array, " L"]:
-        # √(R²μ² + 2Rz + z²), positive: ViewingGeometry keeps μ > 0.
-        return jnp.sqrt((radius * mu) ** 2 + z * (2 * radius + z))
-
-    return (2 * radius + z_t + z_b) / (root(z_t) + root(z_b))
+        down = shell_air_mass(self.mu0, z_b, z_t, radius=earth_radius_m)
+        up = shell_air_mass(self.mu, z_b, z_t, radius=earth_radius_m)
+        return down + up
 
 
 def _cosine(name: str, value: Real[ArrayLike, ""]) -> Float[Array, ""]:

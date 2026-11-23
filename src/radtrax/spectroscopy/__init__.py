@@ -39,7 +39,6 @@ from radtrax.spectroscopy.table_cache import (
 )
 from radtrax.spectroscopy.tables import (
     absorption_coefficient,
-    air_mass_factor,
     beers_law_from_lut,
     interpolate_cross_section,
     number_density,
@@ -56,7 +55,6 @@ __all__ = [
     "TableGrid",
     "TableOpacity",
     "absorption_coefficient",
-    "air_mass_factor",
     "beers_law_from_lut",
     "earth_sun_distance",
     "fetch_solar_spectrum",

@@ -14,8 +14,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
+from radiomax.geometry import air_mass_factor
 
-from radtrax.atmosphere import ViewingGeometry, air_mass_factor
+from radtrax.atmosphere import ViewingGeometry
 from radtrax.optics import OpticalProperties
 from radtrax.solvers import BeerLambert, RTSolver
 from radtrax.surface import Lambertian

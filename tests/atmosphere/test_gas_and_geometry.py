@@ -24,7 +24,6 @@ from radtrax.spectroscopy import tables
         "BOLTZMANN_J_PER_K",
         "CM3_PER_M3",
         "number_density",
-        "air_mass_factor",
     ],
 )
 def test_tables_reexports_the_one_object(name: str) -> None:
@@ -41,23 +40,12 @@ ANGLES = np.linspace(0.0, 70.0, 15)
 
 
 @pytest.mark.parametrize("sza", ANGLES)
-def test_observation_geometry_uses_the_one_air_mass_factor(sza: float) -> None:
+def test_observation_geometry_is_the_plane_parallel_air_mass(sza: float) -> None:
     for vza in ANGLES:
         # plumax's formula, written out independently, as the oracle.
         expected = 1.0 / np.cos(np.deg2rad(sza)) + 1.0 / np.cos(np.deg2rad(vza))
-        got_fn = atmosphere.air_mass_factor(sza, vza)
         got_geom = ObservationGeometry(sza_deg=sza, vza_deg=vza).air_mass_factor
-        np.testing.assert_allclose(got_fn, expected, rtol=1e-14)
         np.testing.assert_allclose(got_geom, expected, rtol=1e-14)
-
-
-def test_air_mass_factor_is_elementwise() -> None:
-    sza, vza = np.meshgrid(ANGLES, ANGLES)
-    out = atmosphere.air_mass_factor(sza, vza)
-    assert out.shape == sza.shape
-    np.testing.assert_allclose(
-        out[3, 7], atmosphere.air_mass_factor(sza[3, 7], vza[3, 7])
-    )
 
 
 def test_explicit_amf_override_still_wins() -> None:

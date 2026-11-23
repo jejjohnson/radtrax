@@ -14,12 +14,12 @@ import numpy as np
 import pytest
 import xarray as xr
 from _bands import emit_like_srf
+from radiomax.geometry import air_mass_factor
 
 from radtrax.atmosphere import (
     AVOGADRO_PER_MOL,
     DRY_AIR_MOLAR_MASS_KG_PER_MOL,
     STANDARD_GRAVITY_M_PER_S2,
-    air_mass_factor,
 )
 from radtrax.instrument import SpectralResponseFunction
 from radtrax.slab.nb_lut import build_nb_lut, lookup_nb
