@@ -28,6 +28,7 @@ from typing import Any
 import equinox as eqx
 import numpy as np
 from jaxtyping import ArrayLike, Float
+from radiomax.geometry import relative_azimuth
 
 from radtrax.atmosphere.geometry import ViewingGeometry
 from radtrax.exceptions import (
@@ -227,9 +228,9 @@ def emit_geometry(image: Any) -> ViewingGeometry:
     if not np.any(valid):
         raise DegenerateInputError("emit_geometry: no pixel has valid angles.")
     s_zen, s_az, v_zen, v_az = (np.where(valid, a, np.mean(a[valid])) for a in angles)
-    # The azimuths' cosine difference is formed per pixel, so the fill mean of
-    # an azimuth that wraps through 0°/360° only affects masked pixels.
-    raa = np.rad2deg(np.arccos(np.cos(np.deg2rad(v_az - s_az))))
+    # The azimuths' difference is folded per pixel, so the fill mean of an
+    # azimuth that wraps through 0°/360° only affects masked pixels.
+    raa = relative_azimuth(v_az, s_az)
     from_angles = eqx.filter_vmap(eqx.filter_vmap(ViewingGeometry.from_angles))
     return from_angles(s_zen, v_zen, raa)
 

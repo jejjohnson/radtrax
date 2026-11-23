@@ -20,7 +20,7 @@ cm⁻¹,
 $$E_\\nu = E_\\lambda \\left|\\frac{d\\lambda}{d\\nu}\\right| = E_\\lambda \\frac{\\lambda^2}{10^7}.$$
 
 At a date other than the mean distance, divide by $d^2$, with $d$ from
-:func:`earth_sun_distance`.
+`radiomax.geometry.earth_sun_distance`.
 """
 
 from __future__ import annotations
@@ -36,7 +36,8 @@ from pathlib import Path
 
 import jax.numpy as jnp
 import numpy as np
-from jaxtyping import Array, ArrayLike, Float, Real
+from jaxtyping import Array, ArrayLike, Float
+from radiomax.radiometry import per_nm_to_per_cm
 
 from radtrax.exceptions import (
     GridError,
@@ -50,7 +51,6 @@ from radtrax.spectroscopy.table_cache import table_cache_dir
 __all__ = [
     "SOLAR_SOURCES",
     "SolarSource",
-    "earth_sun_distance",
     "fetch_solar_spectrum",
     "solar_irradiance",
     "solar_spectrum_path",
@@ -205,7 +205,7 @@ def _spectrum_cm(path: str) -> tuple[np.ndarray, np.ndarray]:
         wl_nm = np.asarray(ds["Vacuum Wavelength"].values, dtype=np.float64)
         ssi = np.asarray(ds["SSI"].values, dtype=np.float64)  # W m⁻² nm⁻¹
     nu = 1e7 / wl_nm[::-1]
-    e_nu = (ssi * wl_nm**2 / 1e7)[::-1]
+    e_nu = per_nm_to_per_cm(ssi, wl_nm)[::-1]
     return nu, e_nu
 
 
@@ -237,7 +237,7 @@ def solar_irradiance(
 
     Returns:
         $E_0$ [W m⁻² (cm⁻¹)⁻¹], ``(G,)``. Divide by $d^2$
-        (:func:`earth_sun_distance`) for a given date.
+        (`radiomax.geometry.earth_sun_distance`) for a given date.
 
     Raises:
         ParameterError: If ``source`` is unknown.
@@ -263,33 +263,3 @@ def solar_irradiance(
             f"{source} solar spectrum ({nu_ref[0]:.2f}–{nu_ref[-1]:.2f} cm⁻¹)."
         )
     return jnp.asarray(np.interp(nu, nu_ref, e_ref))
-
-
-def earth_sun_distance(
-    day_of_year: Real[ArrayLike, "*shape"],
-) -> Float[Array, "*shape"]:
-    """The Earth–Sun distance [AU] on a day of the year.
-
-    $$d = 1 - 0.01673 \\cos\\big(0.0172\\,(t - 4)\\big),$$
-
-    with $t$ the day of the year (1 on 1 January; fractional days allowed):
-    the first-order eccentricity term with perihelion on 4 January, the
-    formula georeader's ``earth_sun_distance_correction_factor`` uses for
-    EMIT, Sentinel-2 and PRISMA reflectance. The irradiance on that day is
-    $E_0 / d^2$.
-
-    Args:
-        day_of_year: The day of the year, any shape.
-
-    Returns:
-        $d$ [AU], same shape.
-
-    Examples:
-        >>> from radtrax.spectroscopy.solar import earth_sun_distance
-        >>> print(f"{float(earth_sun_distance(4.0)):.5f}")
-        0.98327
-        >>> print(f"{float(earth_sun_distance(186.0)):.5f}")
-        1.01673
-    """
-    t = jnp.asarray(day_of_year, dtype=float)
-    return 1.0 - 0.01673 * jnp.cos(0.0172 * (t - 4.0))

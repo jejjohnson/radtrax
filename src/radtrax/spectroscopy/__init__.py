@@ -25,11 +25,7 @@ from radtrax.spectroscopy.opacity import (
     SumOpacity,
     TableOpacity,
 )
-from radtrax.spectroscopy.solar import (
-    earth_sun_distance,
-    fetch_solar_spectrum,
-    solar_irradiance,
-)
+from radtrax.spectroscopy.solar import fetch_solar_spectrum, solar_irradiance
 from radtrax.spectroscopy.table_cache import (
     V0_GRID,
     TableGrid,
@@ -56,7 +52,6 @@ __all__ = [
     "TableOpacity",
     "absorption_coefficient",
     "beers_law_from_lut",
-    "earth_sun_distance",
     "fetch_solar_spectrum",
     "hitran",
     "interpolate_cross_section",

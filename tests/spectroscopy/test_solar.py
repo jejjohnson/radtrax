@@ -20,12 +20,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import jax
-import jax.numpy as jnp
 import numpy as np
 import pytest
 import xarray as xr
-from _gradcheck import assert_gradients_match
 
 from radtrax import (
     GridError,
@@ -36,7 +33,6 @@ from radtrax import (
 from radtrax.spectroscopy.solar import (
     SOLAR_SOURCES,
     SolarSource,
-    earth_sun_distance,
     fetch_solar_spectrum,
     solar_irradiance,
     solar_spectrum_path,
@@ -200,32 +196,6 @@ def test_the_registered_source_is_the_tsis1_hsrs_v2_file() -> None:
     assert spec.url.endswith(spec.filename)
     assert spec.url.startswith("https://lasp.colorado.edu/")
     assert len(spec.sha256) == 64
-
-
-# ── Earth–Sun distance ───────────────────────────────────────────────────────
-
-
-def test_earth_sun_distance_extremes_and_period() -> None:
-    d = earth_sun_distance(jnp.arange(1.0, 367.0))
-    assert float(d.min()) == pytest.approx(1 - 0.01673, abs=1e-6)  # perihelion
-    assert int(jnp.argmin(d)) + 1 == 4
-    assert float(d.max()) == pytest.approx(1 + 0.01673, abs=1e-6)
-    assert d.shape == (366,)
-
-
-def test_earth_sun_distance_matches_georeader() -> None:
-    from datetime import datetime
-
-    reflectance = pytest.importorskip("georeader.reflectance")
-    for date in (datetime(2023, 1, 4), datetime(2023, 4, 1), datetime(2023, 7, 15)):
-        day = date.timetuple().tm_yday
-        expected = reflectance.earth_sun_distance_correction_factor(date)
-        assert float(earth_sun_distance(day)) == pytest.approx(expected, rel=1e-10)
-
-
-def test_earth_sun_distance_gradient() -> None:
-    assert_gradients_match(earth_sun_distance, jnp.array([1.0, 95.0, 200.0, 300.0]))
-    assert jax.grad(earth_sun_distance)(4.0) == pytest.approx(0.0, abs=1e-12)
 
 
 # ── against the references (needs the cached full file) ──────────────────────
