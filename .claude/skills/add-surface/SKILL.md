@@ -9,7 +9,7 @@ Read "The contracts" in `AGENTS.md` first. The protocol is `Surface` in `src/rad
 
 ## 1. Check it does not exist
 
-Search `docs/api/capabilities.md`. A kernel is a function and a surface that weights kernels is a module (the AGENTS.md rule: modules carry state, functions carry transforms): `ross_thick` and `li_sparse_reciprocal` are public functions and `RossLi` holds the weights. A new surface goes in `src/radtrax/surface/<name>.py`.
+Search `docs/api/capabilities.md`. A kernel is a function and a surface that weights kernels is a module (the AGENTS.md rule: modules carry state, functions carry transforms): `ross_thick_from_cosines` and `li_sparse_reciprocal_from_cosines` are radiomax's functions and `RossLi` holds the weights. A new surface goes in `src/radtrax/surface/<name>.py`.
 
 ## 2. Write the class
 
@@ -17,7 +17,7 @@ The contract: `reflectance(geometry, nu_cm)` returns the bidirectional reflectan
 
 - Subclass `Surface` and implement `reflectance(self, geometry: ViewingGeometry, nu_cm: Float[Array, " G"]) -> Float[Array, "*G"]`. Parameters are ordinary fields, converted with `jnp.asarray(x, dtype=float)` in `__init__`, scalar or `(G,)` where a per-wavenumber value makes sense (`Lambertian.albedo`, `RossLi.f_iso`).
 - Delete the arguments you do not use (`del geometry, nu_cm`) as `Lambertian` and `RossLi` do; a spectral model uses `nu_cm`, a BRDF uses the geometry.
-- Geometry: `geometry.mu0`, `geometry.mu` (cosines in `(0, 1]`) and `geometry.relative_azimuth_rad` (sensor minus sun, `φ = 0` with `θ₀ = θ` is the hotspot). `jnp.arccos` differentiated naively is `0 · ∞` at `±1`, so a model that recovers an angle from a cosine guards it; `ross_li.py` writes the affected terms with a `custom_jvp` and its module docstring says which first and second derivatives are finite.
+- Geometry: `geometry.mu0`, `geometry.mu` (cosines in `(0, 1]`) and `geometry.relative_azimuth_rad` (sensor minus sun, `φ = 0` with `θ₀ = θ` is the hotspot). `jnp.arccos` differentiated naively is `0 · ∞` at `±1`, so a model that recovers an angle from a cosine guards it; a kernel of cosines goes to `radiomax.retrievals`, as RossThick did, and `ross_li.py`'s module docstring says which first and second derivatives are finite.
 - A point where an expression is 0/0 or a distance vanishes (nadir, the hotspot) uses the double-where: a safe argument in the branch not taken, then `jnp.where`. A bare `jnp.where` still propagates the NaN. State in the docstring what the gradient is at a kink (`RossLi`: the symmetric subgradient, 0).
 - A window or domain that the model is only valid in (`PolynomialAlbedo`'s Legendre window) is documented, checked in `__check_init__` when concrete (skipping under tracing) and raises `GridError` or `ParameterError`; the model grid is kept inside it.
 - Arrays are leaves, never `eqx.field(static=True)`.

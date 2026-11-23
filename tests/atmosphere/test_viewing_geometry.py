@@ -8,8 +8,9 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
+from radiomax.geometry import air_mass_factor
 
-from radtrax.atmosphere import ViewingGeometry, air_mass_factor
+from radtrax.atmosphere import ViewingGeometry
 
 
 @pytest.mark.parametrize(("sza", "vza"), [(0.0, 0.0), (35.0, 10.0), (70.0, 25.0)])

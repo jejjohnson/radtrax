@@ -13,10 +13,19 @@ from _gradcheck import assert_gradients_match
 
 from radtrax.atmosphere import ViewingGeometry
 from radtrax.surface import Lambertian, RossLi
-from radtrax.surface.ross_li import li_sparse_reciprocal, ross_thick
 
 
 NU = jnp.array([4300.0, 4300.1])
+
+
+def ross_thick(geometry: ViewingGeometry) -> jax.Array:
+    """K_vol, as `RossLi` forms it."""
+    return RossLi(0.0, 1.0, 0.0).reflectance(geometry, NU)
+
+
+def li_sparse_reciprocal(geometry: ViewingGeometry) -> jax.Array:
+    """K_geo, as `RossLi` forms it."""
+    return RossLi(0.0, 0.0, 1.0).reflectance(geometry, NU)
 
 
 def _reference(sza: float, vza: float, raa: float) -> tuple[float, float]:

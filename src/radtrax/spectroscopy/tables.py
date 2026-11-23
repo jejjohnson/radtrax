@@ -30,16 +30,16 @@ from __future__ import annotations
 import numpy as np
 import xarray as xr
 from jaxtyping import Float
+from radiomax.geometry import air_mass_factor
 
-# The one home of the constants, number density and air-mass factor
-# (radtrax#27); re-exported here, where plumax defined them.
+# The one home of the constants and number density (radtrax#27); re-exported
+# here, where plumax defined them.
 from radtrax.atmosphere.gas import (
     ATM_TO_PA,
     BOLTZMANN_J_PER_K,
     CM3_PER_M3,
     number_density,
 )
-from radtrax.atmosphere.geometry import air_mass_factor
 from radtrax.exceptions import MissingKeyError
 
 
@@ -48,7 +48,6 @@ __all__ = [
     "BOLTZMANN_J_PER_K",
     "CM3_PER_M3",
     "absorption_coefficient",
-    "air_mass_factor",
     "beers_law_from_lut",
     "interpolate_cross_section",
     "number_density",

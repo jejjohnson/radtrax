@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 from jaxtyping import ArrayLike, Float
+from radiomax.geometry import air_mass_factor
 
 from radtrax.exceptions import ParameterError, ShapeError
 
@@ -51,7 +52,6 @@ from radtrax.atmosphere.gas import (
     CM3_PER_M3 as CM3_PER_M3,
     number_density,
 )
-from radtrax.atmosphere.geometry import air_mass_factor
 
 
 @dataclass(frozen=True)

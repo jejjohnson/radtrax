@@ -24,8 +24,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from _bands import emit_like_srf
+from radiomax.geometry import air_mass_factor
 
-from radtrax.atmosphere import ATM_TO_PA, afgl_us_standard, air_mass_factor
+from radtrax.atmosphere import ATM_TO_PA, afgl_us_standard
 from radtrax.spectroscopy import TableOpacity, load_table
 from radtrax.spectroscopy.hitran import LUTGridConfig, default_cache_dir
 from radtrax.spectroscopy.hitran.build import fetch_lines
