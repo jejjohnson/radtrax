@@ -92,7 +92,7 @@ def sentinel2_srf(
     5–10 nm and a band can vanish entirely from about 25 nm. The grid's own
     wavelengths give every point of a grid finer than 1 nm its weight, so a
     line-by-line spectrum is integrated rather than read every 1 nm
-    (radtrax#ISSUE). On the table's own 1 nm grid the weights are the table.
+    (radtrax#322). On the table's own 1 nm grid the weights are the table.
 
     Args:
         satellite: ``"S2A"``, ``"S2B"`` or ``"S2C"``.

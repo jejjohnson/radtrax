@@ -154,6 +154,48 @@ def test_one_nm_grid_matches_the_table() -> None:
     )
 
 
+def _node_sum_weights(
+    table: np.ndarray, full: np.ndarray, grid: np.ndarray
+) -> np.ndarray:
+    """``Σ_k R_b(λ_k) φ_j(λ_k)`` over the table's wavelengths, ``(B, G)``."""
+    hats = np.stack([np.interp(table, grid, e, 0.0, 0.0) for e in np.eye(grid.size)])
+    return full @ hats.T
+
+
+@pytest.mark.parametrize("step", [1.0, 5.0, 25.0])
+def test_grids_of_table_wavelengths_keep_the_node_sum(step: float) -> None:
+    # A grid made of table wavelengths adds no node, so the trapezoid rule
+    # over both is the plain sum over the 1 nm table, as before radtrax#322.
+    from georeader.readers.S2_SAFE_reader import read_srf
+
+    grid = np.arange(400.0, 2351.0, step)
+    table = read_srf("S2A")
+    wl = np.arange(table.index[0], table.index[-1] + 1.0)
+    full = table.reindex(wl, fill_value=0.0).to_numpy(float).T
+    weights = _node_sum_weights(wl, full, grid)
+    expected = weights / weights.sum(axis=1, keepdims=True)
+    srf = sentinel2_srf("S2A", wavelengths_hr_nm=grid)
+    np.testing.assert_allclose(srf.matrix, expected, rtol=1e-12, atol=1e-15)
+
+
+@pytest.mark.parametrize("step", [0.01, 0.05, 0.3])
+def test_fine_grids_agree_with_the_response_on_the_grid(step: float) -> None:
+    # Finer than the table, the band average tends to the trapezoid average
+    # of the interpolated response; a 0.7 nm ripple shows a 1 nm sampling.
+    from georeader.readers.S2_SAFE_reader import read_srf
+
+    table = read_srf("S2A")["B11"]
+    grid = np.arange(1500.0, 1720.0, step)
+    spectrum = 1.0 + 0.5 * np.sin(2.0 * np.pi * grid / 0.7) * (grid > 1600.0)
+    srf = sentinel2_srf("S2A", wavelengths_hr_nm=grid, bands=("B11",))
+    wl = np.arange(table.index[0], table.index[-1] + 1.0)
+    fine = np.arange(1500.0, 1720.0, 0.001)
+    response = np.interp(fine, wl, table.reindex(wl, fill_value=0.0))
+    # the spectrum read as linear between its grid points
+    reference = (response * np.interp(fine, grid, spectrum)).sum() / response.sum()
+    np.testing.assert_allclose(srf.apply(spectrum)[0], reference, rtol=2e-4)
+
+
 def test_a_grid_that_cuts_a_band_warns() -> None:
     with pytest.warns(UserWarning, match=r"covers 7\d\.\d % of band B12"):
         sentinel2_srf(

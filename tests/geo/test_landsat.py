@@ -84,6 +84,39 @@ def test_srf_on_its_own_grid_is_the_rsr_weighted_mean(satellite: str) -> None:
         np.testing.assert_allclose(srf.apply(spectrum)[b], expected, rtol=1e-12)
 
 
+@pytest.mark.parametrize("band", ["B6", "B7"])
+def test_a_line_by_line_grid_integrates_every_point(band: str) -> None:
+    """On a grid finer than the 1 nm table, the band average is ``∫R L / ∫R``.
+
+    A sum over the table's wavelengths alone reads the spectrum every 1 nm
+    (radtrax#322): it was off by 4.0e-3 (B6) and 1.4e-3 (B7) on these lines.
+    After it, the trapezoid error of the 0.01 cm⁻¹ grid is left, 3.7e-8 and
+    4.3e-7 (measured).
+    """
+    wl_b, r_b = _bundled()["L8", band]
+    lo, hi = {"B6": (1480.0, 1760.0), "B7": (2050.0, 2370.0)}[band]
+    rng = np.random.default_rng({"B6": 1, "B7": 2}[band])
+    centre, depth = rng.uniform(lo, hi, 600), rng.uniform(0.1, 0.9, 600)
+    half_width = rng.uniform(0.02, 0.1, 600)  # nm
+
+    def spectrum(wavelength: np.ndarray) -> np.ndarray:
+        tau = np.zeros_like(wavelength)
+        for c, d, w in zip(centre, depth, half_width, strict=True):
+            near = np.abs(wavelength - c) < 60.0 * w
+            tau[near] += d / (1.0 + ((wavelength[near] - c) / w) ** 2)
+        return np.exp(-tau)
+
+    fine = np.arange(wl_b[0], wl_b[-1], 0.002)
+    response = np.interp(fine, wl_b, r_b)
+    reference = (response * spectrum(fine)).sum() / response.sum()
+
+    grid = 1e7 / np.arange(1e7 / hi - 20.0, 1e7 / lo + 20.0, 0.01)[::-1]
+    srf = landsat_srf("L8", bands=(band,), wavelengths_hr_nm=grid)
+    np.testing.assert_allclose(srf.apply(spectrum(grid))[0], reference, rtol=1e-6)
+    responds = np.interp(grid, wl_b, r_b, left=0.0, right=0.0) > 1e-3
+    assert np.all(srf.matrix[0, responds] > 0.0)
+
+
 def test_srf_band_centres_sit_in_the_swir_windows() -> None:
     for satellite in ("L8", "L9"):
         c6, c7 = landsat_srf(satellite).band_centers_nm

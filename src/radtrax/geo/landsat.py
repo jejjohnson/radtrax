@@ -117,8 +117,9 @@ def landsat_srf(
     Each band's response is placed on one 1 nm grid spanning the requested
     bands, zero where it was not measured, and projected onto
     ``wavelengths_hr_nm`` with the linear-interpolation (hat) basis, as
-    :func:`~radtrax.geo.sentinel2_srf` does: band integration is then exact
-    for any radiance linear between grid points. OLI's responses are
+    :func:`~radtrax.geo.sentinel2_srf` does: band integration reads the
+    radiance as linear between grid points, on grids coarser and finer than
+    the table. OLI's responses are
     published every 1 nm and used as they are; TIRS's every 50 nm, and are
     taken as piecewise linear between the published values (interpolated
     onto the 1 nm grid). The values are used as published, including the
