@@ -30,7 +30,6 @@ from geophysix.constants import CH4, STANDARD
 from jaxtyping import Float
 
 from radtrax.atmosphere.gas import AVOGADRO_PER_MOL, BOLTZMANN_J_PER_K
-from radtrax.radiometry.planck import C2_CM_K
 
 
 __all__ = [
@@ -54,7 +53,8 @@ P_ATM = np.geomspace(0.03, 1.1, 10)
 T_K = np.linspace(200.0, 310.0, 6)
 _N_LINES = 150
 _GAMMA_AIR, _N_AIR = 0.06, 0.75  # cm⁻¹/atm, -
-_C2 = C2_CM_K  # second radiation constant hc/k_B, cm K
+# second radiation constant c₂ = hc/k_B, cm K (10² cm per m)
+_C2 = STANDARD.planck * STANDARD.speed_of_light / STANDARD.boltzmann * 1e2
 #: The table's CH₄ molecular mass [u] (its Doppler widths).
 CH4_MASS_U = CH4.molar_mass * 1e3
 _AMU_KG = 1e-3 / AVOGADRO_PER_MOL  # one dalton

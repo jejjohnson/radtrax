@@ -57,10 +57,10 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Float
+from radiomax.thermal import to_per_um
 
 from radtrax.exceptions import GridError, ParameterError, ShapeError
 from radtrax.instrument.srf import FWHM_PER_SIGMA, SpectralResponseFunction
-from radtrax.radiometry.planck import to_per_um
 
 
 __all__ = ["BandInstrument", "GaussianInstrument", "Instrument"]

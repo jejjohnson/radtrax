@@ -8,10 +8,11 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
+from radiomax.thermal import planck_radiance, to_per_um
 
 from radtrax import ParameterError, ShapeError
 from radtrax.instrument import DiagonalNoise, GaussianInstrument, NEdTNoise
-from radtrax.radiometry import band_planck_radiance, planck_radiance, to_per_um
+from radtrax.radiometry import band_planck_radiance
 
 
 #: Two TIRS-2-like bands, B10 and B11 (10.9 and 12.0 µm), on-orbit NEΔT at 300 K.

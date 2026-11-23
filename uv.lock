@@ -52,6 +52,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "array-api-compat"
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/88/d7b0f89b1ad0f42ef94b8440fff87b7c0b69701b3c30a5b160fdbc850f25/array_api_compat-1.16.0.tar.gz", hash = "sha256:c8117cb4d6c7aacaec38c2705f72509e342c20b1a716a04cb5397a611f122d51", size = 134991, upload-time = "2026-10-25T18:37:17.582Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/09/cab56a48b7e83609831c96f36658f9e30421877875071f2413eb591cf756/array_api_compat-1.16.0-py3-none-any.whl", hash = "sha256:0464934d7d5f1e9b728b2e248da52400630b1fcb46b70073eab3c7ae084290aa", size = 81744, upload-time = "2026-10-25T18:37:15.934Z" },
+]
+
+[[package]]
 name = "asttokens"
 version = "3.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -716,8 +725,8 @@ wheels = [
 
 [[package]]
 name = "geophysix"
-version = "0.0.3"
-source = { git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.3#65b1faab906a4b2abfc743eacac4f21745c00d67" }
+version = "0.0.4"
+source = { git = "https://github.com/jejjohnson/geophysix?tag=v0.0.4#aed2dab2815a32fb24be446ba4a570aab746935a" }
 dependencies = [
     { name = "numpy" },
 ]
@@ -2536,6 +2545,16 @@ wheels = [
 ]
 
 [[package]]
+name = "radiomax"
+version = "0.0.5"
+source = { git = "https://github.com/jejjohnson/radiomax?tag=v0.0.5#6ec036239ac35f799b23a54e1f1ce86d11ebed3f" }
+dependencies = [
+    { name = "array-api-compat" },
+    { name = "geophysix" },
+    { name = "numpy" },
+]
+
+[[package]]
 name = "radtrax"
 version = "0.1.0"
 source = { editable = "." }
@@ -2553,6 +2572,7 @@ dependencies = [
     { name = "netcdf4" },
     { name = "numpy" },
     { name = "optimistix" },
+    { name = "radiomax" },
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "xarray" },
@@ -2607,7 +2627,7 @@ requires-dist = [
     { name = "equinox", specifier = ">=0.13" },
     { name = "gaussx", git = "https://github.com/jejjohnson/gaussx?rev=v0.6.12" },
     { name = "geonnax", git = "https://github.com/jejjohnson/geonnax?tag=v0.0.9" },
-    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix.git?tag=v0.0.3" },
+    { name = "geophysix", git = "https://github.com/jejjohnson/geophysix?tag=v0.0.4" },
     { name = "georeader-spaceml", marker = "extra == 'geo'", specifier = ">=2.4.1" },
     { name = "geotoolz-ops", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/geotoolz?subdirectory=packages%2Fgeotoolz-ops&rev=df8c228090b675365abd3fe272890f6a055434c6" },
     { name = "hitran-api", marker = "extra == 'hitran'" },
@@ -2620,6 +2640,7 @@ requires-dist = [
     { name = "openpyxl", marker = "extra == 'geo'", specifier = ">=3.1" },
     { name = "optimistix", specifier = ">=0.1" },
     { name = "pipekit-ops", marker = "extra == 'geo'", git = "https://github.com/jejjohnson/pipekit?subdirectory=packages%2Fpipekit-ops&tag=pipekit-ops-v0.2.1" },
+    { name = "radiomax", git = "https://github.com/jejjohnson/radiomax?tag=v0.0.5" },
     { name = "scikit-learn", specifier = ">=1.3" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "tqdm", marker = "extra == 'geo'", specifier = ">=4" },
