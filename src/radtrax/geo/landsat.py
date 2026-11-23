@@ -46,6 +46,8 @@ from typing import Any
 import equinox as eqx
 import numpy as np
 from jaxtyping import ArrayLike, Float, Real
+from radiomax.geometry import relative_azimuth
+from radiomax.radiometry import counts_to_radiance
 
 from radtrax.atmosphere.geometry import ViewingGeometry
 from radtrax.exceptions import (
@@ -376,7 +378,8 @@ def landsat_radiance(
         )
     shape = (-1,) + (1,) * (q.ndim - 1)
     q = q.astype(float)
-    radiance = np.where(q == 0.0, 0.0, m.reshape(shape) * q + a.reshape(shape))
+    radiance = counts_to_radiance(q, m.reshape(shape), a.reshape(shape))
+    radiance = np.where(q == 0.0, 0.0, radiance)
     if hasattr(dn, "transform") and hasattr(dn, "crs"):  # a GeoTensor
         from georeader.geotensor import GeoTensor
 
@@ -450,7 +453,7 @@ def _geometry_from_degrees(
 ) -> ViewingGeometry:
     """A ``ViewingGeometry`` per pixel from four angle grids [deg], ``(H, W)``.
 
-    The relative azimuth is ``arccos(cos(vaa − saa))`` in ``[0°, 180°]``;
+    The relative azimuth is ``vaa − saa`` folded to ``[0°, 180°]``;
     shared by :func:`landsat_geometry` and
     :func:`radtrax.geo.ecostress_geometry`.
     """
@@ -459,7 +462,7 @@ def _geometry_from_degrees(
             f"{caller}: the angle bands differ in shape "
             f"{[x.shape for x in (sza, saa, vza, vaa)]}."
         )
-    raa = np.rad2deg(np.arccos(np.cos(np.deg2rad(vaa - saa))))
+    raa = relative_azimuth(vaa, saa)
     from_angles = eqx.filter_vmap(eqx.filter_vmap(ViewingGeometry.from_angles))
     return from_angles(sza, vza, raa)
 

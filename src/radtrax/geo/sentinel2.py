@@ -40,6 +40,8 @@ from typing import Any
 import equinox as eqx
 import numpy as np
 from jaxtyping import ArrayLike, Float
+from radiomax.geometry import relative_azimuth
+from radiomax.radiometry import radiance_from_reflectance
 
 from radtrax.atmosphere.geometry import ViewingGeometry
 from radtrax.exceptions import GridError, MissingExtraError, MissingKeyError
@@ -199,7 +201,9 @@ def sentinel2_radiance(image: Any, bands: Sequence[str] = ("B11", "B12")) -> Any
     e_b = np.array([irradiance[b] for b in sub.bands])[:, None, None]  # (B, 1, 1)
     image.read_metadata_tl()
     sza = _on_grid(image, image.sza, dn)  # (H, W) [deg]
-    radiance = rho * e_b * sub.scale_factor_U() * np.cos(np.deg2rad(sza)) / np.pi
+    # U = 1/d²
+    distance = 1.0 / np.sqrt(sub.scale_factor_U())
+    radiance = radiance_from_reflectance(rho, e_b, sza, distance)
     return GeoTensor(
         radiance,
         transform=dn.transform,
@@ -245,14 +249,15 @@ def _on_grid(image: Any, angle: Any, like: Any) -> np.ndarray:
 
 
 def _relative_azimuth(image: Any, band: str) -> Any:
-    """``φ = arccos(cos(φ_v − φ_s))`` [deg] on the tie points, a GeoTensor."""
+    """``φ_v − φ_s`` folded to [0°, 180°] on the tie points, a GeoTensor."""
     vaa, saa = image.vaa[band], image.saa
     if vaa.shape != saa.shape or vaa.transform != saa.transform:
         raise GridError(
             "sentinel2_geometry: the view and sun azimuth grids differ "
             f"({vaa.shape} against {saa.shape})."
         )
-    dphi = np.deg2rad(np.asarray(vaa.values, float) - np.asarray(saa.values, float))
     return _georeader().GeoTensor(
-        np.rad2deg(np.arccos(np.cos(dphi))), transform=saa.transform, crs=saa.crs
+        relative_azimuth(np.asarray(vaa.values, float), np.asarray(saa.values, float)),
+        transform=saa.transform,
+        crs=saa.crs,
     )
