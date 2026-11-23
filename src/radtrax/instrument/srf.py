@@ -40,6 +40,12 @@ from typing import Literal
 
 import numpy as np
 from jaxtyping import ArrayLike, Float
+from radiomax.radiometry import (
+    box_response,
+    gaussian_response,
+    trapezoid_weights,
+    triangle_response,
+)
 
 from radtrax.exceptions import (
     DegenerateInputError,
@@ -63,30 +69,6 @@ FWHM_PER_SIGMA: float = 2.0 * math.sqrt(2.0 * math.log(2.0))
 
 
 SRFType = Literal["gaussian", "rectangular", "triangular", "custom"]
-
-
-def _bin_widths(samples: np.ndarray) -> np.ndarray:
-    """Trapezoidal quadrature weights for (possibly non-uniform) 1-D samples.
-
-    Each interior sample gets half of each neighbouring interval and the
-    endpoints get a single half-interval — the standard trapezoidal-rule
-    weights. Works for ascending or descending grids (e.g. wavelengths from
-    ``1e7 / nu``); a single-sample grid falls back to unit weight.
-    """
-    s = np.asarray(samples, dtype=float)
-    if s.size < 2:
-        return np.ones_like(s)
-    # Each interval contributes half its width to the sample on either side, so
-    # interior samples get half of both neighbouring intervals and the endpoints
-    # get a single half-interval — the exact trapezoidal-rule weights. (Unlike
-    # ``np.gradient``, which gives the endpoints a full interval and would
-    # over-weight an SRF with response at the grid edge by 2×.) ``abs`` makes
-    # the result independent of ascending/descending sample order.
-    half = np.abs(np.diff(s)) / 2.0
-    widths = np.zeros_like(s)
-    widths[:-1] += half
-    widths[1:] += half
-    return widths
 
 
 @dataclass
@@ -172,8 +154,9 @@ class SpectralResponseFunction:
         # ``1e7 / nu`` — otherwise the densely-sampled side of each band is
         # over-weighted. On a uniform grid the widths are constant and cancel in
         # the row normalisation below, leaving the matrix unchanged.
-        widths = _bin_widths(np.asarray(self.wavelengths_hr_nm, dtype=float))
-        mat = mat * widths[None, :]
+        # (A grid of one sample has no width, and its weight cancels.)
+        if self.n_lambda > 1:
+            mat = mat * trapezoid_weights(self.wavelengths_hr_nm)
 
         # L1-normalise each band so a flat input gives a flat output.
         row_sums = mat.sum(axis=1, keepdims=True)
@@ -201,18 +184,13 @@ class SpectralResponseFunction:
 
     def _build_parametric_matrix(self) -> np.ndarray:
         """Build the ``(n_bands, n_lambda)`` SRF matrix for a parametric shape."""
-        wl = self.wavelengths_hr_nm[None, :]  # (1, n_lambda)
-        centers = self.band_centers_nm[:, None]  # (n_bands, 1)
-        widths = self.band_widths_nm[:, None]  # (n_bands, 1)
-        dwl = wl - centers
-
+        bands = (self.wavelengths_hr_nm, self.band_centers_nm, self.band_widths_nm)
         if self.srf_type == "gaussian":
-            sigma = widths / FWHM_PER_SIGMA
-            return np.exp(-(dwl**2) / (2.0 * sigma**2))
+            return gaussian_response(*bands)
         if self.srf_type == "rectangular":
-            return (np.abs(dwl) <= widths / 2.0).astype(float)
+            return box_response(*bands)
         if self.srf_type == "triangular":
-            return np.maximum(0.0, 1.0 - np.abs(dwl) / (widths / 2.0))
+            return triangle_response(*bands)
         raise AssertionError(f"unreachable srf_type {self.srf_type!r}")
 
     # ── linear operator ──────────────────────────────────────────────────────
