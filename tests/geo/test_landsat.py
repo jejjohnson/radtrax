@@ -71,16 +71,25 @@ def test_bundled_table_holds_oli_and_tirs_of_both_satellites() -> None:
     assert table["L9", "B11"][0][[0, -1]].tolist() == [11000.0, 13000.0]
 
 
+def _piecewise_mean(wl: np.ndarray, r: np.ndarray, f: np.ndarray) -> float:
+    """``∫ R f dλ / ∫ R dλ`` with both linear between the points of ``wl``."""
+    r0, r1, f0, f1, h = r[:-1], r[1:], f[:-1], f[1:], np.diff(wl)
+    top = (h * (2.0 * r0 * f0 + r0 * f1 + r1 * f0 + 2.0 * r1 * f1)).sum() / 6.0
+    return float(top / (h * (r0 + r1)).sum() * 2.0)
+
+
 @pytest.mark.parametrize("satellite", ["L8", "L9"])
 def test_srf_on_its_own_grid_is_the_rsr_weighted_mean(satellite: str) -> None:
-    """On the 1 nm table grid, band integration is ``Σ R L / Σ R``."""
+    """On the 1 nm table grid, band integration is ``∫ R L / ∫ R``, both linear
+    between its points; the negative tails of the published RSRs count as 0."""
     srf = landsat_srf(satellite)
     wl = srf.wavelengths_hr_nm
     spectrum = 1.0 + 0.2 * np.sin(wl / 17.0)
     for b, name in enumerate(("B6", "B7")):
         wl_b, r_b = _bundled()[satellite, name]
-        on = np.searchsorted(wl, wl_b)
-        expected = (r_b * spectrum[on]).sum() / r_b.sum()
+        r = np.zeros_like(wl)
+        r[np.searchsorted(wl, wl_b)] = np.maximum(r_b, 0.0)
+        expected = _piecewise_mean(wl, r, spectrum)
         np.testing.assert_allclose(srf.apply(spectrum)[b], expected, rtol=1e-12)
 
 
@@ -381,7 +390,7 @@ def _slope(instrument: BandInstrument, t_k: float) -> np.ndarray:
 def test_tirs_responses_are_piecewise_linear_between_the_samples(
     satellite: str,
 ) -> None:
-    """On the 1 nm grid, B10's band average is Σ R L / Σ R with R
+    """On the 1 nm grid, B10's band average is ∫ R L / ∫ R with R
     interpolated linearly between the 50 nm samples (rounding, 1e-12)."""
     srf = landsat_srf(satellite, bands=("B10",))
     wl = srf.wavelengths_hr_nm
@@ -389,7 +398,7 @@ def test_tirs_responses_are_piecewise_linear_between_the_samples(
     wl_b, r_b = _bundled()[satellite, "B10"]
     r = np.interp(wl, wl_b, r_b, left=0.0, right=0.0)
     np.testing.assert_allclose(
-        srf.apply(spectrum)[0], (r * spectrum).sum() / r.sum(), rtol=1e-12
+        srf.apply(spectrum)[0], _piecewise_mean(wl, r, spectrum), rtol=1e-12
     )
 
 

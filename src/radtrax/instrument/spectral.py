@@ -57,10 +57,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jaxtyping import Array, ArrayLike, Float
+from radiomax.radiometry import gaussian_response, sampled_response_matrix
 from radiomax.thermal import to_per_um
 
 from radtrax.exceptions import GridError, ParameterError, ShapeError
-from radtrax.instrument.srf import FWHM_PER_SIGMA, SpectralResponseFunction
+from radtrax.instrument.srf import SpectralResponseFunction
 
 
 __all__ = ["BandInstrument", "GaussianInstrument", "Instrument"]
@@ -343,21 +344,16 @@ class GaussianInstrument(Instrument):
     def response(self) -> Float[Array, "B G"]:
         """The shifted, trapezoid-weighted response, each row summing to 1, ``(B, G)``."""
         wavelength_nm = 1e7 / (self.nu_cm - self.shift_cm) - self.shift_nm  # (G,)
-        sigma = self.fwhm_nm[:, None] / FWHM_PER_SIGMA  # (B, 1)
-        f = jnp.exp(-((wavelength_nm - self.center_nm[:, None]) ** 2) / (2 * sigma**2))
+        f = gaussian_response(wavelength_nm, self.center_nm, self.fwhm_nm)  # (B, G)
         # Trapezoidal weights on the (unshifted) wavelengths, as the NumPy SRF.
-        half = jnp.abs(jnp.diff(1e7 / self.nu_cm)) / 2  # (G − 1,)
-        weights = jnp.pad(half, (0, 1)) + jnp.pad(half, (1, 0))  # (G,)
-        weighted = f * weights
-        total = jnp.sum(weighted, axis=1, keepdims=True)  # (B, 1)
-        # A band shifted off the grid has no response left: fail loudly (also
-        # under jit), as the NumPy SRF does, rather than return 0/0.
-        total = eqx.error_if(
-            total,
-            jnp.any(total <= 0),
+        matrix = sampled_response_matrix(f, 1e7 / self.nu_cm)
+        # A band shifted off the grid has no response left and is a row of NaN:
+        # fail loudly (also under jit), as the NumPy SRF does.
+        return eqx.error_if(
+            matrix,
+            jnp.any(jnp.isnan(matrix)),
             "GaussianInstrument: a band has no response on the grid.",
         )
-        return weighted / total
 
     def __call__(self, radiance: Float[ArrayLike, " G"]) -> Float[Array, " B"]:
         return self.response() @ jnp.asarray(radiance)

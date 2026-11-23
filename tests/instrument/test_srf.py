@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from radtrax.instrument.srf import SpectralResponseFunction, _bin_widths
+from radtrax.instrument.srf import SpectralResponseFunction
 
 
 def _make_srf(srf_type: str = "gaussian") -> SpectralResponseFunction:
@@ -132,29 +132,7 @@ def test_nonuniform_grid_matches_trapezoidal_quadrature():
     )
 
 
-def test_bin_widths_are_trapezoidal_with_half_endpoints():
-    # Uniform grid: interior weights = spacing d, endpoints = d/2 (half), and
-    # the total equals the full integration span (n-1)*d, not n*d.
-    d = 2.5
-    s = np.arange(6) * d
-    w = _bin_widths(s)
-    assert w[0] == pytest.approx(d / 2.0)
-    assert w[-1] == pytest.approx(d / 2.0)
-    np.testing.assert_allclose(w[1:-1], d)
-    assert w.sum() == pytest.approx((s.size - 1) * d)
-
-
-def test_bin_widths_handle_descending_and_nonuniform():
-    s = np.array([10.0, 7.0, 1.0])  # descending, non-uniform
-    w = _bin_widths(s)
-    # Endpoints: half of their single adjacent interval (|3|/2, |6|/2).
-    assert w[0] == pytest.approx(1.5)
-    assert w[-1] == pytest.approx(3.0)
-    assert w[1] == pytest.approx(1.5 + 3.0)
-    assert np.all(w > 0)
-
-
-def test_bin_widths_endpoint_response_not_overweighted():
+def test_the_endpoint_response_is_not_overweighted():
     # A custom SRF whose only support is the first sample must integrate to that
     # sample's value — the endpoint must not be double-weighted (the np.gradient
     # bug would inflate it). Row normalisation makes the band a pure passthrough

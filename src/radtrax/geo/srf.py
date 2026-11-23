@@ -15,9 +15,19 @@ from importlib import resources
 
 import numpy as np
 from jaxtyping import ArrayLike, Float
+from radiomax.radiometry import (
+    response_coverage,
+    response_matrix,
+    trapezoid_weights,
+)
 
-from radtrax.exceptions import GridError, MissingExtraError, MissingKeyError
-from radtrax.instrument.srf import SpectralResponseFunction, _bin_widths
+from radtrax.exceptions import (
+    DegenerateInputError,
+    GridError,
+    MissingExtraError,
+    MissingKeyError,
+)
+from radtrax.instrument.srf import SpectralResponseFunction
 
 
 __all__ = ["sentinel2_band_responses", "sentinel2_srf"]
@@ -34,40 +44,6 @@ def _read_srf_table(satellite: str):  # -> pandas.DataFrame
     return read_srf(satellite)
 
 
-def _hat_integrals(
-    values: np.ndarray, nodes: np.ndarray, grid: np.ndarray
-) -> np.ndarray:
-    """Sum node values onto the hat basis of an increasing ``grid``.
-
-    ``W[b, j] = Σ_k values[b, k] φ_j(nodes_k)`` with ``φ_j`` the
-    piecewise-linear interpolation basis on ``grid``: 1 at ``grid[j]``, 0 at
-    its neighbours. A node outside ``grid`` adds nothing. Each node touches
-    two grid points, so the cost is one pass over the nodes per band, not a
-    dense ``(grid.size, nodes.size)`` matrix.
-
-    Args:
-        values: ``(B, K)``.
-        nodes: ``(K,)``.
-        grid: ``(G,)``, strictly increasing, two points or more.
-
-    Returns:
-        ``W``, ``(B, G)``.
-    """
-    k = np.flatnonzero((nodes >= grid[0]) & (nodes <= grid[-1]))
-    j = np.searchsorted(grid, nodes[k], side="right") - 1
-    j = np.clip(j, 0, grid.size - 2)
-    t = (nodes[k] - grid[j]) / (grid[j + 1] - grid[j])
-    left = values[:, k] * (1.0 - t)
-    right = values[:, k] * t
-    return np.stack(
-        [
-            np.bincount(j, weights=lo, minlength=grid.size)
-            + np.bincount(j + 1, weights=hi, minlength=grid.size)
-            for lo, hi in zip(left, right, strict=True)
-        ]
-    )
-
-
 def sentinel2_srf(
     satellite: str = "S2A",
     *,
@@ -81,18 +57,17 @@ def sentinel2_srf(
     interpolating across a dropped gap would invent a response.
 
     The 1 nm responses are then *projected* onto ``wavelengths_hr_nm``, not
-    sampled at it. With ``φ_j`` the linear-interpolation (hat) basis on the
-    grid, band ``b``'s weight on grid point ``j`` is
-    ``W[b, j] = Σ_k w_k R_b(λ_k) φ_j(λ_k)``, the trapezoid rule over the
-    wavelengths ``λ_k`` of the table *and* of the grid together, with
-    ``R_b`` linear between table wavelengths. Band integration
+    sampled at it (`radiomax.radiometry.response_matrix`). With ``φ_j`` the
+    linear-interpolation (hat) basis on the grid, band ``b``'s weight on grid
+    point ``j`` is ``W[b, j] = ∫ R_b φ_j dλ``, the exact integral with ``R_b``
+    linear between table wavelengths. Band integration
     ``Σ_j W[b, j] L(λ_j) / Σ_j W[b, j]`` then reads the radiance between its
-    grid points as linear. The table's wavelengths keep every band's full
-    response on a coarse grid, where sampling loses most of a narrow band at
-    5–10 nm and a band can vanish entirely from about 25 nm. The grid's own
-    wavelengths give every point of a grid finer than 1 nm its weight, so a
-    line-by-line spectrum is integrated rather than read every 1 nm
-    (radtrax#322). On the table's own 1 nm grid the weights are the table.
+    grid points as linear. A coarse grid keeps every band's full response,
+    where sampling loses most of a narrow band at 5–10 nm and a band can
+    vanish entirely from about 25 nm; and every point of a grid finer than
+    1 nm has its weight, so a line-by-line spectrum is integrated rather than
+    read every 1 nm (radtrax#322). On the table's own 1 nm grid a weight is
+    ``(R_{j−1} + 4 R_j + R_{j+1}) / 6``, not ``R_j``.
 
     Args:
         satellite: ``"S2A"``, ``"S2B"`` or ``"S2C"``.
@@ -174,12 +149,6 @@ def _projected_srf(
     :func:`sentinel2_srf`, shared with :func:`radtrax.geo.landsat_srf`.
     ``grid`` is the full 1 nm grid, with zeros where a band was not measured;
     the responses fall to zero one table step beyond its ends.
-
-    Algorithm:
-        1. Take the nodes of the table and of ``wavelengths_hr_nm`` together.
-        2. Interpolate each response onto them and weight it by the trapezoid
-           rule of the nodes.
-        3. Sum onto the hat basis of ``wavelengths_hr_nm``.
     """
     wl = grid if wavelengths_hr_nm is None else np.asarray(wavelengths_hr_nm, float)
     if wl.ndim != 1 or wl.size < 2 or np.any(np.diff(wl) <= 0.0):
@@ -187,22 +156,11 @@ def _projected_srf(
             f"{caller}: `wavelengths_hr_nm` must be 1-D, strictly increasing, "
             "with at least two points."
         )
-    # --- nodes ---
-    # A zero one step beyond each end gives the end rows their full weight in
-    # the trapezoid rule, so on a coarse grid it is the sum over the table.
+    # The responses fall to zero one step beyond each end of the table.
     ends = (2.0 * grid[0] - grid[1], 2.0 * grid[-1] - grid[-2])
     table = np.concatenate([ends[:1], grid, ends[1:]])
     padded = np.pad(full, ((0, 0), (1, 1)))  # (B, N + 2)
-    inside = wl[(wl > table[0]) & (wl < table[-1])]
-    nodes = np.union1d(table, inside)
-    # --- weighted responses ---
-    # w_k R_b(λ_k)
-    at_nodes = np.stack([np.interp(nodes, table, r) for r in padded])
-    weighted = at_nodes * _bin_widths(nodes)
-    # --- projection ---
-    # W[b, j] = Σ_k w_k R_b(λ_k) φ_j(λ_k)
-    weights = _hat_integrals(weighted, nodes, wl)  # (B, len(wl))
-    covered = weights.sum(axis=1) / weighted.sum(axis=1)
+    covered = response_coverage(padded, table, wl)
     for name, frac in zip(names, covered, strict=True):
         if frac < 0.999:
             warnings.warn(
@@ -212,7 +170,15 @@ def _projected_srf(
                 UserWarning,
                 stacklevel=3,
             )
-    responses = weights / _bin_widths(wl)
+    if np.any(~(covered > 0.0)):
+        lost = [n for n, frac in zip(names, covered, strict=True) if not frac > 0.0]
+        raise DegenerateInputError(
+            f"{caller}: the grid [{wl[0]:g}, {wl[-1]:g}] nm holds no response of "
+            f"band(s) {lost}."
+        )
+    # A_bj = ∫ R_b φ_j dλ / ∫ R_b dλ, as a response per nm: SpectralResponseFunction
+    # multiplies by the same trapezoid widths.
+    responses = response_matrix(padded, table, wl) / trapezoid_weights(wl)
     centers = (full * grid).sum(axis=1) / full.sum(axis=1)
     widths = full.sum(axis=1) / full.max(axis=1)  # 1 nm spacing
     return SpectralResponseFunction(
