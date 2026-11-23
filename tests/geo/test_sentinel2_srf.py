@@ -65,21 +65,25 @@ def test_gaussian_srf_matches_georeader_to_1e10() -> None:
     np.testing.assert_allclose(ours, theirs, rtol=1e-10, atol=1e-15)
 
 
-def test_table_integration_matches_georeader_at_float32() -> None:
-    """The issue's gate for the agency table, at the precision georeader keeps.
+def test_table_integration_is_close_to_georeaders_node_sum() -> None:
+    """The issue's gate for the agency table, on a spectrum the grid resolves.
 
-    ``transform_to_srf`` writes float32, so 1e-10 cannot hold against it;
-    float32 resolves about 6e-8 relative, so the bound is 1e-6.
+    georeader sums over the table's wavelengths; the projection integrates the
+    product of two piecewise-linear functions (radtrax#327). On a 1 nm grid the
+    two differ by the spectrum's second difference over 6: 5.0e-5 here (measured), and up
+    to 1.1e-3 on white noise, where a 1 nm sample says nothing about the
+    spectrum between samples.
     """
     from georeader.readers.S2_SAFE_reader import read_srf
 
-    rng = np.random.default_rng(0)
-    cube = 1.0 + 0.5 * rng.random((GRID.size, 3, 4))  # (λ, H, W) radiance
+    cube = np.broadcast_to(
+        (1.0 + 0.3 * np.sin(GRID / 37.0))[:, None, None], (GRID.size, 2, 2)
+    )
     theirs = reflectance.transform_to_srf(
-        cube, read_srf("S2A"), list(GRID), epsilon_srf=0.0
+        np.array(cube), read_srf("S2A"), list(GRID), epsilon_srf=0.0
     )  # (bands, H, W)
     ours = sentinel2_srf("S2A", wavelengths_hr_nm=GRID).apply(np.moveaxis(cube, 0, -1))
-    np.testing.assert_allclose(np.moveaxis(ours, -1, 0), theirs, rtol=1e-6)
+    np.testing.assert_allclose(np.moveaxis(ours, -1, 0), theirs, rtol=1e-4)
 
 
 def test_dropped_rows_are_zero_not_interpolated() -> None:
@@ -90,7 +94,8 @@ def test_dropped_rows_are_zero_not_interpolated() -> None:
 
     grid = np.arange(900.0, 1420.0, 0.5)
     srf = sentinel2_srf("S2A", wavelengths_hr_nm=grid, bands=("B09", "B10"))
-    gap = (grid >= 959.0) & (grid <= 1336.0)  # the dropped rows themselves
+    # inside the dropped rows; the response falls to 0 at their ends
+    gap = (grid > 959.0) & (grid < 1336.0)
     assert np.all(srf.custom_srfs[:, gap] == 0.0)
 
     table = read_srf("S2A")
@@ -140,42 +145,27 @@ def test_coarse_grids_keep_every_band(step: float, bound: float) -> None:
     np.testing.assert_allclose(values, reference, rtol=bound)
 
 
-def test_one_nm_grid_matches_the_table() -> None:
-    # On the table's own grid, projection is the identity: each band's matrix
-    # row is its 1 nm response, normalised (zero at both ends of GRID).
-    from georeader.readers.S2_SAFE_reader import read_srf
+def _exact_weights(table: np.ndarray, full: np.ndarray, grid: np.ndarray) -> np.ndarray:
+    """``∫ R_b φ_j dλ`` for a 1 nm ``table`` that holds every grid point, ``(B, G)``.
 
-    bands = ("B04", "B11")
-    table = read_srf("S2A")[list(bands)]
-    full = table.reindex(GRID, fill_value=0.0).to_numpy(float).T  # (2, len(GRID))
-    srf = sentinel2_srf("S2A", wavelengths_hr_nm=GRID, bands=bands)
-    np.testing.assert_allclose(
-        srf.matrix, full / full.sum(axis=1, keepdims=True), rtol=1e-12, atol=1e-15
-    )
-
-
-def _node_sum_weights(
-    table: np.ndarray, full: np.ndarray, grid: np.ndarray
-) -> np.ndarray:
-    """``Σ_k R_b(λ_k) φ_j(λ_k)`` over the table's wavelengths, ``(B, G)``."""
+    Over each nm both factors are linear, with end values ``R₀, R₁`` and
+    ``φ₀, φ₁``: ``(2 R₀ φ₀ + R₀ φ₁ + R₁ φ₀ + 2 R₁ φ₁) / 6``.
+    """
     hats = np.stack([np.interp(table, grid, e, 0.0, 0.0) for e in np.eye(grid.size)])
-    return full @ hats.T
+    r0, r1, h0, h1 = full[:, :-1], full[:, 1:], hats[:, :-1], hats[:, 1:]
+    return (2.0 * r0 @ h0.T + r0 @ h1.T + r1 @ h0.T + 2.0 * r1 @ h1.T) / 6.0
 
 
 @pytest.mark.parametrize("step", [1.0, 5.0, 25.0])
-def test_grids_of_table_wavelengths_keep_the_node_sum(step: float) -> None:
-    # A grid made of table wavelengths adds no node, so the trapezoid rule
-    # over both is the plain sum over the 1 nm table, as before radtrax#322.
+def test_grids_of_table_wavelengths_hold_the_exact_integral(step: float) -> None:
     from georeader.readers.S2_SAFE_reader import read_srf
 
     grid = np.arange(400.0, 2351.0, step)
-    table = read_srf("S2A")
-    wl = np.arange(table.index[0], table.index[-1] + 1.0)
-    full = table.reindex(wl, fill_value=0.0).to_numpy(float).T
-    weights = _node_sum_weights(wl, full, grid)
+    full = read_srf("S2A").reindex(GRID, fill_value=0.0).to_numpy(float).T
+    weights = _exact_weights(GRID, full, grid)
     expected = weights / weights.sum(axis=1, keepdims=True)
     srf = sentinel2_srf("S2A", wavelengths_hr_nm=grid)
-    np.testing.assert_allclose(srf.matrix, expected, rtol=1e-12, atol=1e-15)
+    np.testing.assert_allclose(srf.matrix, expected, rtol=1e-11, atol=1e-15)
 
 
 @pytest.mark.parametrize("step", [0.01, 0.05, 0.3])

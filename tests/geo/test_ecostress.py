@@ -89,8 +89,15 @@ def test_bundled_table_holds_the_five_bands_as_published() -> None:
     assert table["B5"][0][-1] == 893.687 and table["B5"][1][-1] == 0.0012
 
 
+def _piecewise_mean(wl: np.ndarray, r: np.ndarray, f: np.ndarray) -> float:
+    """``∫ R f dλ / ∫ R dλ`` with both linear between the points of ``wl``."""
+    r0, r1, f0, f1, h = r[:-1], r[1:], f[:-1], f[1:], np.diff(wl)
+    top = (h * (2.0 * r0 * f0 + r0 * f1 + r1 * f0 + 2.0 * r1 * f1)).sum() / 6.0
+    return float(top / (h * (r0 + r1)).sum() * 2.0)
+
+
 def test_srf_on_its_own_grid_is_the_piecewise_linear_weighted_mean() -> None:
-    """On the 1 nm grid, a band average is Σ S L / Σ S with S linear in
+    """On the 1 nm grid, a band average is ∫ S L / ∫ S with S linear in
     wavelength between the published samples (rounding, 1e-12)."""
     srf = ecostress_srf()
     wl = srf.wavelengths_hr_nm
@@ -99,7 +106,7 @@ def test_srf_on_its_own_grid_is_the_piecewise_linear_weighted_mean() -> None:
         nu, r_b = _bundled()[name]
         s = np.interp(wl, 1e7 / nu[::-1], r_b[::-1], left=0.0, right=0.0)
         np.testing.assert_allclose(
-            srf.apply(spectrum)[b], (s * spectrum).sum() / s.sum(), rtol=1e-12
+            srf.apply(spectrum)[b], _piecewise_mean(wl, s, spectrum), rtol=1e-12
         )
 
 
