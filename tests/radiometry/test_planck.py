@@ -1,4 +1,8 @@
-"""The Planck radiance in wavenumber, its derivatives and unit views (radtrax#247)."""
+"""radiomax's Planck radiance does what radtrax needs of it (radtrax#247, #324).
+
+The values, limits, derivatives and dtypes that radtrax's own Planck function
+was held to before radiomax took it over.
+"""
 
 from __future__ import annotations
 
@@ -9,10 +13,8 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
-
-from radtrax.radiometry import (
-    C1_W_M2_SR_CM4 as C1,
-    C2_CM_K as C2,
+from geophysix.constants import STANDARD
+from radiomax.thermal import (
     from_per_ghz,
     from_per_um,
     log_planck_radiance,
@@ -20,6 +22,11 @@ from radtrax.radiometry import (
     to_per_ghz,
     to_per_um,
 )
+
+
+#: c₁ = 2hc² [W m⁻² sr⁻¹ cm⁴] and c₂ = hc/k [cm K].
+C1 = 2.0 * STANDARD.planck * STANDARD.speed_of_light**2 * 1e8
+C2 = STANDARD.planck * STANDARD.speed_of_light / STANDARD.boltzmann * 1e2
 
 
 #: The design range, 0.4–15 µm × 150–2500 K, on a 64 × 64 grid.
@@ -43,11 +50,6 @@ def _grads(
     f: Callable[[jax.Array, jax.Array], jax.Array], nu: jax.Array, t: jax.Array
 ) -> tuple[jax.Array, jax.Array]:
     return jax.vmap(jax.grad(f, argnums=(0, 1)))(nu, t)
-
-
-def _bracket_scale(nu: jax.Array, t: jax.Array) -> jax.Array:
-    """|3/ν̃| + |c₂/(T(1 − e^{−x}))|, the scale of ∂lnB/∂ν̃'s two terms."""
-    return 3.0 / nu + C2 / (t * -jnp.expm1(-C2 * nu / t))
 
 
 @pytest.mark.parametrize(
@@ -95,23 +97,6 @@ def test_per_um_reference_values() -> None:
     db_um = to_per_um(jax.grad(planck_radiance, argnums=1)(nu, 300.0), nu)
     np.testing.assert_allclose(b_um, 9.622663, rtol=5e-7)
     np.testing.assert_allclose(db_um, 1.428845e-1, rtol=5e-7)
-
-
-def test_custom_jvp_equals_plain_autodiff_over_the_design_grid() -> None:
-    dnu, dt = _grads(planck_radiance, NU, T)
-    dnu_ref, dt_ref = _grads(_plain, NU, T)
-    np.testing.assert_allclose(dt, dt_ref, rtol=1e-12)
-    # ∂B/∂ν̃ = B (3/ν̃ − c₂/(T(1 − e^{−x}))) crosses 0 at the Wien peak, so it is
-    # compared on the scale of its two terms, not relative to itself.
-    scale = planck_radiance(NU, T) * _bracket_scale(NU, T)
-    assert np.all(np.abs(dnu - dnu_ref) <= 1e-12 * scale)
-
-
-def test_log_custom_jvp_equals_plain_autodiff_over_the_design_grid() -> None:
-    dnu, dt = _grads(log_planck_radiance, NU, T)
-    dnu_ref, dt_ref = _grads(_plain_log, NU, T)
-    np.testing.assert_allclose(dt, dt_ref, rtol=1e-12)
-    assert np.all(np.abs(dnu - dnu_ref) <= 1e-12 * _bracket_scale(NU, T))
 
 
 @pytest.mark.parametrize(

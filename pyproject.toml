@@ -43,7 +43,9 @@ dependencies = [
     # Legendre polynomials for the spectral albedo (geonnax.basis).
     "geonnax>=0.0.9",
     # physical constants and the ideal-gas law.
-    "geophysix>=0.0.3",
+    "geophysix>=0.0.4",
+    # Planck's law, observation geometry, BRDF kernels and response matrices.
+    "radiomax>=0.0.5",
     "numpy>=2.0",
     "xarray",
     # backs the compressed-NetCDF round-trip of the cross-section tables.
@@ -79,7 +81,7 @@ bayes = []
 Repository = "https://github.com/jejjohnson/radtrax"
 Documentation = "https://jejjohnson.github.io/radtrax"
 
-# gaussx, argminax, geotoolz-ops and pipekit-ops are not on PyPI yet: resolve
+# gaussx, argminax, geotoolz-ops, radiomax and pipekit-ops are not on PyPI yet: resolve
 # them from git, as plumax does. geotoolz-ops and geotoolz-array (geoops on the
 # GeoArray carrier) are pinned to one geotoolz commit on main, df8c228, as in
 # plumax, until geotoolz tags them; functax is geoarray's own git dependency,
@@ -94,10 +96,11 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 argminax = { git = "https://github.com/jejjohnson/argminax", rev = "v0.0.4" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", rev = "v0.6.12" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
-geophysix = { git = "https://github.com/jejjohnson/geophysix.git", tag = "v0.0.3" }
+geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.4" }
 geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-ops" }
 geotoolz-array = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-array" }
 functax = { git = "https://github.com/jejjohnson/functax", tag = "v0.0.6" }
+radiomax = { git = "https://github.com/jejjohnson/radiomax", tag = "v0.0.5" }
 pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-ops-v0.2.1" }
 pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-ops-v0.2.1" }
 

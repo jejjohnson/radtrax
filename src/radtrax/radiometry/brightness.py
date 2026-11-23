@@ -1,16 +1,8 @@
-"""Brightness temperature: Planck inverted, per wavenumber and per band.
+"""Band Planck radiance, and the band brightness temperature that inverts it.
 
-The monochromatic brightness temperature is the closed-form inverse of
-`planck_radiance`,
-
-$$
-T_b(\\tilde\\nu, L) = \\frac{c_2 \\tilde\\nu}{\\ln(1 + c_1 \\tilde\\nu^3 / L)},
-$$
-
-evaluated through logs, $\\ln(1 + r) = \\mathrm{logaddexp}(0, \\ln r)$ with
-$\\ln r = \\ln c_1 + 3 \\ln \\tilde\\nu - \\ln L$, so that it stays finite in
-any precision; autodiff of that form gives
-$\\partial T_b / \\partial L = 1 / (\\partial B / \\partial T)|_{T_b}$.
+`radiomax.thermal` holds the monochromatic functions: the Planck radiance
+$B(\\tilde\\nu, T)$ and its closed-form inverse $T_b(\\tilde\\nu, L)$. This
+module holds what an instrument adds.
 
 An instrument is linear in radiance, $y = A L$ with $A$ its response matrix
 (`Instrument.response_matrix`, ``(B, G)``), so the band-integrated Planck
@@ -41,15 +33,13 @@ Shapes: ``G`` wavenumbers, ``B`` bands; ``*B`` means a scalar or ``(B,)``.
 
 from __future__ import annotations
 
-import math
 from typing import TYPE_CHECKING
 
 import jax.numpy as jnp
 import lineax as lx
 import optimistix as optx
 from jaxtyping import Array, ArrayLike, Float
-
-from radtrax.radiometry.planck import C1_W_M2_SR_CM4, C2_CM_K, planck_radiance
+from radiomax.thermal import brightness_temperature, planck_radiance
 
 
 if TYPE_CHECKING:  # instrument/noise.py imports this module (#249)
@@ -59,48 +49,7 @@ if TYPE_CHECKING:  # instrument/noise.py imports this module (#249)
 __all__ = [
     "band_brightness_temperature",
     "band_planck_radiance",
-    "brightness_temperature",
 ]
-
-_LOG_C1: float = math.log(C1_W_M2_SR_CM4)
-
-
-def brightness_temperature(
-    nu_cm: Float[ArrayLike, "*#shape"], radiance: Float[ArrayLike, "*#shape"]
-) -> Float[Array, "*#shape"]:
-    """Monochromatic brightness temperature [K], the inverse of `planck_radiance`.
-
-    $$
-    T_b = \\frac{c_2 \\tilde\\nu}{\\ln(1 + c_1 \\tilde\\nu^3 / L)},
-    $$
-
-    with $\\ln(1 + r)$ as $\\mathrm{logaddexp}(0, \\ln r)$, finite and accurate
-    from the Rayleigh–Jeans limit ($r \\to 0$) to the Wien limit
-    ($r \\to \\infty$). A non-positive radiance has no brightness temperature:
-    it gives NaN, through a double where, so the gradient elsewhere stays
-    finite.
-
-    Args:
-        nu_cm: Wavenumber $\\tilde\\nu$ [cm⁻¹], > 0.
-        radiance: $L$ [W m⁻² sr⁻¹ (cm⁻¹)⁻¹]; broadcasts against ``nu_cm``.
-
-    Returns:
-        $T_b$ [K], the broadcast shape of the inputs; NaN where $L \\le 0$.
-
-    Examples:
-        >>> from radtrax.radiometry import planck_radiance
-        >>> nu = 1e4 / 10.9
-        >>> round(float(brightness_temperature(nu, planck_radiance(nu, 300.0))), 9)
-        300.0
-    """
-    dtype = jnp.result_type(nu_cm, radiance, float)
-    nu = jnp.asarray(nu_cm, dtype)
-    radiance = jnp.asarray(radiance, dtype)
-    positive = radiance > 0
-    safe = jnp.where(positive, radiance, 1.0)
-    log_r = _LOG_C1 + 3.0 * jnp.log(nu) - jnp.log(safe)
-    t_b = C2_CM_K * nu / jnp.logaddexp(0.0, log_r)
-    return jnp.where(positive, t_b, jnp.nan)
 
 
 def band_planck_radiance(

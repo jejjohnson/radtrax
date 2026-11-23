@@ -10,7 +10,8 @@ values, computed by ``scripts/make_planck_oracle.py`` from ``ryplanck.py`` at
 NelisW/pyradi commit c7cfe9df96fdf0e6c258ee6fd624f62f19ebab06 (MIT licence at
 the root, BSD-3 per file); the file records the commit, the NumPy and SciPy
 versions and SciPy's (h, k, c). pyradi returns exitance M = πL, so every
-comparison multiplies radtrax's radiance by π.
+comparison multiplies the radiance by π. The Planck function is radiomax's
+(radtrax#324).
 """
 
 from __future__ import annotations
@@ -27,19 +28,14 @@ import jax.numpy as jnp
 import numpy as np
 import optimistix as optx
 import pytest
+from geophysix.constants import STANDARD
+from radiomax.thermal import planck_radiance, to_per_ghz, to_per_um
 
-from radtrax.atmosphere.gas import BOLTZMANN_J_PER_K
-from radtrax.radiometry import (
-    C1_W_M2_SR_CM4,
-    C2_CM_K,
-    PLANCK_J_S,
-    SPEED_OF_LIGHT_M_PER_S,
-    STEFAN_BOLTZMANN_W_M2_K4,
-    planck_radiance,
-    to_per_ghz,
-    to_per_um,
-)
 
+H, C, K = STANDARD.planck, STANDARD.speed_of_light, STANDARD.boltzmann
+#: c₂ = hc/k [cm K] and σ = 2π⁵k⁴/(15h³c²) [W m⁻² K⁻⁴].
+C2_CM_K = H * C / K * 1e2
+STEFAN_BOLTZMANN_W_M2_K4 = 2.0 * math.pi**5 * K**4 / (15.0 * H**3 * C**2)
 
 ROOT = Path(__file__).resolve().parents[2]
 ORACLE = ROOT / "tests" / "data" / "planck_pyradi_c7cfe9d.npz"
@@ -57,9 +53,7 @@ def oracle() -> dict[str, np.ndarray]:
 
 
 def test_constants_from_si_2019() -> None:
-    h, c, k = PLANCK_J_S, SPEED_OF_LIGHT_M_PER_S, BOLTZMANN_J_PER_K
-    assert (h, c, k) == (6.62607015e-34, 299792458.0, 1.380649e-23)
-    np.testing.assert_allclose(C1_W_M2_SR_CM4, 1.1910429723971885e-8, rtol=1e-15)
+    assert (H, C, K) == (6.62607015e-34, 299792458.0, 1.380649e-23)
     np.testing.assert_allclose(C2_CM_K, 1.4387768775039338, rtol=1e-15)
     # CODATA's σ = 5.670374419e-8 W m⁻² K⁻⁴ is exact to its 10 digits.
     np.testing.assert_allclose(STEFAN_BOLTZMANN_W_M2_K4, 5.670374419e-8, rtol=1e-10)
@@ -67,7 +61,7 @@ def test_constants_from_si_2019() -> None:
 
 def test_oracle_used_the_same_constants(oracle: dict[str, np.ndarray]) -> None:
     h, k, c = oracle["scipy_h_k_c"]
-    assert (h, k, c) == (PLANCK_J_S, BOLTZMANN_J_PER_K, SPEED_OF_LIGHT_M_PER_S)
+    assert (h, k, c) == (H, K, C)
     assert str(oracle["commit"]) == "c7cfe9df96fdf0e6c258ee6fd624f62f19ebab06"
 
 

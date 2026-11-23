@@ -247,7 +247,10 @@ class NEdTNoise(NoiseModel):
             (t_k,),
             (jnp.ones_like(t_k),),
         )
-        return slope
+        # a band without a temperature has no slope either: radiomax's Planck
+        # function gives a NaN there with a derivative of 0, and a σ of 0
+        # would be an infinite weight
+        return jnp.where(jnp.isnan(t_k), jnp.nan, slope)
 
     def _temperature(self, y: Float[Array, " B"]) -> Float[Array, "*B"]:
         if self.mode == "reference":

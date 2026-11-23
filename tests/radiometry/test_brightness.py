@@ -10,14 +10,10 @@ import jax.numpy as jnp
 import numpy as np
 import pytest
 from _gradcheck import assert_gradients_match
+from radiomax.thermal import brightness_temperature, planck_radiance
 
 from radtrax.instrument import BandInstrument, GaussianInstrument
-from radtrax.radiometry import (
-    band_brightness_temperature,
-    band_planck_radiance,
-    brightness_temperature,
-    planck_radiance,
-)
+from radtrax.radiometry import band_brightness_temperature, band_planck_radiance
 
 
 NU_GRID = jnp.asarray(1e4 / np.geomspace(0.4, 15.0, 64))
