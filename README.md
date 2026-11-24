@@ -174,7 +174,8 @@ and `tests/test_dependency_rules.py` checks them here.
 ## Install
 
 The base install is JAX-only: JAX, Equinox, jaxtyping, lineax, optimistix,
-gaussx and geonnax, plus NumPy, xarray and scikit-learn for the matched
+gaussx, argminax, geonnax, geophysix and radiomax (with pipekit-array, their
+array backend), plus NumPy, SciPy, xarray and scikit-learn for the matched
 filter's backgrounds. The extras add the rest:
 
 | Extra | Adds | For |

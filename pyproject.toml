@@ -29,7 +29,8 @@ classifiers = [
     "Development Status :: 2 - Pre-Alpha",
 ]
 # The base install is JAX-only: geo carriers, table building and the Bayesian
-# retrievals arrive through extras (package-boundaries rule 3).
+# retrievals arrive through extras (package-boundaries rule 3). pipekit-array,
+# pure Python, comes with geophysix and radiomax as their array backend.
 dependencies = [
     "jax>=0.10",
     "jaxlib>=0.10",
@@ -43,9 +44,9 @@ dependencies = [
     # Legendre polynomials for the spectral albedo (geonnax.basis).
     "geonnax>=0.0.9",
     # physical constants and the ideal-gas law.
-    "geophysix>=0.0.4",
+    "geophysix>=0.0.7",
     # Planck's law, observation geometry, BRDF kernels and response matrices.
-    "radiomax>=0.0.5",
+    "radiomax>=0.0.9",
     "numpy>=2.0",
     "xarray",
     # backs the compressed-NetCDF round-trip of the cross-section tables.
@@ -70,7 +71,7 @@ geo = [
     "georeader-spaceml>=2.4.1",
     "geotoolz-ops>=0.18.1",
     "openpyxl>=3.1",
-    "pipekit-ops>=0.2.1",
+    "pipekit-ops>=0.2.3",
     "tqdm>=4",
     "typing-extensions>=4",
 ]
@@ -83,11 +84,13 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 
 # gaussx, argminax, geotoolz-ops, radiomax and pipekit-ops are not on PyPI yet: resolve
 # them from git, as plumax does. geotoolz-ops and geotoolz-array (geoops on the
-# GeoArray carrier) are pinned to one geotoolz commit on main, df8c228, as in
+# GeoArray carrier) are pinned to one geotoolz commit on main, a02cebc, as in
 # plumax, until geotoolz tags them; functax is geoarray's own git dependency,
 # at the tag geotoolz pins. Every pipekit package is pinned to the one tag
-# pipekit-ops-v0.2.1: per-package tags make uv report conflicting URLs for
-# pipekit-ops, which they all reference. argminax requires gaussx as
+# pipekit-array-v0.1.4: per-package tags make uv report conflicting URLs for
+# pipekit-ops, which they all reference. geophysix, radiomax and geotoolz pin
+# that tag too, and geotoolz these geophysix and radiomax tags, so the four
+# move together. argminax requires gaussx as
 # `git+https://github.com/jejjohnson/gaussx@v0.6.12`, and uv reads a `tag =`
 # source as a different URL from that, so both pin their tag with `rev =`.
 # A plain `pip install` reads only the PyPI-style
@@ -96,13 +99,13 @@ Documentation = "https://jejjohnson.github.io/radtrax"
 argminax = { git = "https://github.com/jejjohnson/argminax", rev = "v0.0.4" }
 gaussx = { git = "https://github.com/jejjohnson/gaussx", rev = "v0.6.12" }
 geonnax = { git = "https://github.com/jejjohnson/geonnax", tag = "v0.0.9" }
-geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.4" }
-geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-ops" }
-geotoolz-array = { git = "https://github.com/jejjohnson/geotoolz", rev = "df8c228090b675365abd3fe272890f6a055434c6", subdirectory = "packages/geotoolz-array" }
+geophysix = { git = "https://github.com/jejjohnson/geophysix", tag = "v0.0.7" }
+geotoolz-ops = { git = "https://github.com/jejjohnson/geotoolz", rev = "a02cebcbf1e57ff205507b8bd0f9687f6fc4184c", subdirectory = "packages/geotoolz-ops" }
+geotoolz-array = { git = "https://github.com/jejjohnson/geotoolz", rev = "a02cebcbf1e57ff205507b8bd0f9687f6fc4184c", subdirectory = "packages/geotoolz-array" }
 functax = { git = "https://github.com/jejjohnson/functax", tag = "v0.0.6" }
-radiomax = { git = "https://github.com/jejjohnson/radiomax", tag = "v0.0.5" }
-pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-ops-v0.2.1" }
-pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-ops-v0.2.1" }
+radiomax = { git = "https://github.com/jejjohnson/radiomax", tag = "v0.0.9" }
+pipekit-ops = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-ops", tag = "pipekit-array-v0.1.4" }
+pipekit-array = { git = "https://github.com/jejjohnson/pipekit", subdirectory = "packages/pipekit-array", tag = "pipekit-array-v0.1.4" }
 
 [dependency-groups]
 dev = [

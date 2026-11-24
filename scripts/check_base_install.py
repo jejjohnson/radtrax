@@ -4,7 +4,7 @@ Run with the interpreter of a fresh environment that has ``radtrax``
 installed without extras (``uv pip install .``); CI does exactly that in
 ``.github/workflows/base-install.yml``. The check fails if
 
-- a geo package (``georeader``, ``geotoolz``) or plumax is importable, so
+- a geo package (``georeader``, ``geoarray``, ``geoops``) or plumax is importable, so
   something in the base dependencies pulled it in; or
 - any radtrax module fails to import, so an optional dependency is imported
   at module level instead of inside the function that needs it. The modules
@@ -22,7 +22,7 @@ import sys
 
 #: Packages the base install must not contain (package-boundaries rule 3;
 #: plumax is above radtrax in the package graph).
-FORBIDDEN = ("georeader", "geoops", "geotoolz", "pipekit", "plumax")
+FORBIDDEN = ("georeader", "geoarray", "geoops", "geotoolz", "plumax")
 
 #: The only modules that may refuse to import in the base install, each with
 #: the extra its ImportError must name. Anything else that fails to import
