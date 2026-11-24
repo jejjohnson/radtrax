@@ -21,8 +21,10 @@ import sys
 
 
 #: Packages the base install must not contain (package-boundaries rule 3;
-#: plumax is above radtrax in the package graph).
-FORBIDDEN = ("georeader", "geoarray", "geoops", "geotoolz", "plumax")
+#: plumax is above radtrax in the package graph). ``pipekit`` is the umbrella of
+#: every pipekit package; ``pipekit_array`` and ``pipekit_ops`` alone are the
+#: array backend of geophysix and radiomax, and belong here.
+FORBIDDEN = ("georeader", "geoarray", "geoops", "geotoolz", "pipekit", "plumax")
 
 #: The only modules that may refuse to import in the base install, each with
 #: the extra its ImportError must name. Anything else that fails to import
