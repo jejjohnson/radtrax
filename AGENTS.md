@@ -65,7 +65,8 @@ GeoStack package graph gets a cycle.
   GeoModels tier, so neither may be imported.
 - **Geo carriers arrive through extras.** `radtrax[geo]` adds georeader
   (with the `openpyxl`, `tqdm` and `typing-extensions` it needs but does not
-  declare), geotoolz and pipekit-ops; the base install stays JAX-only. The
+  declare), geotoolz and pipekit-ops; the base install stays JAX-only, with
+  pipekit-array, pure Python, as the array backend of geophysix and radiomax. The
   dev group installs `radtrax[geo]`, so CI runs the geo tests. Code in `geo/` imports only
   public geotoolz names, never `geoops._src`.
 - **Optional dependencies are lazy.** Anything behind an extra (`hitran`,
