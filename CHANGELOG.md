@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/jejjohnson/radtrax/compare/v0.2.0...v0.2.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **deps:** radiomax v0.0.13, geophysix v0.0.10, geotoolz 543ad57 and the pipekit tag they share ([#336](https://github.com/jejjohnson/radtrax/issues/336)) ([f300f6b](https://github.com/jejjohnson/radtrax/commit/f300f6b7d150e1239226a6380e60c7a3b16f4dc8))
+
 ## [0.2.0](https://github.com/jejjohnson/radtrax/compare/v0.1.0...v0.2.0) (2026-11-24)
 
 
