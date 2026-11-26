@@ -178,7 +178,7 @@ def test_fit_transform_and_config() -> None:
 
 
 def test_matched_filter_satisfies_fittable_transformer() -> None:
-    from pipekit_ops.protocols import FittableTransformer
+    from pipekit_ops import FittableTransformer
 
     assert isinstance(rg.MatchedFilter(), FittableTransformer)
 
@@ -187,7 +187,7 @@ def test_first_call_fits_once_under_thread_map() -> None:
     import threading
     import time
 
-    from pipekit_ops.parallel import ThreadMap
+    from pipekit_ops import ThreadMap
 
     rng = np.random.default_rng(4)
     scenes = [rng.normal(loc=i, size=(2, 5, 5)) for i in range(8)]
